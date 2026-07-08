@@ -225,14 +225,34 @@ def articles_add():
 
 @app.get("/api/econ_calendar")
 def econ_calendar_list():
-    """Event HIGH/MED mendatang (dari hari ini), dengan countdown hari."""
+    """Event HIGH/MED, dari 7 hari lalu s.d. mendatang (dengan countdown hari).
+    Window 7-hari-lalu ikut disertakan supaya event yang barusan rilis (mis.
+    CPI kemarin) masih muncul buat diisi `actual`-nya secara manual --
+    ForexFactory tidak pernah menyediakan kolom ini (lihat
+    scrapers/econ_calendar.py)."""
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT * FROM econ_calendar WHERE event_date >= ? "
-            "AND importance IN ('HIGH','MED') ORDER BY event_date ASC LIMIT 30",
+            "SELECT * FROM econ_calendar WHERE event_date >= date(?, '-7 days') "
+            "AND importance IN ('HIGH','MED') ORDER BY event_date ASC LIMIT 40",
             (today_wib(),),
         ).fetchall()
     return jsonify(_rows_to_dicts(rows))
+
+
+@app.post("/api/econ_calendar/actual")
+def econ_calendar_set_actual():
+    """Isi manual `actual` (hasil rilis) untuk 1 event by id."""
+    body = request.get_json(force=True)
+    event_id = body.get("id")
+    actual = (body.get("actual") or "").strip()
+    if not event_id or not actual:
+        return jsonify({"error": "id dan actual wajib diisi"}), 400
+    with get_connection() as conn:
+        ok = writes.set_econ_actual(conn, event_id, actual)
+        conn.commit()
+    if not ok:
+        return jsonify({"error": "event tidak ditemukan"}), 404
+    return jsonify({"ok": True})
 
 
 @app.get("/api/policy")

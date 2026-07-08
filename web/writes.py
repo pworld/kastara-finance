@@ -35,6 +35,19 @@ def flag_key_trigger(conn: sqlite3.Connection, news_id: int, is_key: bool = True
     return True
 
 
+# ---------- Panel 3: Economic Calendar actual (manual, sumber tidak sediakan) ----------
+
+def set_econ_actual(conn: sqlite3.Connection, event_id: int, actual: str) -> bool:
+    """Update econ_calendar.actual by id. ForexFactory tidak pernah kasih
+    kolom ini (lihat scrapers/econ_calendar.py) -- diisi manual pas rilis
+    keluar. Return False kalau id tidak ada."""
+    exists = conn.execute("SELECT 1 FROM econ_calendar WHERE id = ?", (event_id,)).fetchone()
+    if not exists:
+        return False
+    conn.execute("UPDATE econ_calendar SET actual = ? WHERE id = ?", (actual, event_id))
+    return True
+
+
 # ---------- Panel 3: Policy Tracker (manual, independen Phase D) ----------
 
 def insert_policy_note(

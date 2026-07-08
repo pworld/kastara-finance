@@ -319,6 +319,18 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       (re-run backfill: 0 baris baru = cakupan sudah lengkap). Histori lebih
       panjang dari series ini **tidak tersedia gratis** — cuma lewat ICE Data
       langsung (berbayar), di luar scope "no paid API".
+- [x] ~~Panel 3 Economic Calendar: tampilkan forecast/previous + isi actual~~
+      — `forecast`/`previous` sebenarnya sudah discrape sejak awal tapi tidak
+      pernah ditampilkan; sekarang muncul sebagai kolom di tabel. `actual`
+      **tidak pernah** disediakan ForexFactory (dicek langsung ke raw JSON
+      endpoint — field itu tidak ada sama sekali di respons), jadi diisi
+      **manual** lewat dashboard: input inline + tombol "Simpan" per baris
+      (`POST /api/econ_calendar/actual`, `web/writes.py::set_econ_actual`),
+      berubah jadi tombol "Ubah" begitu terisi. Query `/api/econ_calendar`
+      juga diperluas dari "hari ini + mendatang" jadi "H-7 s.d. mendatang"
+      biar event yang baru rilis kemarin masih muncul untuk diisi actual-nya.
+      2 test baru (`test_web_writes.py`), diverifikasi live di browser +
+      query DB langsung.
 - [ ] Index/monitoring ukuran DB berkala saat volume bertambah (sanity check,
       bukan berarti perlu migrasi — lihat rationale SQLite di
       ARCHITECTURE.md).

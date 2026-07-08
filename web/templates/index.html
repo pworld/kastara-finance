@@ -254,7 +254,8 @@
         <h2>Economic Calendar</h2>
         <div class="panel">
           <table>
-            <thead><tr><th>Tanggal</th><th>Countdown</th><th>Event</th><th>Negara</th><th>Importance</th></tr></thead>
+            <thead><tr><th>Tanggal</th><th>Countdown</th><th>Event</th><th>Negara</th><th>Importance</th>
+              <th>Forecast</th><th>Previous</th><th>Actual</th></tr></thead>
             <tbody id="calBody"></tbody>
           </table>
         </div>
@@ -642,11 +643,37 @@ async function loadEconCalendar() {
   const now = new Date();
   $("#calBody").innerHTML = rows.map(r => {
     const days = Math.ceil((new Date(r.event_date) - now) / 86400000);
+    const actualCell = r.actual
+      ? `${r.actual} <button class="btn small secondary" data-act="edit-actual" data-id="${r.id}">Ubah</button>`
+      : `<input type="text" class="calActualInput" data-id="${r.id}" placeholder="isi setelah rilis" style="width:80px">
+         <button class="btn small secondary" data-act="save-actual" data-id="${r.id}">Simpan</button>`;
     return `<tr><td>${r.event_date}</td><td class="src">${days <= 0 ? "hari ini/lewat" : "H-" + days}</td>
       <td>${r.event_name}</td><td class="src">${r.country || "-"}</td>
-      <td><span class="badge ${r.importance}">${r.importance}</span></td></tr>`;
-  }).join("") || `<tr><td colspan="5" class="src">tidak ada event mendatang</td></tr>`;
+      <td><span class="badge ${r.importance}">${r.importance}</span></td>
+      <td class="src">${r.forecast || "-"}</td><td class="src">${r.previous || "-"}</td>
+      <td>${actualCell}</td></tr>`;
+  }).join("") || `<tr><td colspan="8" class="src">tidak ada event mendatang</td></tr>`;
 }
+$("#calBody").addEventListener("click", async (e) => {
+  const btn = e.target;
+  const id = btn.dataset.id;
+  if (!id) return;
+  if (btn.dataset.act === "edit-actual") {
+    const row = btn.closest("tr");
+    const cell = btn.closest("td");
+    cell.innerHTML = `<input type="text" class="calActualInput" data-id="${id}" style="width:80px">
+      <button class="btn small secondary" data-act="save-actual" data-id="${id}">Simpan</button>`;
+    return;
+  }
+  if (btn.dataset.act === "save-actual") {
+    const input = btn.closest("td").querySelector(".calActualInput");
+    const actual = input.value.trim();
+    if (!actual) { toast("Actual wajib diisi"); return; }
+    await postJSON("/api/econ_calendar/actual", { id: Number(id), actual });
+    toast("Actual tersimpan");
+    loadEconCalendar();
+  }
+});
 async function loadPolicyNotes() {
   const rows = await (await fetch("/api/policy?limit=15")).json();
   $("#policyBody").innerHTML = rows.map(r => `<tr>

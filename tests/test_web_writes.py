@@ -12,6 +12,7 @@ from web.writes import (
     save_reading_entry,
     save_synthesis,
     score_prediction,
+    set_econ_actual,
 )
 
 
@@ -50,6 +51,45 @@ def test_flag_key_trigger_unknown_id(tmp_path):
     init_db(db)
     with get_connection(db) as conn:
         assert flag_key_trigger(conn, 9999) is False
+
+
+# ---------- Economic Calendar actual ----------
+
+def _seed_econ_event(conn, **overrides):
+    defaults = {
+        "event_date": "2026-01-01", "event_time": "20:30", "event_name": "CPI m/m",
+        "country": "US", "importance": "HIGH", "forecast": "2.5%", "previous": "2.4%",
+        "actual": None,
+    }
+    defaults.update(overrides)
+    cur = conn.execute(
+        "INSERT INTO econ_calendar (event_date, event_time, event_name, country, "
+        "importance, forecast, previous, actual, created_at) VALUES (:event_date, "
+        ":event_time, :event_name, :country, :importance, :forecast, :previous, "
+        ":actual, '')",
+        defaults,
+    )
+    return cur.lastrowid
+
+
+def test_set_econ_actual_updates_value(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        eid = _seed_econ_event(conn)
+        conn.commit()
+        ok = set_econ_actual(conn, eid, "3%")
+        conn.commit()
+        assert ok is True
+        row = conn.execute("SELECT actual FROM econ_calendar WHERE id=?", (eid,)).fetchone()
+        assert row["actual"] == "3%"
+
+
+def test_set_econ_actual_unknown_id(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        assert set_econ_actual(conn, 9999, "3%") is False
 
 
 # ---------- Policy Tracker ----------
