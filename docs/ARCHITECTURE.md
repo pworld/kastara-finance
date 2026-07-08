@@ -34,7 +34,7 @@ Prinsip desain inti (dikunci sejak awal, lihat [plan.txt](../plan.txt)):
 | Layer | Pilihan | Alasan |
 |---|---|---|
 | Bahasa | Python 3.11+ (dijalankan di 3.14 lewat WSL) | Ekosistem data/scraping matang |
-| Database | SQLite (`kastara-finance.db`), mode **WAL** | Lihat [§6.1](#61-sqlite-vs-postgres-vs-nosql) |
+| Database | SQLite (`kastara-finance.db`), mode **DELETE** + `busy_timeout` | Lihat [§6.1](#61-sqlite-vs-postgres-vs-nosql) |
 | HTTP client | `requests` | Simpel, cukup untuk REST/JSON |
 | Data harga | `yfinance` | Gratis, no key, cakupan luas (ekuitas/FX/komoditas) |
 | Transform ringan | `pandas` | Dipakai seperlunya (agregasi OHLC), bukan ML |
@@ -205,9 +205,17 @@ harian.
 - Volume realistis: `asset_ohlcv` ≈ puluhan ribu baris untuk 5 tahun ×
   beberapa instrument; `daily_news` (paling gemuk) ≈ ratusan ribu baris.
   SQLite nyaman sampai jutaan baris.
-- Concurrency ditangani dengan **mode WAL** (`PRAGMA journal_mode=WAL`) +
-  `busy_timeout` — reader (dashboard, SQL client) dan writer (pipeline) bisa
-  jalan bersamaan tanpa `SQLITE_BUSY`.
+- Concurrency ditangani dengan **mode DELETE** (default SQLite, dipilih
+  sadar) + `busy_timeout=5000` — retry otomatis s/d 5 detik kalau ada lock
+  singkat, bukan langsung `SQLITE_BUSY`. Sempat pakai mode **WAL** untuk
+  tujuan yang sama, tapi WAL butuh shared-memory (`-shm`) yang **tidak
+  reliable lintas boundary Windows↔WSL** — kasus nyata: DBeaver di Windows
+  akses file lewat `\\wsl.localhost\...` (efektif network share/9P dari
+  sisi Windows) sementara pipeline jalan native di WSL; WAL malah bikin
+  `SQLITE_BUSY` yang sama, cuma ganti bentuk. DELETE + `busy_timeout` lebih
+  predictable untuk pola akses campuran begini. Tulisan kita (pipeline,
+  dashboard) singkat (<1 detik), jadi trade-off exclusive-lock saat commit
+  kecil.
 - **Trigger untuk pindah ke Postgres** (bukan sekarang): kalau dashboard
   perlu diakses banyak user concurrent, atau butuh banyak proses penulis
   bersamaan, atau butuh hosting cloud managed. Ini soal concurrency/deployment,
@@ -229,6 +237,15 @@ dengan path UNC Windows (`\\wsl.localhost\<distro>\...`) — misalnya hasil
 copy dari SQL client di sisi Windows. `db/connection.py` menerjemahkan path
 ini ke path native Linux yang menunjuk file yang sama, supaya tidak
 membuat file duplikat/sampah karena beda representasi path.
+
+**DB sengaja ditaruh di luar folder project** (`kastara-finance-data/`,
+sibling dari `kastara-finance/`), diatur lewat `KASTARA_DB_PATH` di `.env`.
+Alasannya: DB berubah tiap hari (pipeline/cron), kode tidak — memisahkan
+keduanya menghindarkan file data ikut ke-track/ke-commit git secara tidak
+sengaja (di luar proteksi `.gitignore` yang memang sudah ada juga). Semua
+resolusi path (`get_db_path()` / `_resolve_db_path()`) tetap satu-satunya
+sumber kebenaran lokasi DB — tidak ada path DB yang di-hardcode di modul
+lain (scrapers, pipeline, web).
 
 ### 6.4 Rule-based, bukan AI/LLM
 

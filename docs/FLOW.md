@@ -118,7 +118,7 @@ flowchart LR
     HTML -->|fetch JS| API3[/api/asset_ohlcv?instrument=X/]
     HTML -->|fetch JS| API4[/api/news?impact=Y/]
 
-    API1 --> DB[(kastara-finance.db\nmode WAL)]
+    API1 --> DB[(kastara-finance.db\nmode DELETE + busy_timeout)]
     API2 --> DB
     API3 --> DB
     API4 --> DB
@@ -130,8 +130,10 @@ flowchart LR
 - Dashboard **hanya membaca** (`SELECT`) — tidak ada endpoint yang menulis
   ke DB. Pipeline (dijalankan terpisah, manual/cron) tetap satu-satunya
   penulis.
-- Mode **WAL** memungkinkan dashboard membaca *saat* pipeline sedang menulis,
-  tanpa `SQLITE_BUSY`.
+- Mode **DELETE** + `busy_timeout=5000` (bukan WAL — lihat
+  [ARCHITECTURE.md §6.1](ARCHITECTURE.md#61-sqlite-vs-postgres-vs-nosql))
+  dipilih supaya akses lintas Windows↔WSL (mis. DBeaver) tetap predictable;
+  tulisan pipeline singkat jadi jarang benar-benar nabrak baca dashboard.
 - `/api/latest` mengurai `source_flags` JSON jadi struktur siap-render
   (dot indikator ok/fail/skip di UI).
 

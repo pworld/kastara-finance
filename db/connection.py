@@ -72,18 +72,27 @@ def get_db_path() -> Path:
 def get_connection(db_path: str | os.PathLike | None = None) -> sqlite3.Connection:
     """Buka koneksi SQLite dengan row_factory dict-like + foreign keys on.
 
-    - journal_mode=WAL: reader (mis. DBeaver/dashboard) dan writer (pipeline)
-      bisa jalan bareng tanpa saling ngunci -> hindari SQLITE_BUSY.
-    - busy_timeout=5000: kalau tetap ada lock singkat, tunggu s/d 5 detik
-      sebelum error, bukan langsung 'database is locked'.
+    - journal_mode=DELETE (default SQLite): dipilih SADAR, bukan lupa
+      di-set. Sempat pakai WAL, tapi WAL butuh shared-memory (-shm) yang
+      tidak reliable lintas boundary Windows<->WSL (mis. DBeaver di Windows
+      akses file lewat \\\\wsl.localhost\\... yang secara efektif network
+      share/9P dari sisi Windows) -> WAL malah bikin SQLITE_BUSY yang sama,
+      cuma ganti bentuk. DELETE mode + busy_timeout lebih predictable untuk
+      pola akses ini. Tulisan kita (pipeline/dashboard) singkat (<1 detik),
+      jadi trade-off exclusive-lock saat commit kecil.
+    - busy_timeout=5000: kalau ada lock singkat, TUNGGU s/d 5 detik dan
+      retry otomatis, bukan langsung error 'database is locked'. Ini cuma
+      berlaku untuk koneksi yang dibuka lewat get_connection() ini
+      (proses Python kita) -- client lain (DBeaver dll) yang connect
+      langsung ke file perlu set busy_timeout di driver-nya sendiri kalau
+      mau retry serupa.
     """
     path = Path(db_path) if db_path is not None else get_db_path()
     conn = sqlite3.connect(path, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute("PRAGMA busy_timeout = 5000;")
-    conn.execute("PRAGMA journal_mode = WAL;")
-    conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.execute("PRAGMA journal_mode = DELETE;")
     return conn
 
 

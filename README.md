@@ -29,7 +29,9 @@ itu Phase B+.
   - `scrapers/econ_calendar.py` — ForexFactory (event ekonomi masa depan:
     FOMC/CPI/dll), endpoint JSON gratis tidak resmi.
 - **Pipeline** `pipeline/run_daily.py` — orchestrator harian, idempotent (UPSERT).
-- **Backfill** `pipeline/backfill.py` — tarik data historis, preview-before-commit.
+- **Backfill** `pipeline/backfill.py` — tarik data historis (BTC/macro), preview-before-commit.
+- **Manual article** `pipeline/add_article.py` — isi `manual_articles` untuk riset
+  historis (RSS tidak bisa backfill — lihat [Artikel manual](#artikel-manual-riset-historis)).
 - **Indikator** `indicators/calc.py` — `net_liquidity`, `volume_ma20`.
 
 Semua scraper **tahan API-fail**: kalau satu source mati, ditandai `fail` di
@@ -89,6 +91,35 @@ Instrument yang didukung:
 Backfill selalu menampilkan **preview** (berapa baris baru, berapa duplikat
 di-skip) dan minta konfirmasi `[y/N]` sebelum menulis.
 
+Backfill itu bootstrap **sekali**, bukan job berulang — jangan taruh di cron
+yang sama dengan `run_daily`. Aman dipanggil back-to-back untuk banyak
+instrument sekaligus (yfinance/FRED balikin seluruh rentang tanggal dalam
+1 request, jumlah request tidak berubah walau rentang tahunnya lebih jauh,
+mis. dari 2010 vs dari 2021).
+
+### Artikel manual (riset historis)
+
+RSS (`scrapers/news.py`) cuma nampilin berita **terkini** — tidak ada cara
+narik headline lama (mis. dari 2010) dari RSS, itu keterbatasan struktural
+sumbernya, bukan sesuatu yang bisa di-backfill. Untuk riset historis, isi
+`manual_articles` manual:
+
+```bash
+# Tambah artikel yang kamu temukan/kurasi sendiri
+python -m pipeline.add_article add --date 2015-06-19 --source CNBC \
+    --url "https://..." --headline "Fed hints at rate hike" \
+    --notes "Titik balik penting buat DXY tahun itu" \
+    --tags fed,rate,dxy --key-event
+
+# Cari lagi buat riset nanti
+python -m pipeline.add_article list --tag dxy
+python -m pipeline.add_article list --from 2015-01-01 --to 2015-12-31
+python -m pipeline.add_article list --search "rate hike"
+```
+Kalau URL yang sama sudah pernah ditambah, tool cuma **kasih tahu** (bukan
+blok) lalu minta konfirmasi — re-visit artikel yang sama dengan catatan baru
+itu valid.
+
 ### Dashboard web (read-only)
 ```bash
 python -m web.app
@@ -109,12 +140,14 @@ python -m pytest -q
 
 ## 4. Skema data (ringkas)
 
-| Tabel | Diisi Phase A? | Isi |
+| Tabel | Diisi? | Isi |
 |---|---|---|
-| `daily_market` | ✅ | 1 row/tanggal — konteks makro global (BTC, DXY, S&P, IHSG, Fear&Greed, net liquidity, dll) + `source_flags` JSON |
-| `asset_ohlcv` | ✅ | 1 row/aset/tanggal — OHLCV universal + `volume_ma20` |
-| `daily_news` | ✅ | headline + `impact_level` (HIGH/MED/LOW) |
-| `econ_calendar`, `reading_workspace`, `trade_signals`, `sr_zones`, `manual_articles`, `trading_journal`, `prediction_log`, `asset_context_weight` | struktur saja | dipakai Phase B+ |
+| `daily_market` | ✅ otomatis | 1 row/tanggal — konteks makro global (BTC, DXY, S&P, IHSG, Fear&Greed, net liquidity, dll) + `source_flags` JSON |
+| `asset_ohlcv` | ✅ otomatis | 1 row/aset/tanggal — OHLCV universal + `volume_ma20` |
+| `daily_news` | ✅ otomatis | headline + `impact_level` (HIGH/MED/LOW) |
+| `econ_calendar` | ✅ otomatis | event ekonomi masa depan (ForexFactory), UPSERT by natural key |
+| `manual_articles` | 🖊️ manual (ada tool) | riset historis — isi via `python -m pipeline.add_article`, RSS tidak bisa backfill |
+| `reading_workspace`, `trade_signals`, `sr_zones`, `trading_journal`, `prediction_log`, `asset_context_weight`, `expectations`, `positioning`, `policy_tracker` | ⬜ struktur saja | dipakai Phase B/C/D |
 
 `source_flags` (JSON di `daily_market`) mencatat status tiap API per run, mis:
 ```json
@@ -169,13 +202,35 @@ Scheduler library (APScheduler dll) tetap belum dipakai — cron OS cukup.
   Untuk pakai Binance (VPN aktif) atau route lewat proxy, atur di `.env`:
   `BINANCE_BASE`, `BINANCE_FAPI_BASE`, `BINANCE_ENABLED`, atau `KASTARA_PROXY`
   (mis. `socks5://127.0.0.1:1080`). Lihat `.env.example`.
-- **`SQLITE_BUSY` / database is locked**: DB pakai mode **WAL** + `busy_timeout`
-  (lihat `db/connection.py`), jadi SQL client (DBeaver dll) bisa baca sambil
-  pipeline nulis. Kalau masih ke-lock: pastikan client-mu auto-commit dan tidak
-  menahan transaksi tulis. File sidecar `*.db-wal` / `*.db-shm` itu normal.
-- **`KASTARA_DB_PATH` di Windows/WSL**: app jalan di dalam WSL. Boleh isi path
-  Windows UNC (`\\wsl.localhost\<distro>\home\...`) — otomatis diterjemahkan ke
-  path native Linux (file yang sama). Default cukup `kastara-finance.db`.
+- **`SQLITE_BUSY` / database is locked** (mis. buka DB di DBeaver): DB pakai
+  mode **DELETE** (default SQLite) + `busy_timeout=5000` (lihat
+  `db/connection.py`) — proses Python kita otomatis retry s/d 5 detik kalau
+  ada lock singkat. Akar masalahnya kalau muncul di DBeaver biasanya
+  **DBeaver di Windows connect lewat path `\\wsl.localhost\...`** — itu
+  efektif network share (9P) dari sisi Windows, dan SQLite (apalagi mode
+  WAL, yang sempat dicoba dan tidak membantu — lihat
+  `docs/ARCHITECTURE.md §6.1`) tidak reliable lintas boundary Windows↔WSL.
+  **Solusi permanen: install DBeaver DI DALAM WSL** (bukan di Windows),
+  jalan via WSLg — akses file jadi native, boundary-nya hilang total.
+  Sudah di-setup di `~/dbeaver` (tarball no-root, bundled JRE, tidak perlu
+  `sudo`/`apt`):
+  ```bash
+  ~/dbeaver/launch.sh          # jalankan DBeaver (muncul sebagai window Windows via WSLg)
+  ```
+  Koneksi di DBeaver: pakai path native sesuai `KASTARA_DB_PATH` di `.env`
+  (lihat poin berikutnya — **bukan** lagi di dalam folder project), dan
+  **bukan** `\\wsl.localhost\...`. Kalau tetap mau pakai DBeaver versi
+  Windows: tutup semua tab/reconnect fresh (transaksi lama yang nyangkut di
+  client itu penyebab paling umum) + tambah driver property
+  `busy_timeout=5000`.
+- **`KASTARA_DB_PATH` — lokasi DB**: file DB sengaja ditaruh **di luar folder
+  project** (`.env`: `KASTARA_DB_PATH=/home/<user>/LOCAL/kastara-finance-data/kastara-finance.db`)
+  supaya tidak nyampur sama kode/git — DB berubah tiap hari (pipeline/cron),
+  kode tidak; motong risiko ke-commit atau ke-include ke operasi git secara
+  tidak sengaja. Boleh juga isi path Windows UNC
+  (`\\wsl.localhost\<distro>\home\...`) — otomatis diterjemahkan ke path
+  native Linux (file yang sama), tapi untuk akses dari WSL sendiri (pipeline,
+  DBeaver-di-WSL) pakai path native langsung seperti contoh di atas.
 - **SQLite vs Postgres/NoSQL**: untuk backfill sampai ~5 tahun data harian,
   SQLite masih pas — datanya tabular (cocok relational, bukan NoSQL) dan
   volumenya (puluhan ribu baris `asset_ohlcv`, ratusan ribu `daily_news`) jauh

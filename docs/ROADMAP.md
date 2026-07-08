@@ -155,10 +155,12 @@ reliable — selaras dengan rencana backfill 5 tahun yang sedang berjalan.
 
 ## 🟡 Phase C — Dashboard/UI Penuh
 
-**Sebagian selesai** (lihat Phase 1). Sisa scope:
-- Form input manual untuk `reading_workspace` (catatan analisis harian),
-  `manual_articles` (artikel yang di-flag manual), `trading_journal` (record
-  hasil trading).
+**Sebagian selesai** (lihat Phase 1). `manual_articles` sudah punya jalur
+isi via **CLI** (`pipeline/add_article.py`, di luar dashboard — lihat
+[README](../README.md#artikel-manual-riset-historis)); sisa scope dashboard:
+- Form input manual **di dashboard** (bukan CLI) untuk `reading_workspace`
+  (catatan analisis harian), tombol "+ Add Manual Article" di Panel 2
+  (setara CLI tapi lewat UI), `trading_journal` (record hasil trading).
 - Kemungkinan write-back dari UI (saat ini dashboard 100% read-only).
 - Visualisasi tambahan: overlay `sr_zones` di chart, tampilan
   `econ_calendar` (event mendatang).
@@ -225,8 +227,20 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
 - [ ] Backfill/isi `econ_calendar` untuk event yang sudah lewat kalau perlu
       histori kalender (scraper ini hanya kasih rolling window "minggu ini",
       bukan sumber histori).
+- [x] ~~`manual_articles` CLI~~ — `pipeline/add_article.py` selesai (add +
+      list/search by tag/date-range/keyword), 5 test hijau. Dipakai buat
+      riset historis (mis. dari 2010) yang RSS tidak bisa jangkau.
 
----
+**Dievaluasi, sengaja tidak dikerjakan:**
+- **NewsData.io** — dicek langsung: sentiment analysis **cuma tersedia di
+  tier Professional/Corporate (berbayar)**, bukan tier gratis seperti yang
+  awalnya dikira. Historical archive (10 tahun) juga fitur berbayar. Tier
+  gratisnya (200 credit/hari) cuma jadi agregator RSS tambahan tanpa
+  sentiment asli — dinilai tidak worth effort integrasi vs nilai tambahnya.
+  Diputuskan **skip**.
+- **NewsAPI.org** — free tier "non-commercial only" (konflik dengan rencana
+  monetisasi Phase 2/3 di Master Plan), dan historical depth cuma ~1 bulan.
+  Skip.
 
 ## Prinsip Perubahan Roadmap
 
