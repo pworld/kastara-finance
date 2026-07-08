@@ -1,10 +1,13 @@
-# Kastara Finance — Phase A (Database & Scraper)
+# Kastara Finance — Phase A + B (Data Layer + Analysis Engine)
 
-Data layer untuk Kastara Finance. Phase A = **kumpulkan data mentah** ke SQLite
-lokal dari sumber-sumber gratis (no paid API). Belum ada trading/signal/UI —
-itu Phase B+.
+**Phase A** (selesai): **kumpulkan data mentah** ke SQLite lokal dari
+sumber-sumber gratis (no paid API). **Phase B** (selesai untuk BTC): deteksi
+zona S&R + sinyal breakout/retest + R:R calculator dari histori
+`asset_ohlcv` — tetap **suggestion, bukan execution/trading logic**;
+keputusan akhir tetap manual (`giel_approved`, direview via
+`tools/review_signal.py`).
 
-> Scope dikunci di `plan.txt`. Phase A HANYA data layer.
+> Scope dikunci di `plan.txt` (Phase A) dan `plan_b.txt` (Phase B).
 
 📄 **Dokumen lengkap ada di [`docs/`](docs/):**
 [ARCHITECTURE.md](docs/ARCHITECTURE.md) (desain teknis & rationale),
@@ -32,7 +35,16 @@ itu Phase B+.
 - **Backfill** `pipeline/backfill.py` — tarik data historis (BTC/macro), preview-before-commit.
 - **Manual article** `pipeline/add_article.py` — isi `manual_articles` untuk riset
   historis (RSS tidak bisa backfill — lihat [Artikel manual](#artikel-manual-riset-historis)).
-- **Indikator** `indicators/calc.py` — `net_liquidity`, `volume_ma20`.
+- **Indikator Phase A** `indicators/calc.py` — `net_liquidity`, `volume_ma20`.
+- **Analysis engine Phase B** (`analysis/`, BTC dulu — lihat
+  [plan_b.txt](plan_b.txt)):
+  - `analysis/sr_zones.py` — deteksi zona support/resistance (swing
+    high/low + clustering + touch count).
+  - `analysis/signals.py` — deteksi breakout/retest + R:R calculator.
+  - `pipeline/run_analysis.py` — orchestrator, tulis ke `sr_zones` +
+    `trade_signals`. **Suggestion only** — `giel_approved` selalu 0 dari kode.
+  - `tools/review_signal.py` — CLI approve/reject sinyal by id eksplisit.
+  - `pipeline/seed_context_weight.py` — seed pembobotan driver per aset.
 
 Semua scraper **tahan API-fail**: kalau satu source mati, ditandai `fail` di
 `source_flags` dan pipeline tetap lanjut (tidak crash, tidak silent).
@@ -119,6 +131,31 @@ python -m pipeline.add_article list --search "rate hike"
 Kalau URL yang sama sudah pernah ditambah, tool cuma **kasih tahu** (bukan
 blok) lalu minta konfirmasi — re-visit artikel yang sama dengan catatan baru
 itu valid.
+
+### Analysis engine (Phase B — S&R + breakout/retest, BTC)
+
+```bash
+# Jalankan deteksi zona S&R + sinyal breakout/retest untuk BTC
+python -m pipeline.run_analysis
+```
+Idempotent (re-run tidak duplikat zona/sinyal, tidak menimpa
+`validated_by_giel`/`notes` yang sudah direview manual). **Manual trigger**
+untuk sekarang, belum di-cron (lokal cuma dev — lihat [plan_b.txt](plan_b.txt) §7.6).
+
+```bash
+# Review sinyal (WAJIB by id eksplisit — tidak ada mode approve-semua)
+python -m tools.review_signal list
+python -m tools.review_signal list --instrument BTC --valid-only
+python -m tools.review_signal approve --id 42 --notes "setup bagus, volume kuat"
+python -m tools.review_signal reject  --id 42 --notes "DXY breakout barengan, skip"
+
+# Seed pembobotan driver per aset (sekali, idempotent)
+python -m pipeline.seed_context_weight
+```
+
+Semua sinyal dari `run_analysis` **suggestion only** — `giel_approved`
+selalu 0 dari kode, cuma berubah lewat `review_signal approve`. Tidak ada
+execution/trading logic di mana pun.
 
 ### Dashboard web (read-only)
 ```bash

@@ -65,9 +65,18 @@ kastara-finance/
 │   └── econ_calendar.py      # ForexFactory calendar (event masa depan)
 ├── pipeline/
 │   ├── run_daily.py          # orchestrator harian, UPSERT idempotent
-│   └── backfill.py           # tarik historis, preview-before-commit
+│   ├── backfill.py           # tarik historis, preview-before-commit
+│   ├── add_article.py        # CLI manual_articles (riset historis)
+│   ├── run_analysis.py       # orchestrator Phase B (S&R + sinyal, BTC)
+│   └── seed_context_weight.py  # seed asset_context_weight (BTC)
 ├── indicators/
-│   └── calc.py               # net_liquidity, volume_ma20 (calculated fields)
+│   └── calc.py               # net_liquidity, volume_ma20 (calculated fields, Phase A)
+├── analysis/                  # engine Phase B — S&R + breakout/retest
+│   ├── indicators.py           # MA, volume ratio, rolling_ma (beda dari indicators/calc.py)
+│   ├── sr_zones.py              # swing detection, clustering, touch count
+│   └── signals.py               # breakout/retest detection + R:R calculator
+├── tools/
+│   └── review_signal.py       # CLI approve/reject trade_signals (by id eksplisit)
 ├── web/                      # dashboard read-only (Phase 1)
 │   ├── app.py                 # Flask, endpoint JSON + halaman
 │   └── templates/index.html   # UI single-page, tanpa build step/CDN
@@ -86,7 +95,7 @@ Aturan modular: **tiap scraper harus bisa dijalankan & ditest sendiri**
 gap terhadap Master Plan §10). Phase A **mengisi** 4 tabel aktif; sisanya
 struktur saja (disiapkan untuk Phase B/D, tidak dipakai sekarang).
 
-### 4.1 Tabel aktif (Phase A)
+### 4.1 Tabel aktif (Phase A + B)
 
 | Tabel | Grain | Isi |
 |---|---|---|
@@ -94,11 +103,14 @@ struktur saja (disiapkan untuk Phase B/D, tidak dipakai sekarang).
 | `asset_ohlcv` | 1 baris / (tanggal, instrument) | OHLCV universal semua aset yang tradeable: BTC, SP500, IHSG, GOLD, USDIDR, USDJPY |
 | `daily_news` | 1 baris / headline unik | Headline RSS + `impact_level` (HIGH/MED/LOW, rule-based) |
 | `econ_calendar` | 1 baris / event unik (`event_date`+`event_name`+`country`) | Event ekonomi masa depan (FOMC/CPI/dll) dari ForexFactory, UPSERT (forecast bisa berubah mendekati rilis) |
+| `sr_zones` | 1 baris / zona unik (bucket relatif, per instrument+zone_type) | Zona S&R hasil deteksi `analysis/sr_zones.py`, UPSERT dari `pipeline/run_analysis.py`. `validated_by_giel`/`notes` manual — tidak pernah ditimpa re-run. |
+| `trade_signals` | 1 baris / event sinyal (append-only) | Breakout/retest hasil `analysis/signals.py`. `giel_approved` selalu 0 dari kode — direview manual via `tools/review_signal.py`. |
+| `asset_context_weight` | 1 baris / (instrument, driver) | Pembobotan driver per aset (Master Plan §4.3). BTC di-seed via `pipeline/seed_context_weight.py`. |
+| `manual_articles` | 1 baris / artikel | Riset historis manual (RSS tidak bisa backfill) via `pipeline/add_article.py`. |
 
-### 4.2 Tabel struktur-saja (Phase B/D)
+### 4.2 Tabel struktur-saja (Phase C/D)
 
-`reading_workspace`, `trade_signals`, `sr_zones`, `manual_articles`,
-`trading_journal`, `prediction_log`, `asset_context_weight` (Phase B/C) +
+`reading_workspace`, `trading_journal`, `prediction_log` (Phase C) +
 `expectations`, `positioning`, `policy_tracker` (Phase D, forward-layer
 Master Plan §4.2) — DDL sudah ada di `schema.sql`, belum ada scraper/writer
 yang mengisi.
@@ -190,6 +202,51 @@ satu-satunya penulis. Endpoint: `/api/latest`, `/api/daily_market`,
 `/api/asset_ohlcv`, `/api/news`, `/api/assets`, `/api/health`, plus halaman
 `/` (single-page, JS vanilla, tanpa build step).
 
+### 5.7 `analysis/` — engine Phase B (PURE, tidak baca/tulis DB)
+
+Terpisah dari `indicators/calc.py` (Phase A) karena beda concern & beda
+cara pakai — lihat rationale lengkap di `plan_b.txt` §2. Semua modul
+generic per-instrument (tidak hardcode BTC); filter instrument ada di
+orchestrator (`pipeline/run_analysis.py`), bukan di sini.
+
+- `indicators.py`: `moving_average`/`rolling_ma` (MA — beda dari
+  `indicators/calc.py`, di sini WAJIB full window, None kalau data kurang),
+  `ma_stack_order`, `volume_ratio`, `is_breakout_volume` (>1.5x MA),
+  `is_volume_present` (>=80%, ambang "tidak sepi" saat retest).
+- `sr_zones.py`: `find_swing_points` (lookback simetris ±20 hari — titik
+  baru terkonfirmasi 20 hari SETELAHNYA, cocok untuk review pagi bukan
+  real-time), `cluster_points` (gabung swing point ±0.5%, dibandingkan ke
+  harga PALING RENDAH cluster supaya tidak "creep"), `find_touches`
+  (hitung episode sentuhan, bukan per-hari), `detect_zones` (pipeline
+  penuh), `zone_bucket_key` (natural key log-scale untuk UPSERT stabil
+  walau batas zona geser sedikit antar-run).
+- `signals.py`: `detect_signals` — breakout (close > resistance + volume)
+  → retest (close > zone_lower + volume hadir) → entry/SL/TP1/R:R. Sinyal
+  R:R rendah TETAP direturn (`is_valid=0`), bukan silent-drop. Tidak pernah
+  menyertakan `giel_approved` di output-nya sama sekali (desain lebih ketat
+  dari sekadar "selalu 0" — field itu cuma ada di titik tulis DB).
+
+### 5.8 `pipeline/run_analysis.py` — orchestrator Phase B
+Baca histori `asset_ohlcv` → `analysis/sr_zones.py` → UPSERT `sr_zones`
+(preserve `validated_by_giel`/`notes`) → reload zona aktif → `analysis/
+signals.py` → INSERT `trade_signals` (dedup manual by date+instrument+
+signal_type+zone bounds, tidak ada UNIQUE index — lihat §6.6).
+`giel_approved` **hardcode 0** persis di titik `INSERT` ini — satu-satunya
+tempat kode otomatis menulis `trade_signals`.
+
+**Temuan penting saat eksekusi:** kolom `volume_ma20` di `asset_ohlcv`
+ternyata cuma keisi untuk hari yang diproses `run_daily.py` — baris hasil
+`backfill.py` (mayoritas data historis) NULL semua. Orchestrator re-derive
+`volume_ma20` dari histori volume penuh via `rolling_ma()`, tidak
+mengandalkan kolom tersimpan.
+
+### 5.9 `tools/review_signal.py` — CLI approve/reject
+Pola sama seperti `pipeline/add_article.py`. `approve`/`reject` **wajib
+`--id` eksplisit** — tidak ada mode approve-semua (Master Plan §3: Giel
+yang approve, bukan mesin). `reject` cuma set `notes` (giel_approved tetap
+0) — bedanya dengan "belum direview" (giel_approved=0, notes=NULL) adalah
+notes terisi.
+
 ---
 
 ## 6. Keputusan Desain & Rationale
@@ -275,3 +332,30 @@ testing manual berulang.
 Keterbatasan lain sumber ini: hanya kasih rolling window "minggu ini" (tidak
 ada histori atau minggu depan), dan tidak menyediakan kolom `actual` (hasil
 rilis) — kolom itu tetap `NULL` dari scraper ini.
+
+### 6.6 `trade_signals` — dedup tanpa UNIQUE index
+
+Beda dengan `daily_news`/`econ_calendar` (UNIQUE index, `INSERT OR IGNORE`),
+`trade_signals` **sengaja tidak diberi UNIQUE index** (dikunci di
+`plan_b.txt` §5) — event breakout/retest yang exact match di tanggal yang
+sama secara alami jarang berulang, jadi manfaat UNIQUE index kecil
+dibanding kerumitan mendefinisikan natural key yang tepat untuk data
+append-only seperti ini. Dedup dicek manual di
+`pipeline/run_analysis.py::insert_signal_dedup()` — SELECT dulu by
+`(date, instrument, signal_type, zone_lower, zone_upper)` sebelum INSERT.
+Volume `trade_signals` jauh lebih kecil dari `daily_news` (ratusan per
+instrument vs ratusan-ribu), jadi 1 SELECT tambahan per sinyal bukan
+masalah performa.
+
+### 6.7 `sr_zones` — UPSERT tanpa kolom bucket-key tersimpan
+
+Natural key untuk UPSERT `sr_zones` (`zone_bucket_key()` di
+`analysis/sr_zones.py`) **dihitung ulang di Python setiap saat**, bukan
+disimpan sebagai kolom di DB. Alasan: skema `sr_zones` sudah dikunci sejak
+Phase A (`zone_lower`, `zone_upper`, tanpa kolom tambahan) dan menambah
+kolom baru berarti mengubah skema yang sudah ada — dihindari selama
+alternatif tanpa migrasi (hitung ulang saat lookup, biaya kecil karena
+jumlah zona per instrument masih ratusan) sudah cukup. Kalau nanti jumlah
+zona per instrument membengkak drastis (banyak instrument, Phase F+), ini
+kandidat pertama untuk dioptimasi (mis. kolom generated tersimpan +
+index).

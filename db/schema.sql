@@ -172,3 +172,17 @@ CREATE INDEX IF NOT EXISTS idx_daily_news_impact_date
 -- rilis, event yang sama harus ter-update, bukan duplikat baris.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_econ_calendar_dedup
     ON econ_calendar(event_date, event_name, country);
+
+-- Phase B (plan_b.txt): sr_zones di-lookup by (instrument, zone_type) saat
+-- cari zona existing untuk UPSERT (natural key = bucket relatif, dihitung
+-- di Python dari zone_lower/zone_upper — lihat analysis/sr_zones.py
+-- zone_bucket_key() — bukan kolom tersimpan, jadi index di sini cuma
+-- mempercepat filter awal, bukan constraint UNIQUE).
+CREATE INDEX IF NOT EXISTS idx_sr_zones_instrument_type
+    ON sr_zones(instrument, zone_type);
+
+-- trade_signals: append-only per event (plan_b.txt §5 — tidak perlu UNIQUE,
+-- dedup dicek di pipeline/run_analysis.py sebelum INSERT). Index buat query
+-- dashboard/CLI review by instrument+tanggal.
+CREATE INDEX IF NOT EXISTS idx_trade_signals_instrument_date
+    ON trade_signals(instrument, date DESC);

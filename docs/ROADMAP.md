@@ -12,7 +12,7 @@
 |---|---|---|
 | **A** | Database & Scraper (data layer) | ✅ **Selesai penuh** — sesuai `plan.txt` **dan** checklist Master Plan §10 (lihat [status](#anchor-gap-phase-a)); cron daemon butuh 1 langkah manual sudo, lihat catatan |
 | **1** | Dashboard read-only (Flask) | 🟡 **Selesai sebagai subset kecil** — bukan 6-panel Phase C (lihat [breakdown](#anchor-panel-breakdown)) |
-| **B** | S&R detection, breakout/retest engine | ⬜ Belum mulai |
+| **B** | S&R detection, breakout/retest engine | ✅ **Selesai untuk BTC** — [plan_b.txt](../plan_b.txt) dieksekusi penuh, 46 test baru, diverifikasi data asli |
 | **C** | Dashboard/UI penuh (6 panel, input manual, workspace) | 🟡 Sebagian kecil (lihat [breakdown](#anchor-panel-breakdown)) |
 | **D** | Forward layer (FedWatch, COT, policy) | ⬜ Belum mulai — schema (3 tabel) sudah siap, tinggal isi logic |
 | **E** | Telegram bot | ⬜ Belum mulai |
@@ -138,18 +138,43 @@ selesai" generik — supaya jelas seberapa jauh sisa kerjanya.
 
 ---
 
-## ⬜ Phase B — S&R Detection & Breakout/Retest Engine
+## ✅ Phase B — S&R Detection & Breakout/Retest Engine (selesai, BTC)
 
-**Belum mulai.** Scope (dari `plan.txt`, garis besar — detail akan dikunci di
-plan turunan Phase B saat mulai):
-- Deteksi support/resistance zone dari histori `asset_ohlcv` (semi-otomatis,
-  divalidasi manual → tabel `sr_zones` sudah siap strukturnya).
-- Signal breakout/retest → tulis ke `trade_signals` (struktur sudah ada).
-- **Bukan** execution/trading logic — tetap suggestion/data layer, keputusan
-  akhir tetap manual (`giel_approved` di `trade_signals`).
+**Execution plan: [plan_b.txt](../plan_b.txt)** — 7 Open Questions di §7
+sudah direview & dikunci Giel, dieksekusi persis sesuai itu.
 
-**Prasyarat:** histori `asset_ohlcv` cukup panjang untuk deteksi zone yang
-reliable — selaras dengan rencana backfill 5 tahun yang sedang berjalan.
+**Deliverable:**
+- `analysis/indicators.py` — `moving_average`, `rolling_ma` (MA rolling
+  penuh, dipakai re-derive `volume_ma20` karena kolom itu di `asset_ohlcv`
+  cuma keisi untuk hari yang diproses `run_daily.py` — baris hasil backfill
+  historis NULL semua, ditemukan saat eksekusi), `ma_stack_order`,
+  `volume_ratio`, `is_breakout_volume`, `is_volume_present`.
+- `analysis/sr_zones.py` — swing high/low (lookback simetris §7.1),
+  clustering ±0.5%, touch-count per episode (bukan per-hari), zone_type
+  by majority-vote arah pendekatan, zona <2 touch tetap disimpan
+  `is_active=0` (§7.3). `zone_bucket_key()` — natural key log-scale untuk
+  UPSERT stabil (§7.4).
+- `analysis/signals.py` — breakout (close > resistance + volume >1.5x MA)
+  → retest (close > zone_lower + volume >=80%, §7.2) → entry/SL/TP1/R:R.
+  Breakout tanpa retest disimpan row terpisah (§7.5), R:R < 1.5 tetap
+  disimpan `is_valid=0` (bukan silent-drop).
+- `pipeline/run_analysis.py` — orchestrator, BTC-only filter (§4, generic
+  di `analysis/*`), UPSERT zona (preserve `validated_by_giel`/`notes` milik
+  manusia saat re-run), INSERT sinyal dedup, `giel_approved` **hardcode 0**
+  di satu-satunya titik tulis.
+- `tools/review_signal.py` — CLI approve/reject **by id eksplisit**, tidak
+  ada mode approve-semua (Master Plan §3: Giel yang approve, bukan mesin).
+- `pipeline/seed_context_weight.py` — seed BTC (`net_liquidity`/`etf_flow`
+  =HIGH, `fear_greed`/`dxy`=MED, persis Master Plan §4.3).
+- 46 test baru (total 80), semua hijau. Diverifikasi juga dengan data BTC
+  ASLI (4.313 baris, 2014-2026): 119 zona (117 aktif), 455 sinyal — **0
+  di antaranya `giel_approved=1`** (regression guard, bukan cuma di test
+  sintetis).
+- Cron: **tidak** dijadwalkan otomatis (§7.6) — dijalankan manual, sejalan
+  dengan keputusan cron production akan pindah ke server, lokal cuma dev.
+
+**Belum termasuk** (sesuai batas scope `plan_b.txt` §9): dashboard approve
+button (Phase C), instrument selain BTC (Phase F+), forward layer (Phase D).
 
 ---
 
