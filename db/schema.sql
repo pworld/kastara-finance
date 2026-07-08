@@ -186,3 +186,9 @@ CREATE INDEX IF NOT EXISTS idx_sr_zones_instrument_type
 -- dashboard/CLI review by instrument+tanggal.
 CREATE INDEX IF NOT EXISTS idx_trade_signals_instrument_date
     ON trade_signals(instrument, date DESC);
+
+-- positioning (Phase D, plan_d.txt): COT/ETF-flow di-refresh tiap run (nilai
+-- COT bisa direvisi, ETF flow bisa dikoreksi manual) -> (date, instrument,
+-- metric) sebagai natural key UPSERT, sama pola dengan idx_econ_calendar_dedup.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_positioning_dedup
+    ON positioning(date, instrument, metric);

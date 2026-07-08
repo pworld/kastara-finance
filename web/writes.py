@@ -48,6 +48,100 @@ def set_econ_actual(conn: sqlite3.Connection, event_id: int, actual: str) -> boo
     return True
 
 
+# ---------- Panel 3: Expectations (Layer B, Phase D — manual, tidak ada
+# sumber gratis: CME FedWatch API resmi berbayar, Dot Plot rilis PDF
+# kuartalan) ----------
+
+def insert_expectation(
+    conn: sqlite3.Connection, *, date: str, metric: str, value: float,
+    horizon: str | None, source: str | None,
+) -> int:
+    cur = conn.execute(
+        "INSERT INTO expectations (date, metric, value, horizon, source, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (date, metric, value, horizon, source, created_at()),
+    )
+    return cur.lastrowid
+
+
+def list_expectations(conn: sqlite3.Connection, limit: int = 20) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        "SELECT * FROM expectations ORDER BY date DESC, id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ---------- Panel 3: Positioning (Layer C, Phase D) — COT + BTC ETF flow
+# otomatis (scrapers/positioning.py) + SBN foreign flow & override ETF
+# manual (sumber DJPPR tidak scrape-able reliable) ----------
+
+def insert_positioning_manual(
+    conn: sqlite3.Connection, *, date: str, instrument: str, metric: str,
+    value: float, source: str | None,
+) -> None:
+    """Insert/override 1 row positioning. Natural key (date, instrument,
+    metric) UNIQUE (idx_positioning_dedup) -> ON CONFLICT DO UPDATE, jadi
+    form ini juga bisa dipakai koreksi manual atas row hasil scrape (mis.
+    ETF flow yang perlu dikoreksi), bukan cuma SBN."""
+    conn.execute(
+        "INSERT INTO positioning (date, instrument, metric, value, source, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(date, instrument, metric) DO UPDATE SET "
+        "value=excluded.value, source=excluded.source",
+        (date, instrument, metric, value, source, created_at()),
+    )
+
+
+def list_positioning(conn: sqlite3.Connection, limit: int = 30) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        "SELECT * FROM positioning ORDER BY date DESC, id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ---------- Panel 3: Disonansi Flag (Layer A vs Layer C, aturan sederhana,
+# BUKAN AI — murni perbandingan arah/sign angka) ----------
+
+def compute_disonansi(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Bandingkan stance_score terbaru (policy_tracker) vs tren cot_net_long
+    DXY 14 hari terakhir (proxy arah "uang besar" makro). Return
+    {'available': False} kalau data belum cukup (butuh >=1 stance_score
+    DAN >=2 baris cot_net_long DXY dalam window)."""
+    policy_row = conn.execute(
+        "SELECT date, speaker, stance_score FROM policy_tracker "
+        "WHERE stance_score IS NOT NULL ORDER BY date DESC, id DESC LIMIT 1"
+    ).fetchone()
+    dxy_rows = conn.execute(
+        "SELECT date, value FROM positioning "
+        "WHERE instrument='DXY' AND metric='cot_net_long' "
+        "AND date >= date((SELECT MAX(date) FROM positioning WHERE instrument='DXY' "
+        "AND metric='cot_net_long'), '-14 days') "
+        "ORDER BY date ASC"
+    ).fetchall()
+
+    if not policy_row or policy_row["stance_score"] == 0 or len(dxy_rows) < 2:
+        return {"available": False}
+
+    stance = policy_row["stance_score"]
+    dxy_trend = dxy_rows[-1]["value"] - dxy_rows[0]["value"]
+    # Hawkish (stance>0) SEHARUSNYA searah DXY net-long naik (USD kuat);
+    # dovish (stance<0) SEHARUSNYA searah DXY net-long turun. Kalau tanda
+    # berlawanan -> retorika dan posisi uang besar tidak sinkron.
+    flagged = (stance > 0 and dxy_trend < 0) or (stance < 0 and dxy_trend > 0)
+    return {
+        "available": True,
+        "flagged": flagged,
+        "policy_date": policy_row["date"],
+        "policy_speaker": policy_row["speaker"],
+        "stance_score": stance,
+        "dxy_net_long_trend": dxy_trend,
+        "note": (
+            f"{policy_row['speaker'] or 'Speaker'} ({policy_row['date']}) stance={stance}, "
+            f"DXY cot_net_long trend 14 hari={dxy_trend:+.0f}"
+        ),
+    }
+
+
 # ---------- Panel 3: Policy Tracker (manual, independen Phase D) ----------
 
 def insert_policy_note(

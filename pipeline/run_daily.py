@@ -22,6 +22,7 @@ from scrapers.econ_calendar import fetch_econ_calendar
 from scrapers.macro_fred import fetch_macro_fred
 from scrapers.macro_yf import fetch_macro_yf
 from scrapers.news import fetch_news
+from scrapers.positioning import fetch_positioning
 
 # Kolom daily_market yang boleh ditulis pipeline (sisanya untuk Phase B+).
 DAILY_MARKET_COLS = [
@@ -113,6 +114,33 @@ def upsert_econ_calendar(conn: sqlite3.Connection, items: list[dict[str, Any]]) 
     return inserted
 
 
+def upsert_positioning(conn: sqlite3.Connection, items: list[dict[str, Any]]) -> int:
+    """UPSERT row ke positioning by (date, instrument, metric).
+
+    Natural key ditegakkan oleh UNIQUE INDEX idx_positioning_dedup
+    (db/schema.sql) -> COT yang direvisi atau ETF flow yang dikoreksi
+    ter-update, bukan duplikat baris. Pola sama dengan upsert_econ_calendar.
+    """
+    inserted = 0
+    for it in items:
+        params = {**it, "created_at": created_at()}
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO positioning "
+            "(date, instrument, metric, value, source, created_at) "
+            "VALUES (:date, :instrument, :metric, :value, :source, :created_at)",
+            params,
+        )
+        if cur.rowcount == 1:
+            inserted += 1
+        else:
+            conn.execute(
+                "UPDATE positioning SET value=:value, source=:source "
+                "WHERE date=:date AND instrument=:instrument AND metric=:metric",
+                params,
+            )
+    return inserted
+
+
 def insert_news_dedup(conn: sqlite3.Connection, items: list[dict[str, Any]]) -> int:
     """INSERT news, skip kalau (date, headline) sudah ada. Return jumlah baru.
 
@@ -148,9 +176,10 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
     fred = fetch_macro_fred(date)
     news = fetch_news(date)
     econ = fetch_econ_calendar()
+    positioning = fetch_positioning()
 
     flags = SourceFlags()
-    for part in (crypto, yf, fred, news, econ):
+    for part in (crypto, yf, fred, news, econ, positioning):
         flags.merge(part.get("source_flags", {}))
 
     # Gabungkan asset_ohlcv rows: BTC (dari crypto) + rows dari yfinance.
@@ -203,6 +232,9 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
         # 5) economic calendar (event masa depan, upsert by natural key)
         n_econ = upsert_econ_calendar(conn, econ.get("items", []))
 
+        # 6) positioning (Phase D — COT + BTC ETF flow, upsert by natural key)
+        n_positioning = upsert_positioning(conn, positioning.get("items", []))
+
         conn.commit()
 
     summary = {
@@ -213,6 +245,7 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
         "asset_rows": len(asset_rows),
         "news_inserted": n_news,
         "econ_events_new": n_econ,
+        "positioning_new": n_positioning,
         "source_flags": flags.as_dict(),
     }
     _print_summary(summary)
@@ -228,6 +261,7 @@ def _print_summary(s: dict[str, Any]) -> None:
     print(f"  asset rows    : {s['asset_rows']}")
     print(f"  news inserted : {s['news_inserted']}")
     print(f"  econ events   : {s['econ_events_new']} baru")
+    print(f"  positioning   : {s['positioning_new']} baru")
     print("  flags:")
     for k, v in sorted(s["source_flags"].items()):
         mark = {"ok": "✓", "fail": "✗", "skip": "·"}.get(v, "?")

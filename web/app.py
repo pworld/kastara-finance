@@ -255,6 +255,55 @@ def econ_calendar_set_actual():
     return jsonify({"ok": True})
 
 
+@app.get("/api/expectations")
+def expectations_list():
+    with get_connection() as conn:
+        rows = writes.list_expectations(conn, limit=request.args.get("limit", 20, type=int))
+    return jsonify(rows)
+
+
+@app.post("/api/expectations/add")
+def expectations_add():
+    """Manual entry (Layer B): CME FedWatch cut probability, Dot Plot median,
+    dll — tidak ada sumber gratis yang scrape-able (lihat plan_d.txt)."""
+    body = request.get_json(force=True)
+    with get_connection() as conn:
+        new_id = writes.insert_expectation(
+            conn, date=body.get("date") or today_wib(), metric=body["metric"],
+            value=body["value"], horizon=body.get("horizon"), source=body.get("source"),
+        )
+        conn.commit()
+    return jsonify({"id": new_id})
+
+
+@app.get("/api/positioning")
+def positioning_list():
+    with get_connection() as conn:
+        rows = writes.list_positioning(conn, limit=request.args.get("limit", 30, type=int))
+    return jsonify(rows)
+
+
+@app.post("/api/positioning/add")
+def positioning_add():
+    """Manual entry/override (Layer C): SBN foreign flow (sumber DJPPR tidak
+    scrape-able), atau koreksi manual atas row COT/ETF hasil scrape."""
+    body = request.get_json(force=True)
+    with get_connection() as conn:
+        writes.insert_positioning_manual(
+            conn, date=body.get("date") or today_wib(), instrument=body["instrument"],
+            metric=body["metric"], value=body["value"], source=body.get("source") or "manual",
+        )
+        conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/disonansi")
+def disonansi_get():
+    with get_connection() as conn:
+        result = writes.compute_disonansi(conn)
+    return jsonify(result)
+
+
 @app.get("/api/policy")
 def policy_list():
     with get_connection() as conn:

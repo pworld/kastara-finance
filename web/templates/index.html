@@ -263,12 +263,51 @@
 
       <section>
         <h2>Expectations (Layer B)</h2>
-        <div class="empty-inline">Belum ada data — scraper Expectations (CME FedWatch, Dot Plot) belum dikerjakan (Phase D).</div>
+        <div class="panel">
+          <div class="form-grid">
+            <div><label class="field">Tanggal</label><input type="date" id="expDate"></div>
+            <div>
+              <label class="field">Metric</label>
+              <select id="expMetric">
+                <option value="cme_fedwatch_cut_prob">CME FedWatch cut probability</option>
+                <option value="dot_plot_median">Fed Dot Plot median</option>
+              </select>
+            </div>
+            <div><label class="field">Value</label><input type="number" step="any" id="expValue" placeholder="mis. 0.72"></div>
+            <div><label class="field">Horizon</label><input type="text" id="expHorizon" placeholder="mis. next_meeting / EOY2026"></div>
+          </div>
+          <div class="form-row" style="margin-top:4px">
+            <button class="btn" id="expSaveBtn">+ Add Expectation</button>
+          </div>
+          <table style="margin-top:12px">
+            <thead><tr><th>Tgl</th><th>Metric</th><th>Value</th><th>Horizon</th></tr></thead>
+            <tbody id="expBody"></tbody>
+          </table>
+        </div>
+        <div class="src" style="margin-top:6px">Manual — CME FedWatch API resmi berbayar, Fed Dot Plot rilis PDF kuartalan (tidak ada sumber gratis yang scrape-able).</div>
       </section>
 
       <section>
         <h2>Positioning (Layer C)</h2>
-        <div class="empty-inline">Belum ada data — scraper Positioning (COT, ETF flow, SBN flow) belum dikerjakan (Phase D).</div>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Tgl</th><th>Instrument</th><th>Metric</th><th>Value</th><th>Source</th></tr></thead>
+            <tbody id="posBody"></tbody>
+          </table>
+          <div class="form-grid" style="margin-top:12px">
+            <div><label class="field">Tanggal</label><input type="date" id="posDate"></div>
+            <div>
+              <label class="field">Instrument</label>
+              <select id="posInstrument"><option>SBN</option><option>BTC</option><option>DXY</option><option>GOLD</option><option>SP500</option></select>
+            </div>
+            <div><label class="field">Metric</label><input type="text" id="posMetric" placeholder="mis. sbn_foreign_flow / etf_net_flow"></div>
+            <div><label class="field">Value</label><input type="number" step="any" id="posValue"></div>
+          </div>
+          <div class="form-row" style="margin-top:4px">
+            <button class="btn" id="posSaveBtn">+ Add/Override Positioning</button>
+          </div>
+        </div>
+        <div class="src" style="margin-top:6px">COT (CFTC) &amp; BTC ETF flow terisi otomatis tiap run_daily. Form ini utk SBN foreign flow (manual — sumber DJPPR tidak scrape-able) dan koreksi manual kalau perlu.</div>
       </section>
 
       <section>
@@ -320,7 +359,7 @@
 
       <section>
         <h2>Disonansi Flag</h2>
-        <div class="empty-inline">Butuh Positioning DAN Policy Tracker sama-sama terisi untuk dibandingkan — Positioning belum ada (Phase D).</div>
+        <div id="disonansiBody" class="empty-inline">Memuat...</div>
       </section>
     </div>
 
@@ -674,6 +713,60 @@ $("#calBody").addEventListener("click", async (e) => {
     loadEconCalendar();
   }
 });
+// ---------- Panel 3: Expectations (Layer B, manual) ----------
+async function loadExpectations() {
+  const rows = await (await fetch("/api/expectations?limit=15")).json();
+  $("#expBody").innerHTML = rows.map(r => `<tr>
+    <td class="src">${r.date}</td><td>${r.metric}</td><td>${r.value}</td><td class="src">${r.horizon || "-"}</td>
+  </tr>`).join("") || `<tr><td colspan="4" class="src">belum ada entri</td></tr>`;
+}
+$("#expSaveBtn").addEventListener("click", async () => {
+  const value = $("#expValue").value;
+  if (value === "") { toast("Value wajib diisi"); return; }
+  await postJSON("/api/expectations/add", {
+    date: $("#expDate").value || today(), metric: $("#expMetric").value,
+    value: Number(value), horizon: $("#expHorizon").value || null, source: "manual",
+  });
+  toast("Expectation tersimpan");
+  $("#expValue").value = ""; $("#expHorizon").value = "";
+  loadExpectations();
+});
+
+// ---------- Panel 3: Positioning (Layer C, COT/ETF otomatis + manual) ----------
+async function loadPositioning() {
+  const rows = await (await fetch("/api/positioning?limit=30")).json();
+  $("#posBody").innerHTML = rows.map(r => `<tr>
+    <td class="src">${r.date}</td><td>${r.instrument}</td><td>${r.metric}</td>
+    <td>${fmt(r.value) ?? r.value}</td><td class="src">${r.source || "-"}</td>
+  </tr>`).join("") || `<tr><td colspan="5" class="src">belum ada data</td></tr>`;
+}
+$("#posSaveBtn").addEventListener("click", async () => {
+  const value = $("#posValue").value;
+  const metric = $("#posMetric").value.trim();
+  if (value === "" || !metric) { toast("Metric dan value wajib diisi"); return; }
+  await postJSON("/api/positioning/add", {
+    date: $("#posDate").value || today(), instrument: $("#posInstrument").value,
+    metric, value: Number(value), source: "manual",
+  });
+  toast("Positioning tersimpan");
+  $("#posMetric").value = ""; $("#posValue").value = "";
+  loadPositioning();
+});
+
+// ---------- Panel 3: Disonansi Flag ----------
+async function loadDisonansi() {
+  const r = await (await fetch("/api/disonansi")).json();
+  const el = $("#disonansiBody");
+  if (!r.available) {
+    el.className = "empty-inline";
+    el.textContent = "Belum cukup data untuk dibandingkan (butuh stance_score Policy Tracker + minimal 2 baris COT DXY).";
+    return;
+  }
+  el.className = "";
+  el.innerHTML = `<span class="badge ${r.flagged ? "HIGH" : "LOW"}">${r.flagged ? "DISONANSI" : "SEARAH"}</span>
+    <span class="src" style="margin-left:8px">${r.note}</span>`;
+}
+
 async function loadPolicyNotes() {
   const rows = await (await fetch("/api/policy?limit=15")).json();
   $("#policyBody").innerHTML = rows.map(r => `<tr>
@@ -1036,6 +1129,9 @@ async function refreshAll() {
   await loadContextCharts();
   await loadNews();
   await loadEconCalendar();
+  await loadExpectations();
+  await loadPositioning();
+  await loadDisonansi();
   await loadPolicyNotes();
   await loadReadingEntries();
   await loadOutlookInstruments();

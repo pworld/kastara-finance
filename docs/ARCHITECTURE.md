@@ -428,3 +428,27 @@ observations"*) — histori lebih panjang cuma tersedia langsung dari ICE
 Data (berbayar), di luar scope "no paid API". Dikonfirmasi lewat re-run
 `backfill.py`: 0 baris baru (DB sudah punya semua yang FRED sediakan).
 Tidak ada tindakan lanjut — ini batas sumber data, bukan bug.
+
+### 6.11 `scrapers/positioning.py` — Cloudflare butuh header browser-realistis
+
+Riset Phase D (`plan_d.txt`) sempat menyimpulkan farside.co.uk (BTC ETF
+flow) "bisa di-scrape" berdasar 1x tes `curl` sukses (200, tabel HTML
+lengkap). Begitu diimplementasi pakai `requests` (library yang benar-benar
+dipakai scraper) dengan `scrapers/base.py::DEFAULT_HEADERS` bawaan (UA bot
+jujur `kastara-finance/0.1` + `Accept: application/json`), responsnya malah
+halaman **Cloudflare "Just a moment..."** (bot-challenge), bukan tabel.
+`curl` lolos karena header/TLS fingerprint-nya kebetulan mirip browser;
+`requests` dengan header generik tidak.
+
+Fix: kirim header browser-realistis KHUSUS untuk request ini (UA Chrome +
+`Accept: text/html...` + `Accept-Language`), override `DEFAULT_HEADERS` via
+parameter `headers=` di `http_get()` — bukan ubah `DEFAULT_HEADERS` global
+(itu dipakai scraper JSON lain yang justru butuh `Accept: application/json`
+jujur). Pelajaran: kalau riset kelayakan scrape cuma dites lewat `curl`
+manual, hasilnya belum tentu representatif untuk request yang benar-benar
+dikirim library HTTP Python — validasi ulang pakai kode yang sama persis
+yang bakal jalan di produksi, bukan proxy tool yang beda fingerprint.
+
+CFTC COT sebaliknya: dites langsung pakai Socrata API (`publicreporting.
+cftc.gov/resource/<id>.json`), gratis, TANPA API key — dikonfirmasi bekerja
+persis seperti riset awal, tidak ada kejutan.

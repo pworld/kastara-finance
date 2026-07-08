@@ -1,12 +1,17 @@
 """Test web/writes.py — pure functions tulis-DB untuk Phase C (tanpa Flask)."""
 from db.connection import get_connection, init_db
 from web.writes import (
+    compute_disonansi,
     flag_key_trigger,
+    insert_expectation,
     insert_policy_note,
+    insert_positioning_manual,
     insert_prediction,
     insert_trading_journal,
     list_due_predictions,
+    list_expectations,
     list_policy_notes,
+    list_positioning,
     list_reading_entries,
     save_panel4,
     save_reading_entry,
@@ -90,6 +95,108 @@ def test_set_econ_actual_unknown_id(tmp_path):
     init_db(db)
     with get_connection(db) as conn:
         assert set_econ_actual(conn, 9999, "3%") is False
+
+
+# ---------- Expectations (Layer B, manual) ----------
+
+def test_insert_and_list_expectations(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        eid = insert_expectation(
+            conn, date="2026-07-01", metric="cme_fedwatch_cut_prob",
+            value=0.72, horizon="next_meeting", source="manual",
+        )
+        conn.commit()
+        assert eid > 0
+        rows = list_expectations(conn)
+        assert len(rows) == 1
+        assert rows[0]["metric"] == "cme_fedwatch_cut_prob"
+        assert rows[0]["value"] == 0.72
+
+
+# ---------- Positioning (Layer C, manual/override) ----------
+
+def test_insert_positioning_manual_then_list(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        insert_positioning_manual(
+            conn, date="2026-07-01", instrument="SBN", metric="sbn_foreign_flow",
+            value=-1500.0, source="manual_djppr",
+        )
+        conn.commit()
+        rows = list_positioning(conn)
+        assert len(rows) == 1
+        assert rows[0]["instrument"] == "SBN"
+        assert rows[0]["value"] == -1500.0
+
+
+def test_insert_positioning_manual_overrides_existing_row(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        insert_positioning_manual(
+            conn, date="2026-07-01", instrument="BTC", metric="etf_net_flow",
+            value=100.0, source="farside_btc_etf",
+        )
+        conn.commit()
+        # koreksi manual atas row hasil scrape yang sama (date+instrument+metric)
+        insert_positioning_manual(
+            conn, date="2026-07-01", instrument="BTC", metric="etf_net_flow",
+            value=123.4, source="manual",
+        )
+        conn.commit()
+        rows = list_positioning(conn)
+        assert len(rows) == 1
+        assert rows[0]["value"] == 123.4
+        assert rows[0]["source"] == "manual"
+
+
+# ---------- Disonansi Flag ----------
+
+def _seed_disonansi(conn, stance_score, dxy_values):
+    conn.execute(
+        "INSERT INTO policy_tracker (date, speaker, stance_score, created_at) "
+        "VALUES ('2026-07-05', 'Powell', ?, '')", (stance_score,),
+    )
+    for i, (date, value) in enumerate(dxy_values):
+        insert_positioning_manual(
+            conn, date=date, instrument="DXY", metric="cot_net_long",
+            value=value, source="cftc_cot",
+        )
+
+
+def test_compute_disonansi_insufficient_data(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        result = compute_disonansi(conn)
+        assert result == {"available": False}
+
+
+def test_compute_disonansi_flagged_when_signs_disagree(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        # hawkish stance TAPI DXY net-long malah TURUN -> disonansi
+        _seed_disonansi(conn, stance_score=2, dxy_values=[("2026-06-23", 20000.0), ("2026-06-30", 15000.0)])
+        conn.commit()
+        result = compute_disonansi(conn)
+        assert result["available"] is True
+        assert result["flagged"] is True
+
+
+def test_compute_disonansi_not_flagged_when_signs_agree(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        # hawkish stance DAN DXY net-long naik -> searah, tidak disonansi
+        _seed_disonansi(conn, stance_score=2, dxy_values=[("2026-06-23", 15000.0), ("2026-06-30", 20000.0)])
+        conn.commit()
+        result = compute_disonansi(conn)
+        assert result["available"] is True
+        assert result["flagged"] is False
 
 
 # ---------- Policy Tracker ----------

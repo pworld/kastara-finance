@@ -2,6 +2,7 @@ requests
 yfinance
 pandas
 feedparser
+beautifulsoup4
 python-dotenv
 flask
 pytest

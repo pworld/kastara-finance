@@ -23,8 +23,9 @@ Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
 ## 1. Apa yang dikerjakan
 
 - **SQLite** `kastara-finance.db` dengan 14 tabel (`db/schema.sql`) — 11
-  tabel Phase A + 3 tabel forward-layer (struktur, diisi saat Phase D).
-- **5 scraper** modular (tiap source bisa jalan sendiri):
+  tabel Phase A + 3 tabel forward-layer (`expectations`/`positioning`/
+  `policy_tracker`, diisi Phase D — lihat [plan_d.txt](plan_d.txt)).
+- **6 scraper** modular (tiap source bisa jalan sendiri):
   - `scrapers/crypto.py` — CoinGecko + Binance + Alternative.me (BTC OHLCV,
     dominance, funding, OI, Fear & Greed). *Binance ke-block? otomatis fallback
     CoinGecko untuk OHLC.*
@@ -34,7 +35,14 @@ Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
   - `scrapers/news.py` — RSS (CNBC, Fed, CNBC Indonesia, dll) + scoring
     rule-based HIGH/MED/LOW (bukan AI).
   - `scrapers/econ_calendar.py` — ForexFactory (event ekonomi masa depan:
-    FOMC/CPI/dll), endpoint JSON gratis tidak resmi.
+    FOMC/CPI/dll), endpoint JSON gratis tidak resmi. Forecast/previous ikut
+    tersimpan; `actual` (hasil rilis) diisi **manual** lewat dashboard —
+    sumber ini tidak pernah menyediakan kolom itu.
+  - `scrapers/positioning.py` (Phase D) — COT report (CFTC Socrata API,
+    gratis tanpa key: BTC/DXY/GOLD/SP500 net-long spekulan) + BTC ETF net
+    flow (farside.co.uk, HTML scrape tak-resmi, butuh header browser-
+    realistis krn situs di belakang Cloudflare — lihat
+    [ARCHITECTURE.md §6.11](docs/ARCHITECTURE.md#611-scraperspositioningpy--cloudflare-butuh-header-browser-realistis)).
 - **Pipeline** `pipeline/run_daily.py` — orchestrator harian, idempotent (UPSERT).
 - **Backfill** `pipeline/backfill.py` — tarik data historis (BTC/macro), preview-before-commit.
 - **Manual article** `pipeline/add_article.py` — isi `manual_articles` untuk riset
@@ -169,12 +177,14 @@ python -m web.app
 Navigasi 6 tab sesuai alur pagi Master Plan §0: **1 Snapshot** (cards +
 source_flags + form Manual Backfill preview→confirm), **2 News** (list +
 filter impact + flag key trigger + Add Manual Article), **3 Forward**
-(Economic Calendar data asli + Policy Tracker manual + empty state untuk
-Expectations/Positioning/Disonansi — Phase D belum ada), **4 Reading**
+(Economic Calendar data asli + forecast/previous/actual manual, Expectations
+manual FedWatch/Dot Plot, Positioning COT+ETF otomatis & SBN manual, Policy
+Tracker manual, Disonansi Flag rule-based), **4 Reading**
 (4 lensa GEMA/LEON/AKELA/RIVAN + External AI Check manual + Conflict
 Notes), **5 Chart** (candlestick + S&R zone overlay + marker
-breakout/retest + Approve/Reject sinyal), **6 Synthesis** (textarea +
-outlook 5 instrumen + Trading Journal + Prediction Log + skor prediksi).
+breakout/retest + Approve/Reject sinyal + MA50/100/200 + filter rentang),
+**6 Synthesis** (textarea + outlook 5 instrumen + Trading Journal +
+Prediction Log + skor prediksi).
 
 **Tanpa autentikasi** (local-only, `WEB_HOST`/`WEB_PORT` bisa diatur via
 `.env`). **Tidak ada pemanggilan AI/LLM otomatis di mana pun** — "External
@@ -186,9 +196,11 @@ Endpoint Phase 1 (read-only, tidak berubah): `/api/latest`,
 `/api/health`. Endpoint Phase C (menulis, reuse fungsi yang sudah teruji —
 lihat `docs/ARCHITECTURE.md` §5.6): `/api/backfill/{preview,commit}`,
 `/api/news/flag_key`, `/api/articles/add`, `/api/econ_calendar`,
-`/api/policy{,/add}`, `/api/reading{,/save}`, `/api/sr_zones`,
-`/api/signals{,/review}`, `/api/synthesis/save`, `/api/journal/add`,
-`/api/prediction/{add,due,score}`, `/api/outlook_instruments`.
+`/api/econ_calendar/actual`, `/api/policy{,/add}`, `/api/reading{,/save}`,
+`/api/sr_zones`, `/api/signals{,/review}`, `/api/synthesis/save`,
+`/api/journal/add`, `/api/prediction/{add,due,score}`,
+`/api/outlook_instruments`. Endpoint Phase D:
+`/api/expectations{,/add}`, `/api/positioning{,/add}`, `/api/disonansi`.
 
 ### Test
 ```bash
@@ -206,7 +218,10 @@ python -m pytest -q
 | `daily_news` | ✅ otomatis | headline + `impact_level` (HIGH/MED/LOW) |
 | `econ_calendar` | ✅ otomatis | event ekonomi masa depan (ForexFactory), UPSERT by natural key |
 | `manual_articles` | 🖊️ manual (ada tool) | riset historis — isi via `python -m pipeline.add_article`, RSS tidak bisa backfill |
-| `reading_workspace`, `trade_signals`, `sr_zones`, `trading_journal`, `prediction_log`, `asset_context_weight`, `expectations`, `positioning`, `policy_tracker` | ⬜ struktur saja | dipakai Phase B/C/D |
+| `positioning` | ✅ otomatis + 🖊️ manual | COT (CFTC) + BTC ETF flow otomatis tiap `run_daily`; SBN foreign flow & koreksi manual via dashboard |
+| `expectations` | 🖊️ manual | CME FedWatch cut probability, Fed Dot Plot median — tidak ada sumber gratis, isi via dashboard Panel 3 |
+| `policy_tracker` | 🖊️ manual | pernyataan pembuat kebijakan, `literal_statement` vs `inference` terpisah tegas, via dashboard Panel 3 |
+| `reading_workspace`, `trade_signals`, `sr_zones`, `trading_journal`, `prediction_log`, `asset_context_weight` | 🖊️/⚙️ | dipakai Phase B/C (lihat bagian masing-masing di atas) |
 
 `source_flags` (JSON di `daily_market`) mencatat status tiap API per run, mis:
 ```json

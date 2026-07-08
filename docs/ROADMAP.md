@@ -14,7 +14,7 @@
 | **1** | Dashboard read-only (Flask) | ✅ Selesai — jadi fondasi Panel 1/2/5 di Phase C |
 | **B** | S&R detection, breakout/retest engine | ✅ **Selesai untuk BTC** — [plan_b.txt](../plan_b.txt) dieksekusi penuh, 46 test baru, diverifikasi data asli |
 | **C** | Dashboard/UI penuh (6 panel, write-enabled) | ✅ **Selesai** — [plan_c.txt](../plan_c.txt) dieksekusi penuh, semua panel diverifikasi via browser |
-| **D** | Forward layer (FedWatch, COT, policy) | ⬜ Belum mulai — schema (3 tabel) sudah siap, tinggal isi logic |
+| **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — [plan_d.txt](../plan_d.txt) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
 | **E** | Telegram bot | ⬜ Belum mulai |
 | **F+** | Multi-aset expansion | ⬜ Belum mulai |
 
@@ -230,21 +230,51 @@ perlu — local-only). Panel 5 MA/volume/context-chart yang tadinya backlog
 
 ---
 
-## ⬜ Phase D — Forward Layer
+## ✅ Phase D — Forward Layer
 
-**Belum mulai.** Scope (Master Plan §4.2, 3 stage): data
-**masa depan/forward-looking** — FedWatch probability & Dot Plot
-(Expectations), COT report & ETF/SBN flow (Positioning), pernyataan
-pembuat kebijakan dengan `literal_statement` vs `inference` terpisah
-tegas (Policy Tracker — kolom sempat bernama `giel_inference`, di-rename
-lepas dari nama personal). Juga mengisi `econ_calendar` dan
-`asset_context_weight` (pembobotan driver per aset) yang strukturnya sudah
-disiapkan sejak Phase A.
+**Selesai** — [plan_d.txt](../plan_d.txt) dieksekusi penuh. Scope (Master
+Plan §4.2, 3 stage): Policy Tracker (Stage 3/Layer A) sudah dikerjakan
+lebih awal di Phase C (independen dari urutan Phase D). Sisa scope:
 
-**Prasyarat schema:** ✅ sudah siap — 3 tabel (`expectations`, `positioning`,
-`policy_tracker`) sudah ditambah ke `schema.sql` sejak Phase A (lihat
-[Cross-check](#anchor-cross-check)). Phase D tinggal isi scraper/logic-nya,
-bukan mulai dari bikin schema.
+- **Riset sumber sebelum eksekusi** (dicek langsung, bukan asumsi):
+  - CME FedWatch: TIDAK ADA API gratis (resmi mulai $25/bulan) → **manual**.
+  - Fed Dot Plot/SEP: rilis PDF kuartalan → **manual** (sesuai rencana awal).
+  - COT report: CFTC Socrata API **gratis, tanpa API key** (dikonfirmasi
+    live query) → **diotomatisasi**.
+  - BTC ETF flow: farside.co.uk tidak punya API resmi, dan situsnya di
+    belakang Cloudflare — `requests` dengan header default (`Accept:
+    application/json`, UA bot) kena challenge page, header browser-realistis
+    (UA Chrome + `Accept: text/html` + `Accept-Language`) lolos →
+    **diotomatisasi** (HTML scrape, sama profil risiko dengan ForexFactory/
+    RSS: kalau situs berubah, `source_flags` fail + lanjut, tidak crash).
+  - SBN foreign flow: djppr.kemenkeu.go.id tidak scrape-able reliable (fetch
+    polos tidak dapat konten bermakna, indikasi SPA) → **manual**.
+- **`scrapers/positioning.py`**: `fetch_cot_positioning()` (BTC/DXY/GOLD/
+  SP500, metric `cot_net_long` = noncomm long−short dari CFTC Legacy Futures
+  Only report) + `fetch_btc_etf_flow()` (10 hari terakhir dari farside.co.uk,
+  metric `etf_net_flow`). Terintegrasi ke `run_daily` (dipanggil tiap hari;
+  COT cuma nambah row kalau memang ada rilis mingguan baru — idempotent).
+- **`positioning` UPSERT**: `idx_positioning_dedup` UNIQUE(date, instrument,
+  metric) ditambah ke schema; `pipeline/run_daily.py::upsert_positioning()`.
+- **Manual entry generik** (`web/writes.py::insert_positioning_manual`):
+  satu form dipakai baik utk SBN foreign flow (metric bebas TEXT) MAUPUN
+  koreksi manual atas row hasil scrape (mis. ETF flow) — `ON CONFLICT DO
+  UPDATE` by natural key, sesuai keputusan #2 di `plan_d.txt`.
+- **Expectations** (`insert_expectation`/`list_expectations`): form manual
+  CME FedWatch cut probability & Dot Plot median.
+- **Disonansi Flag** (`compute_disonansi`): aturan v1 sederhana (BUKAN AI) —
+  bandingkan sign `stance_score` terbaru (Policy Tracker) vs tren
+  `cot_net_long` DXY 14 hari terakhir; kalau berlawanan arah → flagged.
+  Return `{"available": false}` kalau data belum cukup (butuh ≥1
+  stance_score DAN ≥2 baris COT DXY dalam window) — empty-state eksplisit,
+  bukan error.
+- **Dashboard Panel 3**: 3 empty-state lama (Expectations/Positioning/
+  Disonansi) diganti tabel+form asli.
+- **Test baru**: `tests/test_positioning.py` (scraper, live network + unit
+  parse helper) + 6 test baru di `tests/test_web_writes.py` — total 108 test.
+- **Belum otomatis** (dicatat, bukan terlewat): SBN foreign flow (sumber
+  tidak scrape-able), CME FedWatch/Dot Plot (tidak ada API gratis) — semua
+  by design, bukan gap teknis.
 
 ---
 
