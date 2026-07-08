@@ -120,8 +120,8 @@ def test_empty_zones_returns_empty():
     assert detect_signals([], [], [], [], [], [], []) == []
 
 
-def test_signal_dict_never_contains_giel_approved_key():
-    # Modul ini PURE, tidak pernah set giel_approved -- itu urusan
+def test_signal_dict_never_contains_approved_key():
+    # Modul ini PURE, tidak pernah set approved -- itu urusan
     # pipeline/run_analysis.py saat INSERT (hardcode 0, lihat regression
     # test di test_run_analysis.py). Guard di sini: key itu memang tidak
     # ada sama sekali di output modul ini (desain lebih ketat dari sekadar
@@ -135,4 +135,4 @@ def test_signal_dict_never_contains_giel_approved_key():
     volume_mas = [100.0, 100.0]
     signals = detect_signals(dates, closes, highs, lows, volumes, volume_mas, zones)
     for s in signals:
-        assert "giel_approved" not in s
+        assert "approved" not in s

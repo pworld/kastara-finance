@@ -4,7 +4,7 @@
 sumber-sumber gratis (no paid API). **Phase B** (selesai untuk BTC): deteksi
 zona S&R + sinyal breakout/retest + R:R calculator dari histori
 `asset_ohlcv` — tetap **suggestion, bukan execution/trading logic**;
-keputusan akhir tetap manual (`giel_approved`, direview via
+keputusan akhir tetap manual (`approved`, direview via
 `tools/review_signal.py`).
 
 > Scope dikunci di `plan.txt` (Phase A) dan `plan_b.txt` (Phase B).
@@ -42,7 +42,7 @@ keputusan akhir tetap manual (`giel_approved`, direview via
     high/low + clustering + touch count).
   - `analysis/signals.py` — deteksi breakout/retest + R:R calculator.
   - `pipeline/run_analysis.py` — orchestrator, tulis ke `sr_zones` +
-    `trade_signals`. **Suggestion only** — `giel_approved` selalu 0 dari kode.
+    `trade_signals`. **Suggestion only** — `approved` selalu 0 dari kode.
   - `tools/review_signal.py` — CLI approve/reject sinyal by id eksplisit.
   - `pipeline/seed_context_weight.py` — seed pembobotan driver per aset.
 
@@ -139,7 +139,7 @@ itu valid.
 python -m pipeline.run_analysis
 ```
 Idempotent (re-run tidak duplikat zona/sinyal, tidak menimpa
-`validated_by_giel`/`notes` yang sudah direview manual). **Manual trigger**
+`validated`/`notes` yang sudah direview manual). **Manual trigger**
 untuk sekarang, belum di-cron (lokal cuma dev — lihat [plan_b.txt](plan_b.txt) §7.6).
 
 ```bash
@@ -153,7 +153,7 @@ python -m tools.review_signal reject  --id 42 --notes "DXY breakout barengan, sk
 python -m pipeline.seed_context_weight
 ```
 
-Semua sinyal dari `run_analysis` **suggestion only** — `giel_approved`
+Semua sinyal dari `run_analysis` **suggestion only** — `approved`
 selalu 0 dari kode, cuma berubah lewat `review_signal approve`. Tidak ada
 execution/trading logic di mana pun.
 

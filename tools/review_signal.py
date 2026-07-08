@@ -1,6 +1,6 @@
 """Tool CLI untuk approve/reject trade_signals (Phase B).
 
-Mengubah HANYA giel_approved + notes untuk row yang SUDAH ADA — tidak
+Mengubah HANYA approved + notes untuk row yang SUDAH ADA — tidak
 pernah membuat/menghitung ulang sinyal (itu tugas pipeline/run_analysis.py).
 ID wajib eksplisit, TIDAK ADA mode "approve semua" — prinsip "Giel yang
 approve, bukan mesin" (Master Plan §3), dikunci di plan_b.txt §6.
@@ -24,12 +24,12 @@ def list_signals(
     conn, *, instrument: str | None = None, valid_only: bool = False,
     show_all: bool = False, limit: int = 50,
 ) -> list[dict[str, Any]]:
-    """Default: cuma sinyal PENDING (giel_approved=0 AND notes IS NULL —
+    """Default: cuma sinyal PENDING (approved=0 AND notes IS NULL —
     belum pernah direview sama sekali). --all: tampilkan semua status."""
     where: list[str] = []
     params: list[Any] = []
     if not show_all:
-        where.append("giel_approved = 0 AND notes IS NULL")
+        where.append("approved = 0 AND notes IS NULL")
     if instrument:
         where.append("instrument = ?")
         params.append(instrument.upper())
@@ -47,20 +47,20 @@ def list_signals(
 
 
 def set_review(conn, signal_id: int, *, approved: bool, notes: str | None) -> bool:
-    """Update giel_approved + notes untuk 1 row by id. Return False kalau
+    """Update approved + notes untuk 1 row by id. Return False kalau
     id tidak ditemukan (bukan diam-diam no-op)."""
     exists = conn.execute("SELECT 1 FROM trade_signals WHERE id = ?", (signal_id,)).fetchone()
     if not exists:
         return False
     conn.execute(
-        "UPDATE trade_signals SET giel_approved = ?, notes = ? WHERE id = ?",
+        "UPDATE trade_signals SET approved = ?, notes = ? WHERE id = ?",
         (1 if approved else 0, notes, signal_id),
     )
     return True
 
 
 def _print_signal(s: dict[str, Any]) -> None:
-    status = "APPROVED" if s["giel_approved"] else ("REJECTED" if s["notes"] else "pending")
+    status = "APPROVED" if s["approved"] else ("REJECTED" if s["notes"] else "pending")
     valid = "valid" if s["is_valid"] == 1 else ("invalid" if s["is_valid"] == 0 else "-")
     print(f"  id={s['id']:<5} {s['date']} {s['instrument']:<8} {s['signal_type']:<9} "
           f"[{valid}] [{status}]")

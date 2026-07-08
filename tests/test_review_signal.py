@@ -9,16 +9,16 @@ def _seed_signal(conn, **overrides):
         "date": "2026-01-01", "instrument": "BTC", "signal_type": "RETEST",
         "entry_price": 100.0, "sl_price": 95.0, "tp1_price": 115.0,
         "rr_ratio": 3.0, "zone_lower": 95.0, "zone_upper": 100.0,
-        "volume_confirmed": 1, "is_valid": 1, "giel_approved": 0, "notes": None,
+        "volume_confirmed": 1, "is_valid": 1, "approved": 0, "notes": None,
     }
     defaults.update(overrides)
     cur = conn.execute(
         "INSERT INTO trade_signals (date, instrument, signal_type, entry_price, "
         "sl_price, tp1_price, rr_ratio, zone_lower, zone_upper, volume_confirmed, "
-        "is_valid, giel_approved, notes, created_at) "
+        "is_valid, approved, notes, created_at) "
         "VALUES (:date, :instrument, :signal_type, :entry_price, :sl_price, "
         ":tp1_price, :rr_ratio, :zone_lower, :zone_upper, :volume_confirmed, "
-        ":is_valid, :giel_approved, :notes, '')",
+        ":is_valid, :approved, :notes, '')",
         defaults,
     )
     return cur.lastrowid
@@ -29,7 +29,7 @@ def test_list_default_shows_only_pending(tmp_path):
     init_db(db)
     with get_connection(db) as conn:
         id_pending = _seed_signal(conn)
-        id_approved = _seed_signal(conn, giel_approved=1)
+        id_approved = _seed_signal(conn, approved=1)
         id_rejected = _seed_signal(conn, notes="skip, alasan")
         conn.commit()
 
@@ -45,7 +45,7 @@ def test_list_all_shows_everything(tmp_path):
     init_db(db)
     with get_connection(db) as conn:
         _seed_signal(conn)
-        _seed_signal(conn, giel_approved=1)
+        _seed_signal(conn, approved=1)
         conn.commit()
         rows = list_signals(conn, show_all=True)
         assert len(rows) == 2
@@ -74,12 +74,12 @@ def test_set_review_approve(tmp_path):
         ok = set_review(conn, sid, approved=True, notes="setup bagus")
         conn.commit()
         assert ok is True
-        row = conn.execute("SELECT giel_approved, notes FROM trade_signals WHERE id=?", (sid,)).fetchone()
-        assert row["giel_approved"] == 1
+        row = conn.execute("SELECT approved, notes FROM trade_signals WHERE id=?", (sid,)).fetchone()
+        assert row["approved"] == 1
         assert row["notes"] == "setup bagus"
 
 
-def test_set_review_reject_keeps_giel_approved_zero(tmp_path):
+def test_set_review_reject_keeps_approved_zero(tmp_path):
     db = tmp_path / "t.db"
     init_db(db)
     with get_connection(db) as conn:
@@ -88,8 +88,8 @@ def test_set_review_reject_keeps_giel_approved_zero(tmp_path):
         ok = set_review(conn, sid, approved=False, notes="DXY breakout barengan, skip")
         conn.commit()
         assert ok is True
-        row = conn.execute("SELECT giel_approved, notes FROM trade_signals WHERE id=?", (sid,)).fetchone()
-        assert row["giel_approved"] == 0
+        row = conn.execute("SELECT approved, notes FROM trade_signals WHERE id=?", (sid,)).fetchone()
+        assert row["approved"] == 0
         assert row["notes"] == "DXY breakout barengan, skip"
 
 
@@ -112,6 +112,6 @@ def test_set_review_only_affects_target_row(tmp_path):
         conn.commit()
         set_review(conn, id1, approved=True, notes="only this one")
         conn.commit()
-        row2 = conn.execute("SELECT giel_approved, notes FROM trade_signals WHERE id=?", (id2,)).fetchone()
-        assert row2["giel_approved"] == 0
+        row2 = conn.execute("SELECT approved, notes FROM trade_signals WHERE id=?", (id2,)).fetchone()
+        assert row2["approved"] == 0
         assert row2["notes"] is None

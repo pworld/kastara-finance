@@ -2,7 +2,7 @@
 
 Baca asset_ohlcv (BTC, hardcode di sini — analysis/*.py TETAP generic per
 plan_b.txt §4), deteksi zona S&R + sinyal breakout/retest, UPSERT sr_zones,
-INSERT trade_signals (dedup manual, giel_approved SELALU 0).
+INSERT trade_signals (dedup manual, approved SELALU 0).
 
 Dijadwalkan MANUAL untuk sekarang (plan_b.txt §7.6 — lokal cuma dev, cron
 dipindah ke server nanti):
@@ -44,7 +44,7 @@ def _load_history(conn: sqlite3.Connection, instrument: str) -> dict[str, list]:
 def upsert_sr_zone(conn: sqlite3.Connection, instrument: str, zone: dict[str, Any]) -> str:
     """UPSERT 1 zona by natural key (bucket relatif, plan_b.txt §7.4).
 
-    Return 'inserted' | 'updated'. TIDAK PERNAH menimpa `validated_by_giel`
+    Return 'inserted' | 'updated'. TIDAK PERNAH menimpa `validated`
     atau `notes` — itu field manual review, bukan hasil deteksi otomatis.
     """
     target_key = zone_bucket_key(zone["zone_type"], zone["zone_lower"], zone["zone_upper"])
@@ -69,7 +69,7 @@ def upsert_sr_zone(conn: sqlite3.Connection, instrument: str, zone: dict[str, An
 
     conn.execute(
         "INSERT INTO sr_zones (instrument, zone_lower, zone_upper, touch_count, "
-        "zone_type, first_seen, last_touched, is_active, validated_by_giel, notes) "
+        "zone_type, first_seen, last_touched, is_active, validated, notes) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)",
         (instrument, zone["zone_lower"], zone["zone_upper"], zone["touch_count"],
          zone["zone_type"], zone["first_seen"], zone["last_touched"], zone["is_active"]),
@@ -83,7 +83,7 @@ def insert_signal_dedup(conn: sqlite3.Connection, instrument: str, signal: dict[
     (trade_signals tidak punya UNIQUE index, plan_b.txt §5: append-only).
     Return True kalau baris baru ditulis.
 
-    `giel_approved` HARDCODE 0 di sini — satu-satunya tempat trade_signals
+    `approved` HARDCODE 0 di sini — satu-satunya tempat trade_signals
     ditulis dari kode otomatis, jadi ini titik jaminan non-negotiable-nya
     (lihat test_run_analysis.py regression guard).
     """
@@ -98,7 +98,7 @@ def insert_signal_dedup(conn: sqlite3.Connection, instrument: str, signal: dict[
     conn.execute(
         "INSERT INTO trade_signals (date, instrument, signal_type, entry_price, "
         "sl_price, tp1_price, tp2_price, rr_ratio, zone_lower, zone_upper, "
-        "volume_confirmed, is_valid, giel_approved, notes, created_at) "
+        "volume_confirmed, is_valid, approved, notes, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)",
         (signal["date"], instrument, signal["signal_type"], signal["entry_price"],
          signal["sl_price"], signal["tp1_price"], signal["tp2_price"], signal["rr_ratio"],

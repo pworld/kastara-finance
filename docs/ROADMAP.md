@@ -159,8 +159,8 @@ sudah direview & dikunci Giel, dieksekusi persis sesuai itu.
   Breakout tanpa retest disimpan row terpisah (§7.5), R:R < 1.5 tetap
   disimpan `is_valid=0` (bukan silent-drop).
 - `pipeline/run_analysis.py` — orchestrator, BTC-only filter (§4, generic
-  di `analysis/*`), UPSERT zona (preserve `validated_by_giel`/`notes` milik
-  manusia saat re-run), INSERT sinyal dedup, `giel_approved` **hardcode 0**
+  di `analysis/*`), UPSERT zona (preserve `validated`/`notes` milik
+  manusia saat re-run), INSERT sinyal dedup, `approved` **hardcode 0**
   di satu-satunya titik tulis.
 - `tools/review_signal.py` — CLI approve/reject **by id eksplisit**, tidak
   ada mode approve-semua (Master Plan §3: Giel yang approve, bukan mesin).
@@ -168,7 +168,7 @@ sudah direview & dikunci Giel, dieksekusi persis sesuai itu.
   =HIGH, `fear_greed`/`dxy`=MED, persis Master Plan §4.3).
 - 46 test baru (total 80), semua hijau. Diverifikasi juga dengan data BTC
   ASLI (4.313 baris, 2014-2026): 119 zona (117 aktif), 455 sinyal — **0
-  di antaranya `giel_approved=1`** (regression guard, bukan cuma di test
+  di antaranya `approved=1`** (regression guard, bukan cuma di test
   sintetis).
 - Cron: **tidak** dijadwalkan otomatis (§7.6) — dijalankan manual, sejalan
   dengan keputusan cron production akan pindah ke server, lokal cuma dev.
@@ -197,8 +197,9 @@ isi via **CLI** (`pipeline/add_article.py`, di luar dashboard — lihat
 **Belum mulai.** Scope (Master Plan §4.2, 3 stage): data
 **masa depan/forward-looking** — FedWatch probability & Dot Plot
 (Expectations), COT report & ETF/SBN flow (Positioning), pernyataan
-pembuat kebijakan dengan `literal_statement` vs `giel_inference` terpisah
-tegas (Policy Tracker). Juga mengisi `econ_calendar` dan
+pembuat kebijakan dengan `literal_statement` vs `inference` terpisah
+tegas (Policy Tracker — kolom sempat bernama `giel_inference`, di-rename
+lepas dari nama personal). Juga mengisi `econ_calendar` dan
 `asset_context_weight` (pembobotan driver per aset) yang strukturnya sudah
 disiapkan sejak Phase A.
 

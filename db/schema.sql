@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS trade_signals (
     entry_price REAL, sl_price REAL, tp1_price REAL, tp2_price REAL,
     rr_ratio REAL, zone_lower REAL, zone_upper REAL,
     volume_confirmed INTEGER, is_valid INTEGER,
-    giel_approved INTEGER DEFAULT 0, notes TEXT, created_at TEXT
+    approved INTEGER DEFAULT 0, notes TEXT, created_at TEXT
 );
 
 -- 7. S&R zones (semi-otomatis + validasi manual, Phase B)
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS sr_zones (
     instrument TEXT, zone_lower REAL, zone_upper REAL,
     touch_count INTEGER, zone_type TEXT,
     first_seen TEXT, last_touched TEXT,
-    is_active INTEGER, validated_by_giel INTEGER DEFAULT 0, notes TEXT
+    is_active INTEGER, validated INTEGER DEFAULT 0, notes TEXT
 );
 
 -- 8. Manual articles (input manual Giel)
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS policy_tracker (
     date TEXT, speaker TEXT, institution TEXT, source_url TEXT,
     literal_statement TEXT,   -- apa yang BENAR-BENAR dikatakan (testable)
     stance_score INTEGER,     -- skala arah, mis. -2 dovish s/d +2 hawkish
-    giel_inference TEXT,      -- pembacaan arah/intent (subjektif)
+    inference TEXT,           -- pembacaan arah/intent (subjektif)
     inference_flag TEXT,      -- TESTABLE / SPEKULATIF
     drift_note TEXT,
     created_at TEXT

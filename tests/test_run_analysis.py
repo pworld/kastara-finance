@@ -1,7 +1,7 @@
 """Test pipeline/run_analysis.py end-to-end — data sintetis di temp DB
 (bukan data BTC asli, supaya deterministic & cepat). Verifikasi wiring
 DB (load histori, UPSERT zona, INSERT sinyal dedup, idempotent) dan
-regression guard giel_approved SELALU 0.
+regression guard approved SELALU 0.
 """
 from db.connection import get_connection, init_db
 from pipeline.run_analysis import run_analysis
@@ -64,7 +64,7 @@ def test_run_analysis_end_to_end(tmp_path):
         # harganya (100.1) juga legitimately jatuh di dalam batas zona ini.
         assert main_zone[0]["touch_count"] == 3
         assert main_zone[0]["is_active"] == 1
-        assert main_zone[0]["validated_by_giel"] == 0  # default, belum direview manual
+        assert main_zone[0]["validated"] == 0  # default, belum direview manual
 
         signals = conn.execute(
             "SELECT * FROM trade_signals WHERE instrument = ?", (INSTRUMENT,)
@@ -75,7 +75,7 @@ def test_run_analysis_end_to_end(tmp_path):
         assert "RETEST" in types
 
 
-def test_run_analysis_giel_approved_always_zero(tmp_path):
+def test_run_analysis_approved_always_zero(tmp_path):
     """Regression guard non-negotiable (plan_b.txt §9 Definition of Done)."""
     db = tmp_path / "analysis_test.db"
     _seed_synthetic_history(db)
@@ -83,10 +83,10 @@ def test_run_analysis_giel_approved_always_zero(tmp_path):
 
     with get_connection(db) as conn:
         rows = conn.execute(
-            "SELECT giel_approved FROM trade_signals WHERE instrument = ?", (INSTRUMENT,)
+            "SELECT approved FROM trade_signals WHERE instrument = ?", (INSTRUMENT,)
         ).fetchall()
         assert len(rows) > 0
-        assert all(r["giel_approved"] == 0 for r in rows)
+        assert all(r["approved"] == 0 for r in rows)
 
 
 def test_run_analysis_idempotent(tmp_path):
@@ -111,7 +111,7 @@ def test_run_analysis_idempotent(tmp_path):
 
 
 def test_run_analysis_preserves_manual_review_on_rerun(tmp_path):
-    """Re-run TIDAK BOLEH menimpa validated_by_giel/notes yang sudah diisi
+    """Re-run TIDAK BOLEH menimpa validated/notes yang sudah diisi
     manual -- ini prinsip non-negotiable (plan_b.txt), bukan detail kecil."""
     db = tmp_path / "analysis_test.db"
     _seed_synthetic_history(db)
@@ -123,7 +123,7 @@ def test_run_analysis_preserves_manual_review_on_rerun(tmp_path):
             (INSTRUMENT,),
         ).fetchone()["id"]
         conn.execute(
-            "UPDATE sr_zones SET validated_by_giel=1, notes='sudah dicek manual' WHERE id=?",
+            "UPDATE sr_zones SET validated=1, notes='sudah dicek manual' WHERE id=?",
             (zone_id,),
         )
         conn.commit()
@@ -131,8 +131,8 @@ def test_run_analysis_preserves_manual_review_on_rerun(tmp_path):
     run_analysis(instrument=INSTRUMENT, db_path=db)
 
     with get_connection(db) as conn:
-        row = conn.execute("SELECT validated_by_giel, notes FROM sr_zones WHERE id=?", (zone_id,)).fetchone()
-        assert row["validated_by_giel"] == 1
+        row = conn.execute("SELECT validated, notes FROM sr_zones WHERE id=?", (zone_id,)).fetchone()
+        assert row["validated"] == 1
         assert row["notes"] == "sudah dicek manual"
 
 

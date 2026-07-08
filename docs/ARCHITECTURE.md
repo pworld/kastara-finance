@@ -103,8 +103,8 @@ struktur saja (disiapkan untuk Phase B/D, tidak dipakai sekarang).
 | `asset_ohlcv` | 1 baris / (tanggal, instrument) | OHLCV universal semua aset yang tradeable: BTC, SP500, IHSG, GOLD, USDIDR, USDJPY |
 | `daily_news` | 1 baris / headline unik | Headline RSS + `impact_level` (HIGH/MED/LOW, rule-based) |
 | `econ_calendar` | 1 baris / event unik (`event_date`+`event_name`+`country`) | Event ekonomi masa depan (FOMC/CPI/dll) dari ForexFactory, UPSERT (forecast bisa berubah mendekati rilis) |
-| `sr_zones` | 1 baris / zona unik (bucket relatif, per instrument+zone_type) | Zona S&R hasil deteksi `analysis/sr_zones.py`, UPSERT dari `pipeline/run_analysis.py`. `validated_by_giel`/`notes` manual — tidak pernah ditimpa re-run. |
-| `trade_signals` | 1 baris / event sinyal (append-only) | Breakout/retest hasil `analysis/signals.py`. `giel_approved` selalu 0 dari kode — direview manual via `tools/review_signal.py`. |
+| `sr_zones` | 1 baris / zona unik (bucket relatif, per instrument+zone_type) | Zona S&R hasil deteksi `analysis/sr_zones.py`, UPSERT dari `pipeline/run_analysis.py`. `validated`/`notes` manual — tidak pernah ditimpa re-run. |
+| `trade_signals` | 1 baris / event sinyal (append-only) | Breakout/retest hasil `analysis/signals.py`. `approved` selalu 0 dari kode — direview manual via `tools/review_signal.py`. |
 | `asset_context_weight` | 1 baris / (instrument, driver) | Pembobotan driver per aset (Master Plan §4.3). BTC di-seed via `pipeline/seed_context_weight.py`. |
 | `manual_articles` | 1 baris / artikel | Riset historis manual (RSS tidak bisa backfill) via `pipeline/add_article.py`. |
 
@@ -223,15 +223,15 @@ orchestrator (`pipeline/run_analysis.py`), bukan di sini.
 - `signals.py`: `detect_signals` — breakout (close > resistance + volume)
   → retest (close > zone_lower + volume hadir) → entry/SL/TP1/R:R. Sinyal
   R:R rendah TETAP direturn (`is_valid=0`), bukan silent-drop. Tidak pernah
-  menyertakan `giel_approved` di output-nya sama sekali (desain lebih ketat
+  menyertakan `approved` di output-nya sama sekali (desain lebih ketat
   dari sekadar "selalu 0" — field itu cuma ada di titik tulis DB).
 
 ### 5.8 `pipeline/run_analysis.py` — orchestrator Phase B
 Baca histori `asset_ohlcv` → `analysis/sr_zones.py` → UPSERT `sr_zones`
-(preserve `validated_by_giel`/`notes`) → reload zona aktif → `analysis/
+(preserve `validated`/`notes`) → reload zona aktif → `analysis/
 signals.py` → INSERT `trade_signals` (dedup manual by date+instrument+
 signal_type+zone bounds, tidak ada UNIQUE index — lihat §6.6).
-`giel_approved` **hardcode 0** persis di titik `INSERT` ini — satu-satunya
+`approved` **hardcode 0** persis di titik `INSERT` ini — satu-satunya
 tempat kode otomatis menulis `trade_signals`.
 
 **Temuan penting saat eksekusi:** kolom `volume_ma20` di `asset_ohlcv`
@@ -243,8 +243,8 @@ mengandalkan kolom tersimpan.
 ### 5.9 `tools/review_signal.py` — CLI approve/reject
 Pola sama seperti `pipeline/add_article.py`. `approve`/`reject` **wajib
 `--id` eksplisit** — tidak ada mode approve-semua (Master Plan §3: Giel
-yang approve, bukan mesin). `reject` cuma set `notes` (giel_approved tetap
-0) — bedanya dengan "belum direview" (giel_approved=0, notes=NULL) adalah
+yang approve, bukan mesin). `reject` cuma set `notes` (approved tetap
+0) — bedanya dengan "belum direview" (approved=0, notes=NULL) adalah
 notes terisi.
 
 ---

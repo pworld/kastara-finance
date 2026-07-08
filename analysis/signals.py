@@ -50,7 +50,7 @@ def detect_signals(
 ) -> list[dict[str, Any]]:
     """Deteksi SEMUA event breakout/retest sepanjang histori untuk zona aktif
     yang diberikan. Return list dict siap di-INSERT ke trade_signals (tanpa
-    `instrument`/`giel_approved`/`created_at` -- itu urusan orchestrator).
+    `instrument`/`approved`/`created_at` -- itu urusan orchestrator).
 
     Deterministik: input sama -> output sama persis, tiap kali dipanggil.
     Dedup terhadap yang sudah ada di DB itu tanggung jawab orchestrator.
