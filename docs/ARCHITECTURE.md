@@ -221,6 +221,17 @@ Reading → Chart → Synthesis.
 **Tanpa autentikasi** (keputusan sadar, `plan_c.txt` §6.4) — local-only,
 `WEB_HOST=127.0.0.1` default, belum ada rencana expose ke luar localhost.
 
+**Chart Panel 5 (menyusul setelah Phase C awal):** candlestick + MA50/100/200
+overlay + volume bar/MA20 + 4 context mini-chart (DXY/S&P500/US10Y/Fear&
+Greed) — item yang sempat ditunda di `plan_c.txt` keputusan #2, dikerjakan
+belakangan. Semua MA dihitung **client-side di JS** (`rollingMA()`, versi
+JS dari `analysis/indicators.py::rolling_ma`), bukan endpoint baru — chart
+fetch `/api/asset_ohlcv` dengan `limit` lebih besar dari yang ditampilkan
+(120 visible + 220 padding histori) supaya MA200 valid sejak candle
+PALING KIRI yang kelihatan, bukan cuma dari titik ke-200 dan seterusnya.
+Context mini-chart pakai `/api/daily_market` (sudah ada, tidak ada endpoint
+baru), independen dari instrument yang dipilih.
+
 ### 5.7 `analysis/` — engine Phase B (PURE, tidak baca/tulis DB)
 
 Terpisah dari `indicators/calc.py` (Phase A) karena beda concern & beda
@@ -403,3 +414,17 @@ akan menangkap bug ini karena tidak ada test untuk response shape endpoint
 JSON lama). Diperbaiki dengan menambah `id` ke `SELECT`. Pelajaran yang
 menegaskan prinsip `plan_c.txt` §5: "diverifikasi via preview browser,
 bukan cuma pytest."
+
+### 6.10 `hy_credit_spread` — contoh nyata "series FRED bisa dibatasi provider"
+
+`scrapers/macro_fred.py` sudah wanti-wanti sejak Phase A: *"Series id FRED
+kadang berubah/deprecate... jangan asumsi."* Ini kejadian konkretnya:
+`hy_credit_spread` (`BAMLH0A0HYM2`) cuma punya 787 baris di DB (vs ~4.100 di
+`dxy_close`/`vix_close`) — awalnya diduga gap backfill, ternyata **bukan**.
+Dicek langsung ke metadata FRED (`/fred/series`): pemilik data (ICE Data
+Indices) membatasi series ini ke **rolling 3-tahun** karena lisensi dengan
+FRED (*"Starting in April 2026, this series will only include 3 years of
+observations"*) — histori lebih panjang cuma tersedia langsung dari ICE
+Data (berbayar), di luar scope "no paid API". Dikonfirmasi lewat re-run
+`backfill.py`: 0 baris baru (DB sudah punya semua yang FRED sediakan).
+Tidak ada tindakan lanjut — ini batas sumber data, bukan bug.

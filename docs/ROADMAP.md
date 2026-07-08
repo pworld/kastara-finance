@@ -208,8 +208,9 @@ navigasi 6 tab sesuai alur pagi Master Plan §0/§6.
 - **Panel 5** (Chart + TA): upgrade dari line-chart Phase 1 jadi **candlestick
   OHLCV + S&R zone overlay + marker breakout/retest + Approve/Reject**
   (reuse `tools.review_signal.set_review()`, `approved` tetap manual).
-  MA overlay/volume bar/context-chart 4-kecil **ditunda ke backlog**
-  (keputusan #2, bukan bagian Phase C ini).
+  MA50/100/200 overlay + volume bar/MA20 + 4 context mini-chart (DXY/S&P
+  500/US10Y/Fear&Greed) sempat ditunda (keputusan #2), **sudah dikerjakan
+  menyusul** — lihat [Backlog Kecil](#anchor-backlog).
 - **Panel 6** (Synthesis): textarea sintesis (→ `reading_workspace` lens=
   SYNTHESIS) + outlook dropdown **5 instrumen** (BTC/SP500/IHSG/GOLD/USDIDR,
   USDJPY dikecualikan — keputusan #5) + form Trading Journal + Prediction
@@ -222,9 +223,10 @@ flag key trigger, kedua form Panel 3/4/6, semuanya dikonfirmasi menulis
 dengan benar ke tabel yang tepat.
 
 **Belum termasuk** (sesuai batas `plan_c.txt`, bukan terlewat): scraper
-otomatis Expectations/Positioning/Policy Tracker (Phase D), MA/volume/
-context-chart Panel 5 (backlog), Telegram bot (Phase E), multi-instrument
-analysis engine (Phase F+), autentikasi (belum perlu — local-only).
+otomatis Expectations/Positioning/Policy Tracker (Phase D), Telegram bot
+(Phase E), multi-instrument analysis engine (Phase F+), autentikasi (belum
+perlu — local-only). Panel 5 MA/volume/context-chart yang tadinya backlog
+**sudah selesai juga** (lihat [Backlog Kecil](#anchor-backlog)).
 
 ---
 
@@ -263,6 +265,7 @@ ditinjau ulang kalau volume/concurrency berubah signifikan (lihat
 
 ---
 
+<a id="anchor-backlog"></a>
 ## Backlog Kecil (tidak terikat 1 phase, bisa dikerjakan kapan saja)
 
 Hal-hal konkret yang sudah teridentifikasi selama Phase A/1 tapi belum
@@ -277,9 +280,45 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       terintegrasi ke `run_daily`, 6 test hijau.
 - [x] ~~3 tabel forward-layer~~ — `expectations`/`positioning`/
       `policy_tracker` sudah di `schema.sql`.
-- [ ] **Backfill penuh 5 tahun** untuk semua instrument (`BTC`, `SP500`,
-      `IHSG`, `GOLD`, `USDIDR`, `USDJPY`, + series FRED kalau
-      `FRED_API_KEY` sudah diisi) — sedang berjalan bertahap oleh user.
+- [x] ~~Backfill penuh 5 tahun~~ — **selesai** untuk semua instrument
+      (`BTC` 2014-2026, `SP500`/`IHSG`/`GOLD`/`USDIDR`/`USDJPY` 2010-2026,
+      4.000+ baris masing-masing) + semua series FRED (lihat item
+      `hy_credit_spread` di bawah untuk penjelasan kenapa satu series lebih
+      pendek — **bukan gap**, `walcl`/`tga` yang rendah juga WAJAR, seri
+      publikasi mingguan bukan harian).
+- [x] ~~Panel 5 chart MA/volume/context~~ — MA50/100/200 overlay, volume
+      bar+MA20, 4 context mini-chart (DXY/S&P500/US10Y/Fear&Greed) selesai,
+      diverifikasi via browser (120 titik penuh tiap garis MA, tanpa NaN).
+- [x] ~~Panel 5 chart: penanda tanggal/bulan + filter rentang~~ — sumbu bawah
+      chart sekarang nampilin label bulan/tahun (tick otomatis di titik
+      pergantian bulan, di-thin maks. 9 label biar gak numpuk saat rentang
+      panjang), plus 5 tombol filter rentang (1B/3B/6B/1T/Semua) di atas
+      chart yang ganti jumlah candle yang di-fetch & ditampilkan
+      (`CHART_VISIBLE`, default 90 hari). "Semua" narik s.d. 5.000 baris
+      (cap di `/api/asset_ohlcv`, dinaikkan dari 1.000) — cukup untuk histori
+      BTC penuh (~4.300 baris sejak 2014). Diverifikasi di browser: tiap
+      tombol filter mengubah rentang tanggal & jumlah candle yang benar
+      (1B → 30 hari/2 label, Semua → 2014-2026/9 label).
+- [x] ~~Panel 5 chart: sumbu harga (Y) + fix skala tertarik zona jauh~~ —
+      ditambah gridline + label harga di kanan chart biar angka open/close
+      kebaca langsung. Nemu bug pas nambahin ini: `sr_zones` narik SEMUA
+      zona aktif sepanjang histori (termasuk era BTC ~$200), jadi skala Y
+      dulu ke-stretch 199 → 124.457 dan candle beneran keliatan gepeng di
+      dasar chart. Fix: cuma zona yang overlap ±50% dari rentang harga yang
+      lagi tampil dipakai buat skala & digambar (`relevantZones`); label
+      "N/117 zona aktif" nunjukin berapa dari total yang relevan ke harga
+      saat ini. Diverifikasi: 3B → 29/117 zona relevan & axis 42.874-98.286
+      (masuk akal), Semua → 117/117 (span histori penuh, benar).
+- [x] ~~Investigasi `hy_credit_spread`~~ — **BUKAN bug/gap kita.** Dicek
+      langsung ke FRED (`/fred/series` metadata untuk `BAMLH0A0HYM2`):
+      *"Starting in April 2026, this series will only include 3 years of
+      observations. For more data, go to the source."* — ICE Data (pemilik
+      data ini) sengaja membatasi seri ini ke rolling 3-tahun karena lisensi
+      dengan FRED, bukan keterbatasan scraper/backfill kita. Dikonfirmasi:
+      DB kita sudah punya 787 dari 793 total observasi yang FRED sediakan
+      (re-run backfill: 0 baris baru = cakupan sudah lengkap). Histori lebih
+      panjang dari series ini **tidak tersedia gratis** — cuma lewat ICE Data
+      langsung (berbayar), di luar scope "no paid API".
 - [ ] Index/monitoring ukuran DB berkala saat volume bertambah (sanity check,
       bukan berarti perlu migrasi — lihat rationale SQLite di
       ARCHITECTURE.md).
@@ -288,7 +327,7 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       URL sudah pindah/berubah.
 - [ ] Backfill/isi `econ_calendar` untuk event yang sudah lewat kalau perlu
       histori kalender (scraper ini hanya kasih rolling window "minggu ini",
-      bukan sumber histori).
+      bukan sumber histori — butuh sumber lain kalau memang perlu).
 - [x] ~~`manual_articles` CLI~~ — `pipeline/add_article.py` selesai (add +
       list/search by tag/date-range/keyword), 5 test hijau. Dipakai buat
       riset historis (mis. dari 2010) yang RSS tidak bisa jangkau.

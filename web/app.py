@@ -1,7 +1,9 @@
 """Kastara Finance — dashboard (Phase 1 read-only + Phase C write-enabled).
 
 Flask app di atas kastara-finance.db. Endpoint /api/latest,daily_market,
-assets,asset_ohlcv,news,health (Phase 1) TETAP read-only, TIDAK diubah.
+assets,asset_ohlcv,news,health (Phase 1) TETAP read-only. `asset_ohlcv`
+limit cap dinaikkan 1000->5000 (Panel 5 chart filter "Semua") -- perilaku
+untuk pemanggil lama TIDAK berubah, cuma naikkan batas atas yang bisa diminta.
 Endpoint baru Phase C (backfill, articles, policy, reading, signals,
 synthesis, journal, prediction) MENULIS — lihat plan_c.txt. Semua tulisan
 manual (form Giel) atau reuse fungsi yang sudah ada & teruji
@@ -136,7 +138,10 @@ def assets():
 @app.get("/api/asset_ohlcv")
 def asset_ohlcv():
     instrument = request.args.get("instrument", "BTC")
-    limit = min(request.args.get("limit", 90, type=int), 1000)
+    # cap dinaikkan dari 1000 -> 5000 supaya filter chart "Semua" (Panel 5)
+    # bisa tarik seluruh histori BTC (~4.300 baris) tanpa terpotong.
+    # Perilaku untuk pemanggil lama (limit <=1000) tidak berubah.
+    limit = min(request.args.get("limit", 90, type=int), 5000)
     with get_connection() as conn:
         rows = conn.execute(
             "SELECT date, open, high, low, close, volume, volume_ma20 "
