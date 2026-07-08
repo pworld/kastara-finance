@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kastara-web",
+      "runtimeExecutable": "wsl",
+      "runtimeArgs": [
+        "bash",
+        "-lc",
+        "cd ~/LOCAL/kastara-finance && .venv/bin/python -m web.app"
+      ],
+      "port": 5000
+    }
+  ]
+}

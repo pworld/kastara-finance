@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kastara Finance — Dashboard</title>
+<style>
+  :root {
+    --bg: #0e1117; --panel: #171b23; --panel2: #1e2430; --border: #2a313c;
+    --text: #e6edf3; --muted: #8b949e; --accent: #4c9aff;
+    --ok: #3fb950; --fail: #f85149; --skip: #d29922;
+    --high: #f85149; --med: #d29922; --low: #6e7681;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    padding: 18px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  header .spacer { flex: 1; }
+  #refresh {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+  }
+  #refresh:hover { border-color: var(--accent); }
+  main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
+  .grid { display: grid; gap: 14px; }
+  .cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase;
+    letter-spacing: .4px; }
+  .card .value { font-size: 20px; font-weight: 600; margin-top: 4px;
+    font-variant-numeric: tabular-nums; }
+  .card .value.na { color: var(--muted); font-weight: 400; font-size: 16px; }
+  section { margin-top: 26px; }
+  section h2 { font-size: 15px; color: var(--text); margin: 0 0 12px;
+    border-left: 3px solid var(--accent); padding-left: 10px; }
+  .panel { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; }
+  .flags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .flag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+    padding: 4px 9px; border-radius: 20px; background: var(--panel2);
+    border: 1px solid var(--border); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot.ok { background: var(--ok); } .dot.fail { background: var(--fail); }
+  .dot.skip { background: var(--skip); }
+  .chart-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  select { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 8px; }
+  #chart { width: 100%; height: 220px; display: block; }
+  #chartMeta { color: var(--muted); font-size: 12px; margin-top: 6px;
+    font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);
+    font-size: 13px; vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+  td a { color: var(--text); text-decoration: none; }
+  td a:hover { color: var(--accent); text-decoration: underline; }
+  .badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+  .badge.HIGH { background: rgba(248,81,73,.18); color: var(--high); }
+  .badge.MED { background: rgba(210,153,34,.18); color: var(--med); }
+  .badge.LOW { background: rgba(110,118,129,.2); color: var(--low); }
+  .news-filters { display: flex; gap: 8px; margin-bottom: 12px; }
+  .news-filters button { background: var(--panel2); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px;
+    cursor: pointer; font-size: 12px; }
+  .news-filters button.active { color: var(--text); border-color: var(--accent); }
+  .empty { color: var(--muted); padding: 30px; text-align: center; }
+  .src { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>KASTARA FINANCE</h1>
+  <span class="sub" id="asOf">memuat…</span>
+  <span class="spacer"></span>
+  <button id="refresh">↻ Refresh</button>
+</header>
+
+<main>
+  <div id="emptyState" class="empty" style="display:none">
+    Belum ada data. Jalankan <code>python -m pipeline.run_daily</code> dulu.
+  </div>
+
+  <div id="content" style="display:none">
+    <section>
+      <h2>Snapshot Pasar</h2>
+      <div class="grid cards" id="cards"></div>
+    </section>
+
+    <section>
+      <h2>Status Sumber Data (source_flags)</h2>
+      <div class="panel">
+        <div class="flags" id="flags"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Chart Harga</h2>
+      <div class="panel">
+        <div class="chart-head">
+          <label class="src">Instrument</label>
+          <select id="instrument"></select>
+          <span id="chartMeta"></span>
+        </div>
+        <svg id="chart" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
+      </div>
+    </section>
+
+    <section>
+      <h2>Berita &amp; Impact</h2>
+      <div class="panel">
+        <div class="news-filters" id="newsFilters">
+          <button data-impact="" class="active">Semua</button>
+          <button data-impact="HIGH">HIGH</button>
+          <button data-impact="MED">MED</button>
+          <button data-impact="LOW">LOW</button>
+        </div>
+        <table>
+          <thead><tr><th>Impact</th><th>Headline</th><th>Sumber</th><th>Tgl</th></tr></thead>
+          <tbody id="newsBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+
+function fmt(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v !== "number") return String(v);
+  const abs = Math.abs(v);
+  if (abs >= 1e9) return (v / 1e9).toFixed(2) + "B";
+  if (abs >= 1e6) return (v / 1e6).toFixed(2) + "M";
+  if (abs >= 1000) return v.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (abs < 1 && abs > 0) return v.toPrecision(3);
+  return v.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+async function loadLatest() {
+  const d = await (await fetch("/api/latest")).json();
+  if (d.empty) {
+    $("#emptyState").style.display = "block";
+    $("#content").style.display = "none";
+    $("#asOf").textContent = "kosong";
+    return;
+  }
+  $("#emptyState").style.display = "none";
+  $("#content").style.display = "block";
+  $("#asOf").textContent = "per " + d.date + " · " + d.news_today + " berita hari itu";
+
+  // cards
+  $("#cards").innerHTML = d.snapshot.map(s => {
+    let val = fmt(s.value);
+    if (s.column === "fear_greed_value" && d.fear_greed_label && val !== null)
+      val = val + " · " + d.fear_greed_label;
+    const na = val === null;
+    return `<div class="card"><div class="label">${s.label}</div>
+      <div class="value ${na ? "na" : ""}">${na ? "n/a" : val}</div></div>`;
+  }).join("");
+
+  // flags
+  const order = { fail: 0, skip: 1, ok: 2 };
+  const flags = Object.entries(d.source_flags)
+    .sort((a, b) => (order[a[1]] - order[b[1]]) || a[0].localeCompare(b[0]));
+  $("#flags").innerHTML = flags.map(([k, v]) =>
+    `<span class="flag"><span class="dot ${v}"></span>${k}</span>`).join("")
+    || '<span class="src">tidak ada flag</span>';
+}
+
+let chartData = [];
+function drawChart(rows) {
+  chartData = rows;
+  const svg = $("#chart");
+  const W = 800, H = 220, pad = 6;
+  const closes = rows.map(r => r.close).filter(v => v !== null);
+  if (closes.length < 2) {
+    svg.innerHTML = `<text x="400" y="110" fill="#8b949e" text-anchor="middle">data kurang</text>`;
+    $("#chartMeta").textContent = "";
+    return;
+  }
+  const min = Math.min(...closes), max = Math.max(...closes);
+  const span = (max - min) || 1;
+  const n = rows.length;
+  const x = i => pad + (i / (n - 1)) * (W - 2 * pad);
+  const y = v => H - pad - ((v - min) / span) * (H - 2 * pad);
+  let d = "", area = "";
+  rows.forEach((r, i) => {
+    if (r.close === null) return;
+    const cmd = d === "" ? "M" : "L";
+    d += `${cmd}${x(i).toFixed(1)},${y(r.close).toFixed(1)} `;
+  });
+  const first = rows.findIndex(r => r.close !== null);
+  area = `M${x(first).toFixed(1)},${H - pad} ` + d.replace(/^M/, "L") +
+         `L${x(n - 1).toFixed(1)},${H - pad} Z`;
+  const up = closes[closes.length - 1] >= closes[0];
+  const col = up ? "#3fb950" : "#f85149";
+  svg.innerHTML =
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+       <stop offset="0" stop-color="${col}" stop-opacity="0.25"/>
+       <stop offset="1" stop-color="${col}" stop-opacity="0"/>
+     </linearGradient></defs>
+     <path d="${area}" fill="url(#g)"/>
+     <path d="${d}" fill="none" stroke="${col}" stroke-width="1.6"/>`;
+  const last = rows[rows.length - 1];
+  const pct = ((closes[closes.length - 1] - closes[0]) / closes[0] * 100).toFixed(2);
+  $("#chartMeta").textContent =
+    `${rows[first].date} → ${last.date} · close ${fmt(last.close)} · ${pct >= 0 ? "+" : ""}${pct}% (range) · MA20 vol ${fmt(last.volume_ma20)}`;
+}
+
+async function loadChart() {
+  const inst = $("#instrument").value;
+  const rows = await (await fetch(`/api/asset_ohlcv?instrument=${encodeURIComponent(inst)}&limit=120`)).json();
+  drawChart(rows);
+}
+
+async function loadAssets() {
+  const list = await (await fetch("/api/assets")).json();
+  const sel = $("#instrument");
+  sel.innerHTML = list.map(i => `<option>${i}</option>`).join("");
+  if (list.includes("BTC")) sel.value = "BTC";
+  if (list.length) await loadChart();
+}
+
+let impactFilter = "";
+async function loadNews() {
+  const q = impactFilter ? `?impact=${impactFilter}&limit=80` : "?limit=80";
+  const rows = await (await fetch("/api/news" + q)).json();
+  $("#newsBody").innerHTML = rows.map(r => {
+    const link = r.raw_url
+      ? `<a href="${r.raw_url}" target="_blank" rel="noopener">${r.headline}</a>`
+      : r.headline;
+    return `<tr>
+      <td><span class="badge ${r.impact_level}">${r.impact_level}</span></td>
+      <td>${link}</td><td class="src">${r.source}</td><td class="src">${r.date}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="4" class="src">tidak ada berita</td></tr>`;
+}
+
+$("#instrument").addEventListener("change", loadChart);
+$("#refresh").addEventListener("click", refreshAll);
+$("#newsFilters").addEventListener("click", (e) => {
+  if (e.target.tagName !== "BUTTON") return;
+  impactFilter = e.target.dataset.impact;
+  [...$("#newsFilters").children].forEach(b => b.classList.toggle("active", b === e.target));
+  loadNews();
+});
+
+async function refreshAll() {
+  await loadLatest();
+  await loadAssets();
+  await loadNews();
+}
+refreshAll();
+</script>
+</body>
+</html>

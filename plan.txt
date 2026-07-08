@@ -1,0 +1,420 @@
+# KASTARA FINANCE — CLAUDE CODE EXECUTION PLAN
+## Phase A: Database & Scraper
+
+**Untuk:** Claude Code (agen eksekusi)
+**Dari:** Kastara Finance Master Plan v1.4 (strategic doc — dokumen ini turunannya)
+**Scope:** HANYA Phase A. Jangan kerjakan Phase B+ tanpa instruksi baru.
+**Prinsip:** Kamu adalah TANGAN. Keputusan arsitektur sudah dikunci di bawah. Eksekusi sesuai spec, jangan re-desain.
+
+---
+
+## 0. ATURAN MAIN UNTUK AGEN (baca dulu)
+
+```
+DO
+✓ Ikuti schema PERSIS seperti di Section 3. Jangan tambah/kurang kolom.
+✓ Tulis kode modular: 1 source = 1 file scraper.
+✓ Tiap scraper HARUS bisa jalan sendiri (testable terpisah).
+✓ Simpan source_flags (ok/fail per API) tiap run — jangan silent fail.
+✓ Idempotent: jalan 2x untuk tanggal sama = update, bukan duplikat row.
+✓ Semua waktu dalam WIB (UTC+7). Simpan date sebagai YYYY-MM-DD.
+✓ Tulis test minimal per scraper (cek return bukan None, kolom lengkap).
+
+DON'T
+✗ JANGAN pakai API berbayar. Semua source di sini gratis.
+✗ JANGAN copy code dari repo AGPL (OpenBB dll) ke dalam project ini.
+  Kalau perlu OpenBB, pakai via `pip install openbb` sebagai library.
+✗ JANGAN bikin execution/trading/order logic. Ini cuma data layer.
+✗ JANGAN tambah dependency berat (no pandas-heavy ML, no tensorflow).
+✗ JANGAN hardcode API key di source. Pakai .env + python-dotenv.
+✗ JANGAN over-engineer. SQLite dulu, bukan Postgres. Local dulu, bukan cloud.
+```
+
+---
+
+## 1. TECH STACK (dikunci)
+
+```
+Language    : Python 3.11+
+Database    : SQLite (file lokal: kastara-finance.db)
+HTTP        : requests
+Data        : yfinance, pandas (untuk transform ringan saja)
+RSS         : feedparser
+Env         : python-dotenv
+Schedule    : (Phase A cukup manual run + cron note, belum perlu scheduler lib)
+Test        : pytest
+```
+
+**requirements.txt:**
+```
+requests
+yfinance
+pandas
+feedparser
+python-dotenv
+pytest
+```
+
+---
+
+## 2. STRUKTUR FOLDER (buat persis ini)
+
+```
+kastara-finance/
+├── .env.example          # template, JANGAN isi key asli
+├── .gitignore            # WAJIB: .env, *.db, __pycache__
+├── requirements.txt
+├── README.md             # cara setup + run
+├── kastara-finance.db            # (generated, gitignored)
+├── db/
+│   ├── __init__.py
+│   ├── schema.sql        # DDL semua tabel
+│   └── connection.py     # helper: get_connection(), init_db()
+├── scrapers/
+│   ├── __init__.py
+│   ├── base.py           # base class / shared helpers + source_flags
+│   ├── crypto.py         # CoinGecko + Binance + Alternative.me
+│   ├── macro_fred.py     # FRED: DXY, US10Y, VIX, WALCL, RRP, TGA, HY spread
+│   ├── macro_yf.py       # yfinance: SP500, IHSG, Gold, USD/IDR, USD/JPY
+│   └── news.py           # RSS parser + rule-based impact scoring
+├── pipeline/
+│   ├── __init__.py
+│   ├── run_daily.py      # orchestrator: panggil semua scraper, tulis DB
+│   └── backfill.py       # manual fetch tool (filter instrument + date range)
+├── indicators/
+│   ├── __init__.py
+│   └── calc.py           # volume_ma20, net_liquidity (calculated fields)
+└── tests/
+    ├── __init__.py
+    ├── test_crypto.py
+    ├── test_macro.py
+    └── test_db.py
+```
+
+---
+
+## 3. DATABASE SCHEMA (db/schema.sql — tulis PERSIS)
+
+Buat 11 tabel. Untuk Phase A, yang WAJIB diisi scraper: `daily_market`, `asset_ohlcv`, `daily_news`. Sisanya dibuat strukturnya saja (dipakai Phase B+).
+
+```sql
+-- 1. Konteks makro global (1 row per tanggal)
+CREATE TABLE IF NOT EXISTS daily_market (
+    date TEXT PRIMARY KEY,
+    btc_open REAL, btc_high REAL, btc_low REAL, btc_close REAL,
+    btc_volume REAL, btc_volume_ma20 REAL,
+    btc_dominance REAL, btc_funding_rate REAL, btc_oi REAL,
+    dxy_close REAL, dxy_change_pct REAL,
+    sp500_close REAL, sp500_change_pct REAL,
+    us10y_yield REAL, us10y_change_bps REAL,
+    vix_close REAL,
+    usd_jpy REAL,
+    walcl REAL, rrp REAL, tga REAL, net_liquidity REAL,
+    fear_greed_value INTEGER, fear_greed_label TEXT,
+    ihsg_close REAL, ihsg_change_pct REAL,
+    usd_idr REAL,
+    gold_close REAL,
+    btc_long_short_ratio REAL, btc_liquidation_24h REAL,
+    stablecoin_supply REAL, hy_credit_spread REAL, bi_fed_spread REAL,
+    created_at TEXT,
+    source_flags TEXT  -- JSON string: {"coingecko":"ok","fred":"fail",...}
+);
+
+-- 2. Harga universal semua aset (1 row per aset per tanggal)
+CREATE TABLE IF NOT EXISTS asset_ohlcv (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT,
+    instrument TEXT,
+    open REAL, high REAL, low REAL, close REAL,
+    volume REAL, volume_ma20 REAL,
+    created_at TEXT,
+    UNIQUE(date, instrument)
+);
+
+-- 3. News (rule-based scoring, BUKAN AI)
+CREATE TABLE IF NOT EXISTS daily_news (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT,
+    source TEXT,
+    headline TEXT,
+    raw_url TEXT,
+    impact_level TEXT,        -- HIGH/MED/LOW
+    is_key_trigger INTEGER DEFAULT 0,
+    created_at TEXT
+);
+
+-- 4. Economic calendar (event MASA DEPAN)
+CREATE TABLE IF NOT EXISTS econ_calendar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_date TEXT, event_time TEXT, event_name TEXT,
+    country TEXT, importance TEXT,
+    forecast TEXT, previous TEXT, actual TEXT,
+    is_watched INTEGER DEFAULT 0,
+    created_at TEXT
+);
+
+-- 5. Reading workspace (diisi manual oleh Giel, Phase C)
+CREATE TABLE IF NOT EXISTS reading_workspace (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT, lens TEXT, notes TEXT,
+    external_ai_ref TEXT, verdict TEXT, created_at TEXT
+);
+
+-- 6. Trade signals (suggest dari engine, Phase B)
+CREATE TABLE IF NOT EXISTS trade_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT, instrument TEXT, signal_type TEXT,
+    entry_price REAL, sl_price REAL, tp1_price REAL, tp2_price REAL,
+    rr_ratio REAL, zone_lower REAL, zone_upper REAL,
+    volume_confirmed INTEGER, is_valid INTEGER,
+    giel_approved INTEGER DEFAULT 0, notes TEXT, created_at TEXT
+);
+
+-- 7. S&R zones (semi-otomatis + validasi manual, Phase B)
+CREATE TABLE IF NOT EXISTS sr_zones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    instrument TEXT, zone_lower REAL, zone_upper REAL,
+    touch_count INTEGER, zone_type TEXT,
+    first_seen TEXT, last_touched TEXT,
+    is_active INTEGER, validated_by_giel INTEGER DEFAULT 0, notes TEXT
+);
+
+-- 8. Manual articles (input manual Giel)
+CREATE TABLE IF NOT EXISTS manual_articles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT, source TEXT, url TEXT, headline TEXT, full_text TEXT,
+    personal_notes TEXT, tags TEXT, is_key_event INTEGER DEFAULT 0,
+    created_at TEXT
+);
+
+-- 9. Trading journal (record final)
+CREATE TABLE IF NOT EXISTS trading_journal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT, instrument TEXT, setup_type TEXT,
+    entry_price REAL, sl_price REAL, tp1_price REAL,
+    outcome TEXT, personal_notes TEXT, lesson_learned TEXT, created_at TEXT
+);
+
+-- 10. Prediction log (jantung mesin prediksi)
+CREATE TABLE IF NOT EXISTS prediction_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date_made TEXT, horizon TEXT, claim TEXT,
+    confidence INTEGER, basis TEXT, target_date TEXT,
+    outcome TEXT, was_actioned INTEGER, lesson TEXT, created_at TEXT
+);
+
+-- 11. Asset context weight (pembobotan driver per aset, Phase D)
+CREATE TABLE IF NOT EXISTS asset_context_weight (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    instrument TEXT, driver TEXT, weight TEXT, notes TEXT
+);
+```
+
+---
+
+## 4. SCRAPER SPECS (sumber + acceptance criteria)
+
+Untuk TIAP scraper: return dict standar, catat status ke source_flags, jangan lempar exception yang menghentikan pipeline (tangkap, tandai "fail", lanjut).
+
+### 4.1 scrapers/crypto.py
+```
+SUMBER (semua gratis, no key):
+- CoinGecko API    → BTC OHLC harian, market cap, BTC dominance
+                     endpoint: api.coingecko.com (free tier, no key)
+- Binance Public   → BTC OHLCV 1D, funding rate, open interest
+                     endpoint: api.binance.com (public, no key)
+- Alternative.me   → Fear & Greed (value + label)
+                     endpoint: api.alternative.me/fng
+
+OUTPUT ke daily_market:
+  btc_open/high/low/close/volume, btc_dominance,
+  btc_funding_rate, btc_oi, fear_greed_value, fear_greed_label
+OUTPUT ke asset_ohlcv:
+  row dengan instrument='BTC'
+
+ACCEPTANCE:
+[ ] fetch_btc() return dict dengan semua kolom non-None (kecuali API down)
+[ ] Fear & Greed value antara 0-100
+[ ] funding_rate dalam desimal (mis. 0.0001), bukan persen
+```
+
+### 4.2 scrapers/macro_fred.py
+```
+SUMBER: FRED API (gratis, butuh register API key → .env: FRED_API_KEY)
+SERIES ID yang dipakai:
+- DXY      → seri "DTWEXBGS" (atau index dolar yang relevan; VERIFIKASI
+             series id yang aktif saat fetch, jangan asumsi)
+- US10Y    → "DGS10"
+- VIX      → "VIXCLS"
+- WALCL    → "WALCL" (Fed balance sheet)
+- RRP      → "RRPONTSYD" (reverse repo)
+- TGA      → "WTREGEN" (treasury general account)
+- HY spread→ "BAMLH0A0HYM2" (optional)
+
+CATATAN: series id FRED kadang berubah/deprecate. Kalau satu series gagal,
+tandai fail di source_flags, JANGAN crash. Log series mana yang gagal.
+
+CALCULATED: net_liquidity = walcl - rrp - tga (hitung di indicators/calc.py)
+
+OUTPUT ke daily_market:
+  dxy_close, dxy_change_pct, us10y_yield, us10y_change_bps,
+  vix_close, walcl, rrp, tga, net_liquidity, hy_credit_spread
+
+ACCEPTANCE:
+[ ] Tiap series gagal → source_flags["fred_<series>"]="fail", pipeline lanjut
+[ ] net_liquidity terhitung kalau walcl+rrp+tga ada
+```
+
+### 4.3 scrapers/macro_yf.py
+```
+SUMBER: yfinance (gratis, no key). Ticker:
+- S&P 500  → "^GSPC"
+- IHSG     → "^JKSE"
+- Gold     → "GC=F" (futures) atau "GLD" proxy
+- USD/IDR  → "IDR=X"
+- USD/JPY  → "JPY=X"
+
+OUTPUT ke daily_market:
+  sp500_close, sp500_change_pct, ihsg_close, ihsg_change_pct,
+  usd_idr, usd_jpy, gold_close
+OUTPUT ke asset_ohlcv:
+  row untuk tiap instrument tradeable: SP500, IHSG, GOLD, USDIDR, USDJPY
+
+ACCEPTANCE:
+[ ] Tiap ticker gagal → tandai fail, lanjut
+[ ] change_pct dihitung vs close kemarin (ambil 2 hari terakhir)
+```
+
+### 4.4 scrapers/news.py
+```
+SUMBER (RSS gratis):
+- Reuters, CNBC, Fed RSS (FOMC press releases)
+- Kontan, Bisnis.com, CNBC Indonesia
+(VERIFIKASI url RSS aktif saat implementasi; kalau satu mati, skip + log)
+
+IMPACT SCORING (rule-based, BUKAN AI/LLM):
+- HIGH  → headline mengandung keyword: "Fed", "rate", "FOMC", "CPI", "BI rate",
+          "inflation", "rate cut", "rate hike", "suku bunga"
+- MED   → "ETF", "earnings", "GDP", "unemployment", "Nasdaq"
+- LOW   → selain itu
+(Buat keyword list bisa dikonfigurasi di constant, mudah ditambah.)
+
+OUTPUT ke daily_news:
+  source, headline, raw_url, impact_level
+  is_key_trigger DEFAULT 0 (Giel yang flag manual nanti)
+
+ACCEPTANCE:
+[ ] Dedup by headline (jangan masuk 2x untuk headline sama)
+[ ] impact_level selalu salah satu HIGH/MED/LOW
+```
+
+---
+
+## 5. PIPELINE ORCHESTRATOR (pipeline/run_daily.py)
+
+```
+ALUR:
+1. init_db() — buat tabel kalau belum ada
+2. Tentukan tanggal target (default: hari ini WIB)
+3. Panggil tiap scraper, kumpulkan hasil + status
+4. Hitung calculated fields (net_liquidity, volume_ma20)
+5. UPSERT ke daily_market (1 row, by date)
+6. UPSERT ke asset_ohlcv (multi row, by date+instrument)
+7. INSERT ke daily_news (dedup)
+8. Tulis source_flags JSON ke daily_market row
+9. Print ringkasan: berapa source ok, berapa fail
+
+IDEMPOTENT: pakai INSERT OR REPLACE / UPSERT. Run 2x = aman.
+
+ACCEPTANCE:
+[ ] `python -m pipeline.run_daily` jalan tanpa crash walau ada source fail
+[ ] Habis run, query daily_market WHERE date=today → 1 row terisi
+[ ] source_flags kebaca status tiap API
+```
+
+---
+
+## 6. MANUAL BACKFILL TOOL (pipeline/backfill.py)
+
+Ini PRIORITAS — dipakai Giel untuk isi data historis sebelum sistem live.
+
+```
+INTERFACE (CLI dulu, cukup):
+  python -m pipeline.backfill --instrument BTC --from 2025-01-01 --to 2025-06-01
+
+LOGIC:
+1. Map instrument → source (BTC→Binance, DXY/US10Y→FRED, sisanya→yfinance)
+2. Fetch historical range
+3. PREVIEW dulu: print "akan insert X row baru, Y duplikat (di-skip)"
+4. Minta konfirmasi [y/N]
+5. Kalau y → UPSERT ke asset_ohlcv (+ daily_market untuk makro)
+
+ACCEPTANCE:
+[ ] Preview tampil SEBELUM commit
+[ ] Duplikat (date+instrument sudah ada) → skip, bukan error
+[ ] Bisa backfill range berapa pun (6 bulan, 2 tahun, dst)
+```
+
+---
+
+## 7. URUTAN KERJA (kerjakan BERURUTAN, jangan loncat)
+
+```
+STEP 1  → Setup project: folder, requirements.txt, .gitignore, .env.example
+STEP 2  → db/schema.sql + db/connection.py (init_db, get_connection)
+          TEST: init_db() bikin kastara-finance.db dengan 11 tabel ✓
+STEP 3  → scrapers/base.py (shared helper + source_flags pattern)
+STEP 4  → scrapers/crypto.py + test_crypto.py
+          TEST: fetch BTC beneran, kolom lengkap ✓
+STEP 5  → scrapers/macro_yf.py + test
+          TEST: fetch ^GSPC, ^JKSE beneran ✓
+STEP 6  → scrapers/macro_fred.py + test (perlu FRED_API_KEY di .env)
+          TEST: fetch DGS10 beneran ✓
+STEP 7  → scrapers/news.py + test
+          TEST: parse 1 RSS, scoring jalan ✓
+STEP 8  → indicators/calc.py (net_liquidity, volume_ma20)
+STEP 9  → pipeline/run_daily.py (orchestrator)
+          TEST: full run, daily_market terisi ✓
+STEP 10 → pipeline/backfill.py (manual fetch)
+          TEST: backfill BTC 1 bulan, preview + commit ✓
+STEP 11 → README.md (cara setup, run, backfill)
+
+Setelah tiap step: jalankan test step itu. Hijau dulu, baru lanjut.
+```
+
+---
+
+## 8. DEFINITION OF DONE (Phase A selesai kalau)
+
+```
+[ ] kastara-finance.db ter-generate dengan 11 tabel sesuai schema
+[ ] `python -m pipeline.run_daily` mengisi daily_market + asset_ohlcv + daily_news
+[ ] Semua scraper handle API-fail tanpa men-crash pipeline
+[ ] source_flags mencatat status tiap source tiap run
+[ ] Backfill tool bisa tarik data historis dengan preview-before-commit
+[ ] Tidak ada API key ter-hardcode (semua di .env)
+[ ] Tidak ada code dari repo AGPL yang disalin ke project
+[ ] README menjelaskan cara setup + run + backfill
+[ ] Minimal 1 test per scraper, semua hijau
+```
+
+---
+
+## 9. YANG TIDAK DIKERJAKAN DI PHASE A (jangan tergoda)
+
+```
+✗ S&R detection, breakout/retest engine     → Phase B
+✗ Dashboard / UI / Flask                      → Phase C
+✗ Forward layer (FedWatch, COT, policy)       → Phase D
+✗ Telegram bot                                → Phase E
+✗ Multi-aset expansion logic                  → Phase F+
+✗ Scheduler otomatis (cron)                   → cukup catat cara setup cron
+                                                di README, belum perlu implement
+```
+
+Kalau ada keraguan arsitektur saat eksekusi: STOP, tanya. Jangan improvisasi
+keputusan desain — itu kerjaan "otak" (sesi planning), bukan "tangan".
+
+---
+
+*Diturunkan dari Kastara Finance Master Plan v1.4. Execution plan ini hanya untuk Phase A. Phase berikutnya akan dibuat plan terpisah saat Phase A done.*

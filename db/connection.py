@@ -1,0 +1,114 @@
+"""SQLite connection helpers untuk Kastara Finance.
+
+Pakai:
+    from db.connection import get_connection, init_db
+    init_db()                       # buat semua tabel kalau belum ada
+    with get_connection() as conn:  # ... query
+"""
+from __future__ import annotations
+
+import os
+import re
+import sqlite3
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Root project = parent dari folder db/
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SCHEMA_PATH = PROJECT_ROOT / "db" / "schema.sql"
+
+# Daftar tabel yang HARUS ada setelah init_db (untuk verifikasi/test).
+EXPECTED_TABLES = [
+    "daily_market",
+    "asset_ohlcv",
+    "daily_news",
+    "econ_calendar",
+    "reading_workspace",
+    "trade_signals",
+    "sr_zones",
+    "manual_articles",
+    "trading_journal",
+    "prediction_log",
+    "asset_context_weight",
+    "expectations",
+    "positioning",
+    "policy_tracker",
+]
+
+
+def _resolve_db_path(raw: str) -> Path:
+    """Terjemahkan nilai KASTARA_DB_PATH ke path yang benar di lingkungan ini.
+
+    Menangani kasus Windows meski app jalan di dalam WSL:
+    - UNC WSL '\\\\wsl.localhost\\<distro>\\home\\...' atau '\\\\wsl$\\<distro>\\...'
+      -> path native Linux '/home/...' (menunjuk FILE YANG SAMA).
+    - Path absolut Windows 'C:\\...' -> dibiarkan apa adanya.
+    - Path absolut POSIX '/...' -> apa adanya.
+    - Path relatif -> relatif ke root project.
+    """
+    s = raw.strip().replace("\\", "/")
+    # UNC WSL -> native Linux path
+    m = re.match(r"^//wsl(?:\.localhost|\$)/[^/]+/(.*)$", s, re.IGNORECASE)
+    if m:
+        return Path("/" + m.group(1))
+    # Drive Windows (C:/...) -> absolut, biarkan
+    if re.match(r"^[A-Za-z]:/", s):
+        return Path(s)
+    p = Path(s)
+    if p.is_absolute():
+        return p
+    return PROJECT_ROOT / p
+
+
+def get_db_path() -> Path:
+    """Lokasi file SQLite. Override via env KASTARA_DB_PATH, default kastara-finance.db."""
+    raw = os.getenv("KASTARA_DB_PATH", "kastara-finance.db") or "kastara-finance.db"
+    return _resolve_db_path(raw)
+
+
+def get_connection(db_path: str | os.PathLike | None = None) -> sqlite3.Connection:
+    """Buka koneksi SQLite dengan row_factory dict-like + foreign keys on.
+
+    - journal_mode=WAL: reader (mis. DBeaver/dashboard) dan writer (pipeline)
+      bisa jalan bareng tanpa saling ngunci -> hindari SQLITE_BUSY.
+    - busy_timeout=5000: kalau tetap ada lock singkat, tunggu s/d 5 detik
+      sebelum error, bukan langsung 'database is locked'.
+    """
+    path = Path(db_path) if db_path is not None else get_db_path()
+    conn = sqlite3.connect(path, timeout=15)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA busy_timeout = 5000;")
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
+    return conn
+
+
+def init_db(db_path: str | os.PathLike | None = None) -> Path:
+    """Buat semua tabel dari schema.sql (idempotent). Return path db."""
+    path = Path(db_path) if db_path is not None else get_db_path()
+    ddl = SCHEMA_PATH.read_text(encoding="utf-8")
+    with get_connection(path) as conn:
+        conn.executescript(ddl)
+        conn.commit()
+    return path
+
+
+def list_tables(db_path: str | os.PathLike | None = None) -> list[str]:
+    """Daftar nama tabel yang ada di db."""
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name NOT LIKE 'sqlite_%' ORDER BY name"
+        ).fetchall()
+    return [r["name"] for r in rows]
+
+
+if __name__ == "__main__":
+    target = init_db()
+    tables = list_tables()
+    print(f"init_db OK -> {target}")
+    print(f"{len(tables)} tabel: {', '.join(tables)}")
