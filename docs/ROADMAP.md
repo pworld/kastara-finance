@@ -11,9 +11,9 @@
 | Phase | Nama | Status |
 |---|---|---|
 | **A** | Database & Scraper (data layer) | ✅ **Selesai penuh** — sesuai `plan.txt` **dan** checklist Master Plan §10 (lihat [status](#anchor-gap-phase-a)); cron daemon butuh 1 langkah manual sudo, lihat catatan |
-| **1** | Dashboard read-only (Flask) | 🟡 **Selesai sebagai subset kecil** — bukan 6-panel Phase C (lihat [breakdown](#anchor-panel-breakdown)) |
+| **1** | Dashboard read-only (Flask) | ✅ Selesai — jadi fondasi Panel 1/2/5 di Phase C |
 | **B** | S&R detection, breakout/retest engine | ✅ **Selesai untuk BTC** — [plan_b.txt](../plan_b.txt) dieksekusi penuh, 46 test baru, diverifikasi data asli |
-| **C** | Dashboard/UI penuh (6 panel, input manual, workspace) | 🟡 Sebagian kecil (lihat [breakdown](#anchor-panel-breakdown)) |
+| **C** | Dashboard/UI penuh (6 panel, write-enabled) | ✅ **Selesai** — [plan_c.txt](../plan_c.txt) dieksekusi penuh, semua panel diverifikasi via browser |
 | **D** | Forward layer (FedWatch, COT, policy) | ⬜ Belum mulai — schema (3 tabel) sudah siap, tinggal isi logic |
 | **E** | Telegram bot | ⬜ Belum mulai |
 | **F+** | Multi-aset expansion | ⬜ Belum mulai |
@@ -101,16 +101,19 @@ Master Plan §10 terpenuhi.
 
 ---
 
-## 🟡 Phase 1 — Dashboard Read-Only (subset kecil dari Phase C)
+## ✅ Phase 1 — Dashboard Read-Only (selesai, jadi fondasi Phase C)
 
 Tidak ada di `plan.txt` asli (yang menaruh dashboard di Phase C), tapi
 dikerjakan lebih dulu atas permintaan langsung karena dibutuhkan segera
-untuk verifikasi visual data yang sudah masuk.
+untuk verifikasi visual data yang sudah masuk. Kemudian jadi fondasi Panel
+1/2/5 saat Phase C dikerjakan penuh.
 
 **Deliverable:**
 - `web/app.py` — Flask, endpoint JSON read-only (`/api/latest`,
   `/api/daily_market`, `/api/asset_ohlcv`, `/api/news`, `/api/assets`,
-  `/api/health`). **Tidak menulis DB** — pipeline tetap satu-satunya penulis.
+  `/api/health`). Tidak menulis DB — pipeline tetap satu-satunya penulis
+  (masih berlaku untuk endpoint ini; Phase C nambah endpoint BARU yang
+  menulis, endpoint lama ini TIDAK diubah).
 - `web/templates/index.html` — single-page UI (snapshot cards, status
   `source_flags`, chart harga SVG per instrument, tabel berita dengan filter
   impact).
@@ -118,13 +121,15 @@ untuk verifikasi visual data yang sudah masuk.
   backfill, filter HIGH/MED/LOW berfungsi.
 
 <a id="anchor-panel-breakdown"></a>
-### Catatan penamaan: Phase 1 vs Phase C (6 panel)
+### Riwayat: Phase 1 vs Phase C (6 panel) — breakdown historis
 
-`plan.txt §9` menyebut "Dashboard/UI/Flask" sebagai **Phase C**. Setelah
-membaca Section 6 Master Plan (spek 6-panel lengkap), yang sudah dibangun di
-Phase 1 ternyata **irisan kecil** — bukan setara satu panel penuh pun:
+Catatan ini ditulis waktu Phase 1 baru selesai dan Phase C belum dikerjakan
+sama sekali (breakdown per panel Master Plan §6). **Sudah tidak akurat** —
+lihat [status terkini Phase C](#anchor-phase-c-status) untuk apa yang
+sekarang benar-benar ada. Dipertahankan di sini sebagai riwayat, bukan
+status aktif:
 
-| Panel (Master Plan §6) | Status di dashboard Phase 1 |
+| Panel (Master Plan §6) | Status SAAT ITU (Phase 1 baru selesai) |
 |---|---|
 | Panel 1 — Data Snapshot | 🟡 Sebagian: cards + `source_flags` ada; tombol Manual Backfill tidak ada |
 | Panel 2 — News Briefing | 🟡 Sebagian: list + impact badge ada; tombol flag manual "key trigger" & "+ Add Manual Article" tidak ada |
@@ -132,9 +137,6 @@ Phase 1 ternyata **irisan kecil** — bukan setara satu panel penuh pun:
 | Panel 4 — Reading Workspace | ⬜ Tidak ada (butuh form input 4 lensa) |
 | Panel 5 — Chart + Technical Analysis | 🟡 Sebagian: chart harga polos ada; MA overlay, S&R zone overlay, approve/reject signal tidak ada (butuh Phase B) |
 | Panel 6 — Synthesis | ⬜ Tidak ada (butuh `prediction_log` capture + skor prediksi) |
-
-Jadi status Phase C ditandai 🟡 **sebagian kecil**, bukan sekadar "belum
-selesai" generik — supaya jelas seberapa jauh sisa kerjanya.
 
 ---
 
@@ -178,17 +180,51 @@ button (Phase C), instrument selain BTC (Phase F+), forward layer (Phase D).
 
 ---
 
-## 🟡 Phase C — Dashboard/UI Penuh
+<a id="anchor-phase-c-status"></a>
+## ✅ Phase C — Dashboard/UI Penuh (selesai)
 
-**Sebagian selesai** (lihat Phase 1). `manual_articles` sudah punya jalur
-isi via **CLI** (`pipeline/add_article.py`, di luar dashboard — lihat
-[README](../README.md#artikel-manual-riset-historis)); sisa scope dashboard:
-- Form input manual **di dashboard** (bukan CLI) untuk `reading_workspace`
-  (catatan analisis harian), tombol "+ Add Manual Article" di Panel 2
-  (setara CLI tapi lewat UI), `trading_journal` (record hasil trading).
-- Kemungkinan write-back dari UI (saat ini dashboard 100% read-only).
-- Visualisasi tambahan: overlay `sr_zones` di chart, tampilan
-  `econ_calendar` (event mendatang).
+**Execution plan: [plan_c.txt](../plan_c.txt)** — 5 Open Questions §6
+direview & dikunci Giel, dieksekusi persis sesuai itu. Dashboard sekarang
+**write-enabled** (pertama kalinya, sebelumnya 100% read-only di Phase 1) —
+navigasi 6 tab sesuai alur pagi Master Plan §0/§6.
+
+**Deliverable per panel:**
+- **Panel 1** (Data Snapshot): + form Manual Backfill, preview-then-confirm
+  (reuse `pipeline.backfill.backfill(preview_only=True)`, ekstensi kecil
+  backward-compatible — CLI tidak berubah).
+- **Panel 2** (News Briefing): + tombol flag key trigger (`daily_news.
+  is_key_trigger`), + form "Add Manual Article" (reuse `pipeline.add_article
+  .insert_article()`). *Bug ketemu & diperbaiki saat verifikasi: endpoint
+  `/api/news` tidak pernah SELECT kolom `id` (tidak perlu di Phase 1
+  read-only) — tombol flag butuh itu, sudah ditambahkan.*
+- **Panel 3** (Forward Panel): Economic Calendar tampil data ASLI (76+ event
+  dari Phase A) dengan countdown hari; Policy Tracker form manual + list
+  (independen Phase D, sesuai keputusan #1); Expectations/Positioning/
+  Disonansi tampil **empty state** eksplisit (bukan error) — nunggu Phase D.
+- **Panel 4** (Reading Workspace): 4 lensa GEMA/LEON/AKELA/RIVAN + External
+  AI Check (manual paste, BUKAN pemanggilan AI) + Conflict Notes. Simpan
+  cuma field yang terisi (skip kosong) ke `reading_workspace`
+  (`lens` ∈ {GEMA,LEON,AKELA,RIVAN,EXTERNAL_AI,CONFLICT,SYNTHESIS}).
+- **Panel 5** (Chart + TA): upgrade dari line-chart Phase 1 jadi **candlestick
+  OHLCV + S&R zone overlay + marker breakout/retest + Approve/Reject**
+  (reuse `tools.review_signal.set_review()`, `approved` tetap manual).
+  MA overlay/volume bar/context-chart 4-kecil **ditunda ke backlog**
+  (keputusan #2, bukan bagian Phase C ini).
+- **Panel 6** (Synthesis): textarea sintesis (→ `reading_workspace` lens=
+  SYNTHESIS) + outlook dropdown **5 instrumen** (BTC/SP500/IHSG/GOLD/USDIDR,
+  USDJPY dikecualikan — keputusan #5) + form Trading Journal + Prediction
+  Log + widget skor prediksi (BENAR/SALAH/PARTIAL).
+
+**Verifikasi:** bukan cuma pytest (92 test, semua hijau) — tiap panel
+dicoba LANGSUNG via browser preview (isi form → submit → cek tersimpan di
+DB via query langsung → data test dibersihkan lagi). Approve/reject sinyal,
+flag key trigger, kedua form Panel 3/4/6, semuanya dikonfirmasi menulis
+dengan benar ke tabel yang tepat.
+
+**Belum termasuk** (sesuai batas `plan_c.txt`, bukan terlewat): scraper
+otomatis Expectations/Positioning/Policy Tracker (Phase D), MA/volume/
+context-chart Panel 5 (backlog), Telegram bot (Phase E), multi-instrument
+analysis engine (Phase F+), autentikasi (belum perlu — local-only).
 
 ---
 

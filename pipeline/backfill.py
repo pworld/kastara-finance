@@ -170,9 +170,15 @@ def _existing_dates_market(col: str, dates: list[str], db_path=None) -> set[str]
 
 def backfill(
     instrument: str, date_from: str, date_to: str,
-    assume_yes: bool = False, db_path=None,
+    assume_yes: bool = False, db_path=None, preview_only: bool = False,
 ) -> dict[str, Any]:
-    """Tarik historis -> preview -> konfirmasi -> upsert. Return ringkasan."""
+    """Tarik historis -> preview -> konfirmasi -> upsert. Return ringkasan.
+
+    `preview_only=True` (dipakai Panel 1 dashboard Phase C): return SETELAH
+    preview, SEBELUM prompt konfirmasi maupun commit -- menghindari `input()`
+    yang bakal hang di request web (tidak ada stdin). Default False -> CLI
+    tidak berubah sama sekali.
+    """
     instrument = instrument.upper()
     init_db(db_path)
     kind, rows = _fetch_rows(instrument, date_from, date_to)
@@ -204,6 +210,11 @@ def backfill(
         print("[backfill] Tidak ada baris baru. Selesai (tidak ada yang ditulis).")
         return {"instrument": instrument, "fetched": len(rows), "new": 0,
                 "dup": n_dup, "committed": False}
+
+    if preview_only:
+        return {"instrument": instrument, "fetched": len(rows), "new": n_new,
+                "dup": n_dup, "committed": False,
+                "sample_from": new_rows[0]["date"], "sample_to": new_rows[-1]["date"]}
 
     if not assume_yes:
         ans = input("\nLanjut commit? [y/N] ").strip().lower()

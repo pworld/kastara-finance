@@ -1,13 +1,17 @@
-# Kastara Finance — Phase A + B (Data Layer + Analysis Engine)
+# Kastara Finance — Phase A + B + C (Data Layer + Analysis Engine + Dashboard)
 
 **Phase A** (selesai): **kumpulkan data mentah** ke SQLite lokal dari
 sumber-sumber gratis (no paid API). **Phase B** (selesai untuk BTC): deteksi
 zona S&R + sinyal breakout/retest + R:R calculator dari histori
 `asset_ohlcv` — tetap **suggestion, bukan execution/trading logic**;
 keputusan akhir tetap manual (`approved`, direview via
-`tools/review_signal.py`).
+`tools/review_signal.py`). **Phase C** (selesai): dashboard 6-panel
+**write-enabled** — Data Snapshot, News Briefing, Forward Panel, Reading
+Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
+**tanpa pemanggilan AI/LLM otomatis** di mana pun.
 
-> Scope dikunci di `plan.txt` (Phase A) dan `plan_b.txt` (Phase B).
+> Scope dikunci di `plan.txt` (Phase A), `plan_b.txt` (Phase B), dan
+> `plan_c.txt` (Phase C).
 
 📄 **Dokumen lengkap ada di [`docs/`](docs/):**
 [ARCHITECTURE.md](docs/ARCHITECTURE.md) (desain teknis & rationale),
@@ -157,16 +161,34 @@ Semua sinyal dari `run_analysis` **suggestion only** — `approved`
 selalu 0 dari kode, cuma berubah lewat `review_signal approve`. Tidak ada
 execution/trading logic di mana pun.
 
-### Dashboard web (read-only)
+### Dashboard web (6 panel, write-enabled sejak Phase C)
 ```bash
 python -m web.app
 # buka http://127.0.0.1:5000
 ```
-Dashboard Flask kecil di atas DB yang sama (HANYA baca — pipeline tetap satu-
-satunya penulis). Menampilkan: snapshot pasar, status `source_flags`, chart harga
-per instrument, dan berita dengan badge impact. Endpoint JSON: `/api/latest`,
-`/api/daily_market`, `/api/asset_ohlcv?instrument=BTC`, `/api/news`, `/api/assets`,
-`/api/health`. Host/port bisa diatur via `WEB_HOST` / `WEB_PORT`.
+Navigasi 6 tab sesuai alur pagi Master Plan §0: **1 Snapshot** (cards +
+source_flags + form Manual Backfill preview→confirm), **2 News** (list +
+filter impact + flag key trigger + Add Manual Article), **3 Forward**
+(Economic Calendar data asli + Policy Tracker manual + empty state untuk
+Expectations/Positioning/Disonansi — Phase D belum ada), **4 Reading**
+(4 lensa GEMA/LEON/AKELA/RIVAN + External AI Check manual + Conflict
+Notes), **5 Chart** (candlestick + S&R zone overlay + marker
+breakout/retest + Approve/Reject sinyal), **6 Synthesis** (textarea +
+outlook 5 instrumen + Trading Journal + Prediction Log + skor prediksi).
+
+**Tanpa autentikasi** (local-only, `WEB_HOST`/`WEB_PORT` bisa diatur via
+`.env`). **Tidak ada pemanggilan AI/LLM otomatis di mana pun** — "External
+AI Check" di Panel 4 itu kolom paste manual (kamu banding hasil tool lain
+sendiri), bukan Kastara yang manggil AI.
+
+Endpoint Phase 1 (read-only, tidak berubah): `/api/latest`,
+`/api/daily_market`, `/api/asset_ohlcv`, `/api/news`, `/api/assets`,
+`/api/health`. Endpoint Phase C (menulis, reuse fungsi yang sudah teruji —
+lihat `docs/ARCHITECTURE.md` §5.6): `/api/backfill/{preview,commit}`,
+`/api/news/flag_key`, `/api/articles/add`, `/api/econ_calendar`,
+`/api/policy{,/add}`, `/api/reading{,/save}`, `/api/sr_zones`,
+`/api/signals{,/review}`, `/api/synthesis/save`, `/api/journal/add`,
+`/api/prediction/{add,due,score}`, `/api/outlook_instruments`.
 
 ### Test
 ```bash

@@ -77,9 +77,11 @@ kastara-finance/
 │   └── signals.py               # breakout/retest detection + R:R calculator
 ├── tools/
 │   └── review_signal.py       # CLI approve/reject trade_signals (by id eksplisit)
-├── web/                      # dashboard read-only (Phase 1)
-│   ├── app.py                 # Flask, endpoint JSON + halaman
-│   └── templates/index.html   # UI single-page, tanpa build step/CDN
+├── web/                      # dashboard: read-only (Phase 1) + write (Phase C)
+│   ├── app.py                 # Flask, endpoint JSON + halaman, 6 tab panel
+│   ├── writes.py               # pure functions tulis-DB Phase C (testable
+│   │                             tanpa Flask, pola sama add_article.py)
+│   └── templates/index.html   # UI single-page 6-tab, tanpa build step/CDN
 ├── tests/                    # 1 test file per modul utama
 └── docs/                     # dokumen ini
 ```
@@ -196,11 +198,28 @@ Pure functions (`net_liquidity`, `volume_ma20_from_values`) + satu fungsi
 yang query DB (`volume_ma20_for_instrument`) untuk hitung rata-rata volume
 20-hari dari histori `asset_ohlcv`.
 
-### 5.6 `web/app.py` — dashboard (read-only)
-Flask kecil di atas DB yang sama. **Tidak pernah menulis** — pipeline tetap
-satu-satunya penulis. Endpoint: `/api/latest`, `/api/daily_market`,
-`/api/asset_ohlcv`, `/api/news`, `/api/assets`, `/api/health`, plus halaman
-`/` (single-page, JS vanilla, tanpa build step).
+### 5.6 `web/app.py` + `web/writes.py` — dashboard (Phase 1 read-only + Phase C write)
+
+Endpoint Phase 1 (`/api/latest`, `/api/daily_market`, `/api/asset_ohlcv`,
+`/api/news`, `/api/assets`, `/api/health`) **tetap read-only, tidak diubah**
+sejak Phase C dikerjakan. Endpoint baru Phase C **menulis**, tapi TIDAK
+menulis logic baru langsung di route — semua reuse fungsi yang sudah ada
+& teruji:
+- Backfill (`/api/backfill/preview`, `/api/backfill/commit`) → panggil
+  `pipeline.backfill.backfill()` langsung (lihat §6.8 soal `preview_only`).
+- Manual article (`/api/articles/add`) → `pipeline.add_article.insert_article()`.
+- Approve/reject sinyal (`/api/signals/review`) → `tools.review_signal.set_review()`.
+- Reading workspace, trading journal, prediction log, policy tracker,
+  key-trigger flag → fungsi baru di `web/writes.py` (pure, testable tanpa
+  Flask — `tests/test_web_writes.py`, tidak ada test Flask-route langsung,
+  endpoint cukup diverifikasi manual via preview browser).
+
+Navigasi 6 tab (satu halaman, JS `display:none/block`, bukan reload) —
+urutan sama dengan alur pagi Master Plan §0: Snapshot → News → Forward →
+Reading → Chart → Synthesis.
+
+**Tanpa autentikasi** (keputusan sadar, `plan_c.txt` §6.4) — local-only,
+`WEB_HOST=127.0.0.1` default, belum ada rencana expose ke luar localhost.
 
 ### 5.7 `analysis/` — engine Phase B (PURE, tidak baca/tulis DB)
 
@@ -359,3 +378,28 @@ jumlah zona per instrument masih ratusan) sudah cukup. Kalau nanti jumlah
 zona per instrument membengkak drastis (banyak instrument, Phase F+), ini
 kandidat pertama untuk dioptimasi (mis. kolom generated tersimpan +
 index).
+
+### 6.8 `pipeline.backfill.backfill()` — `preview_only` (ekstensi Phase C)
+
+CLI backfill (Phase A) pakai `input()` untuk konfirmasi commit — ini akan
+**hang** kalau dipanggil dari request web (tidak ada stdin). Daripada
+duplikat logic fetch+dedup-check di `web/app.py` (melanggar prinsip reuse),
+`backfill()` diberi parameter baru `preview_only: bool = False`: return
+persis setelah preview dihitung, SEBELUM prompt `input()` maupun commit.
+Default `False` — CLI dan semua test lama tidak berubah sama sekali;
+Panel 1 dashboard manggil dengan `preview_only=True` (utk tombol Preview)
+lalu `assume_yes=True` (utk tombol Confirm & Commit, 2 request terpisah,
+re-fetch data — diterima sebagai trade-off karena tiap fetch murah, lihat
+§6.1).
+
+### 6.9 Bug ditemukan saat verifikasi browser: `/api/news` tidak SELECT `id`
+
+Endpoint `/api/news` (Phase 1, read-only) tidak pernah butuh kolom `id`
+sebelumnya. Saat Panel 2 nambah tombol "flag key trigger" (butuh `id` buat
+tahu row mana yang di-update), tombolnya diam-diam tidak muncul sama
+sekali — `r.id` selalu `undefined` di JS. Ditemukan justru karena
+verifikasi dilakukan LANGSUNG di browser (bukan cuma pytest, yang tidak
+akan menangkap bug ini karena tidak ada test untuk response shape endpoint
+JSON lama). Diperbaiki dengan menambah `id` ke `SELECT`. Pelajaran yang
+menegaskan prinsip `plan_c.txt` §5: "diverifikasi via preview browser,
+bukan cuma pytest."

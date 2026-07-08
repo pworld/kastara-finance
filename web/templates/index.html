@@ -28,7 +28,23 @@
     border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px;
   }
   #refresh:hover { border-color: var(--accent); }
+
+  nav.tabs {
+    display: flex; gap: 4px; padding: 10px 24px 0; border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  nav.tabs button {
+    background: none; border: none; color: var(--muted); padding: 10px 16px;
+    font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent;
+    white-space: nowrap;
+  }
+  nav.tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+  nav.tabs button:hover { color: var(--text); }
+
   main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
+  .tabpanel { display: none; }
+  .tabpanel.active { display: block; }
+
   .grid { display: grid; gap: 14px; }
   .cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .card {
@@ -41,8 +57,11 @@
     font-variant-numeric: tabular-nums; }
   .card .value.na { color: var(--muted); font-weight: 400; font-size: 16px; }
   section { margin-top: 26px; }
+  section:first-child { margin-top: 4px; }
   section h2 { font-size: 15px; color: var(--text); margin: 0 0 12px;
     border-left: 3px solid var(--accent); padding-left: 10px; }
+  section h3 { font-size: 13px; color: var(--muted); margin: 0 0 10px;
+    text-transform: uppercase; letter-spacing: .4px; }
   .panel { background: var(--panel); border: 1px solid var(--border);
     border-radius: 8px; padding: 16px; }
   .flags { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -52,10 +71,27 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; }
   .dot.ok { background: var(--ok); } .dot.fail { background: var(--fail); }
   .dot.skip { background: var(--skip); }
-  .chart-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-  select { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
-    border-radius: 6px; padding: 5px 8px; }
-  #chart { width: 100%; height: 220px; display: block; }
+  .chart-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  select, input[type=text], input[type=date], input[type=number], input[type=url], textarea {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 9px; font: inherit; width: 100%;
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  label.field { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .form-row { margin-bottom: 12px; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px; }
+  button.btn {
+    background: var(--accent); color: #05131f; border: none; border-radius: 6px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  button.btn:hover { opacity: .9; }
+  button.btn.secondary { background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); }
+  button.btn.danger { background: rgba(248,81,73,.15); color: var(--high);
+    border: 1px solid rgba(248,81,73,.4); }
+  button.btn.small { padding: 4px 10px; font-size: 12px; }
+  #chart { width: 100%; height: 280px; display: block; }
   #chartMeta { color: var(--muted); font-size: 12px; margin-top: 6px;
     font-variant-numeric: tabular-nums; }
   table { width: 100%; border-collapse: collapse; }
@@ -68,13 +104,26 @@
   .badge.HIGH { background: rgba(248,81,73,.18); color: var(--high); }
   .badge.MED { background: rgba(210,153,34,.18); color: var(--med); }
   .badge.LOW { background: rgba(110,118,129,.2); color: var(--low); }
+  .badge.RETEST { background: rgba(76,154,255,.18); color: var(--accent); }
+  .badge.BREAKOUT { background: rgba(63,185,80,.18); color: var(--ok); }
   .news-filters { display: flex; gap: 8px; margin-bottom: 12px; }
   .news-filters button { background: var(--panel2); color: var(--muted);
     border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px;
     cursor: pointer; font-size: 12px; }
   .news-filters button.active { color: var(--text); border-color: var(--accent); }
   .empty { color: var(--muted); padding: 30px; text-align: center; }
+  .empty-inline { color: var(--muted); font-size: 13px; padding: 14px; text-align: center;
+    border: 1px dashed var(--border); border-radius: 8px; }
   .src { color: var(--muted); font-size: 12px; }
+  .lens-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px; margin-bottom: 16px; }
+  .lens-box h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: .5px; }
+  .lens-box.GEMA h4 { color: #4c9aff; } .lens-box.LEON h4 { color: #f85149; }
+  .lens-box.AKELA h4 { color: #3fb950; } .lens-box.RIVAN h4 { color: #d29922; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2);
+    border: 1px solid var(--accent); border-radius: 8px; padding: 10px 16px;
+    font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
 </style>
 </head>
 <body>
@@ -85,56 +134,349 @@
   <button id="refresh">↻ Refresh</button>
 </header>
 
+<nav class="tabs" id="tabs">
+  <button data-tab="p1" class="active">1 · Snapshot</button>
+  <button data-tab="p2">2 · News</button>
+  <button data-tab="p3">3 · Forward</button>
+  <button data-tab="p4">4 · Reading</button>
+  <button data-tab="p5">5 · Chart</button>
+  <button data-tab="p6">6 · Synthesis</button>
+</nav>
+
 <main>
   <div id="emptyState" class="empty" style="display:none">
     Belum ada data. Jalankan <code>python -m pipeline.run_daily</code> dulu.
   </div>
 
   <div id="content" style="display:none">
-    <section>
-      <h2>Snapshot Pasar</h2>
-      <div class="grid cards" id="cards"></div>
-    </section>
 
-    <section>
-      <h2>Status Sumber Data (source_flags)</h2>
-      <div class="panel">
-        <div class="flags" id="flags"></div>
-      </div>
-    </section>
+    <!-- ===================== PANEL 1: DATA SNAPSHOT ===================== -->
+    <div class="tabpanel active" id="tab-p1">
+      <section>
+        <h2>Snapshot Pasar</h2>
+        <div class="grid cards" id="cards"></div>
+      </section>
 
-    <section>
-      <h2>Chart Harga</h2>
-      <div class="panel">
-        <div class="chart-head">
-          <label class="src">Instrument</label>
-          <select id="instrument"></select>
-          <span id="chartMeta"></span>
+      <section>
+        <h2>Status Sumber Data (source_flags)</h2>
+        <div class="panel">
+          <div class="flags" id="flags"></div>
         </div>
-        <svg id="chart" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
-      </div>
-    </section>
+      </section>
 
-    <section>
-      <h2>Berita &amp; Impact</h2>
-      <div class="panel">
-        <div class="news-filters" id="newsFilters">
-          <button data-impact="" class="active">Semua</button>
-          <button data-impact="HIGH">HIGH</button>
-          <button data-impact="MED">MED</button>
-          <button data-impact="LOW">LOW</button>
+      <section>
+        <h2>Manual Backfill</h2>
+        <div class="panel">
+          <div class="form-grid">
+            <div>
+              <label class="field">Instrument</label>
+              <select id="bfInstrument">
+                <option>BTC</option><option>SP500</option><option>IHSG</option>
+                <option>GOLD</option><option>USDIDR</option><option>USDJPY</option>
+                <option>DXY</option><option>US10Y</option><option>VIX</option>
+                <option>WALCL</option><option>RRP</option><option>TGA</option><option>HY</option>
+              </select>
+            </div>
+            <div>
+              <label class="field">Dari tanggal</label>
+              <input type="date" id="bfFrom">
+            </div>
+            <div>
+              <label class="field">Sampai tanggal</label>
+              <input type="date" id="bfTo">
+            </div>
+          </div>
+          <div class="form-row" style="margin-top:12px">
+            <button class="btn secondary" id="bfPreviewBtn">Preview</button>
+            <button class="btn" id="bfCommitBtn" style="display:none">Confirm &amp; Commit</button>
+          </div>
+          <div id="bfResult" class="src"></div>
         </div>
-        <table>
-          <thead><tr><th>Impact</th><th>Headline</th><th>Sumber</th><th>Tgl</th></tr></thead>
-          <tbody id="newsBody"></tbody>
-        </table>
-      </div>
-    </section>
+      </section>
+    </div>
+
+    <!-- ===================== PANEL 2: NEWS BRIEFING ===================== -->
+    <div class="tabpanel" id="tab-p2">
+      <section>
+        <h2>Berita &amp; Impact</h2>
+        <div class="panel">
+          <div class="news-filters" id="newsFilters">
+            <button data-impact="" class="active">Semua</button>
+            <button data-impact="HIGH">HIGH</button>
+            <button data-impact="MED">MED</button>
+            <button data-impact="LOW">LOW</button>
+          </div>
+          <table>
+            <thead><tr><th>Impact</th><th>Headline</th><th>Sumber</th><th>Tgl</th><th></th></tr></thead>
+            <tbody id="newsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>+ Add Manual Article</h2>
+        <div class="panel">
+          <div class="form-grid">
+            <div><label class="field">Tanggal</label><input type="date" id="artDate"></div>
+            <div><label class="field">Sumber</label><input type="text" id="artSource" placeholder="mis. CNBC"></div>
+            <div><label class="field">URL (opsional)</label><input type="url" id="artUrl"></div>
+          </div>
+          <div class="form-row" style="margin-top:12px">
+            <label class="field">Headline</label>
+            <input type="text" id="artHeadline">
+          </div>
+          <div class="form-row">
+            <label class="field">Catatan pribadi</label>
+            <textarea id="artNotes"></textarea>
+          </div>
+          <div class="form-grid">
+            <div><label class="field">Tags (comma-separated)</label><input type="text" id="artTags"></div>
+            <div style="align-self:end">
+              <label class="field"><input type="checkbox" id="artKeyEvent"> Flag sebagai key event</label>
+            </div>
+          </div>
+          <div class="form-row" style="margin-top:12px">
+            <button class="btn" id="artSaveBtn">Simpan Artikel</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================== PANEL 3: FORWARD PANEL ===================== -->
+    <div class="tabpanel" id="tab-p3">
+      <section>
+        <h2>Economic Calendar</h2>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Tanggal</th><th>Countdown</th><th>Event</th><th>Negara</th><th>Importance</th></tr></thead>
+            <tbody id="calBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>Expectations (Layer B)</h2>
+        <div class="empty-inline">Belum ada data — scraper Expectations (CME FedWatch, Dot Plot) belum dikerjakan (Phase D).</div>
+      </section>
+
+      <section>
+        <h2>Positioning (Layer C)</h2>
+        <div class="empty-inline">Belum ada data — scraper Positioning (COT, ETF flow, SBN flow) belum dikerjakan (Phase D).</div>
+      </section>
+
+      <section>
+        <h2>Policy Tracker (Layer A)</h2>
+        <div class="panel">
+          <div class="form-grid">
+            <div><label class="field">Tanggal</label><input type="date" id="polDate"></div>
+            <div><label class="field">Speaker</label><input type="text" id="polSpeaker" placeholder="mis. Powell"></div>
+            <div><label class="field">Institusi</label><input type="text" id="polInstitution" placeholder="mis. Fed"></div>
+          </div>
+          <div class="form-row" style="margin-top:12px">
+            <label class="field">Literal statement (apa yang BENAR-BENAR dikatakan)</label>
+            <textarea id="polLiteral"></textarea>
+          </div>
+          <div class="form-grid">
+            <div>
+              <label class="field">Stance score (-2 dovish .. +2 hawkish)</label>
+              <input type="number" id="polStance" min="-2" max="2" step="1">
+            </div>
+            <div>
+              <label class="field">Inference flag</label>
+              <select id="polFlag"><option>TESTABLE</option><option>SPEKULATIF</option></select>
+            </div>
+            <div><label class="field">Source URL (opsional)</label><input type="url" id="polUrl"></div>
+          </div>
+          <div class="form-row" style="margin-top:12px">
+            <label class="field">Inference (pembacaan arah/intent — subjektif)</label>
+            <textarea id="polInference"></textarea>
+          </div>
+          <div class="form-row">
+            <label class="field">Drift note (opsional — berubah dari pernyataan sebelumnya?)</label>
+            <textarea id="polDrift"></textarea>
+          </div>
+          <div class="form-row" style="margin-top:4px">
+            <button class="btn" id="polSaveBtn">+ Add Policy Note</button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Entri Policy Tracker Terbaru</h2>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Tgl</th><th>Speaker</th><th>Literal</th><th>Inference</th><th>Flag</th></tr></thead>
+            <tbody id="policyBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>Disonansi Flag</h2>
+        <div class="empty-inline">Butuh Positioning DAN Policy Tracker sama-sama terisi untuk dibandingkan — Positioning belum ada (Phase D).</div>
+      </section>
+    </div>
+
+    <!-- ===================== PANEL 4: READING WORKSPACE ===================== -->
+    <div class="tabpanel" id="tab-p4">
+      <section>
+        <h2>Reading Workspace — 4 Lensa</h2>
+        <div class="panel">
+          <div class="lens-grid">
+            <div class="lens-box GEMA"><h4>GEMA</h4><textarea id="lensGema"></textarea></div>
+            <div class="lens-box LEON"><h4>LEON</h4><textarea id="lensLeon"></textarea></div>
+            <div class="lens-box AKELA"><h4>AKELA</h4><textarea id="lensAkela"></textarea></div>
+            <div class="lens-box RIVAN"><h4>RIVAN</h4><textarea id="lensRivan"></textarea></div>
+          </div>
+          <div class="form-row">
+            <label class="field">External AI Check (opsional — paste hasil banding TradingAgents/qrak/dll, MANUAL)</label>
+            <textarea id="lensExternalAi"></textarea>
+          </div>
+          <div class="form-row">
+            <label class="field">Conflict Notes (poin yang belum sepakat antar lensa)</label>
+            <textarea id="lensConflict"></textarea>
+          </div>
+          <div class="form-row" style="margin-top:4px">
+            <button class="btn" id="readingSaveBtn">Simpan Reading Workspace</button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Entri Hari Ini</h2>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Lensa</th><th>Catatan</th></tr></thead>
+            <tbody id="readingBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================== PANEL 5: CHART + TECHNICAL ANALYSIS ===================== -->
+    <div class="tabpanel" id="tab-p5">
+      <section>
+        <h2>Chart Harga + S&amp;R + Sinyal</h2>
+        <div class="panel">
+          <div class="chart-head">
+            <label class="src">Instrument</label>
+            <select id="instrument"></select>
+            <span id="chartMeta"></span>
+          </div>
+          <svg id="chart" viewBox="0 0 800 280" preserveAspectRatio="none"></svg>
+        </div>
+      </section>
+
+      <section>
+        <h2>Sinyal (Breakout/Retest)</h2>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Tgl</th><th>Tipe</th><th>Entry/SL/TP1</th><th>R:R</th><th>Status</th><th></th></tr></thead>
+            <tbody id="signalsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================== PANEL 6: SYNTHESIS ===================== -->
+    <div class="tabpanel" id="tab-p6">
+      <section>
+        <h2>Synthesis Harian</h2>
+        <div class="panel">
+          <div class="form-row">
+            <label class="field">Kesimpulan hari ini (tulis ulang sendiri, bukan auto-generate)</label>
+            <textarea id="synthText" style="min-height:120px"></textarea>
+          </div>
+          <div class="form-row">
+            <button class="btn" id="synthSaveBtn">Simpan Synthesis</button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Outlook per Instrumen</h2>
+        <div class="panel">
+          <div class="grid cards" id="outlookGrid"></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Trading Journal — Catat Trade</h2>
+        <div class="panel">
+          <div class="form-grid">
+            <div><label class="field">Instrument</label><input type="text" id="jInstrument" value="BTC"></div>
+            <div><label class="field">Setup type</label><input type="text" id="jSetup" placeholder="breakout/retest"></div>
+            <div>
+              <label class="field">Outcome</label>
+              <select id="jOutcome"><option>ONGOING</option><option>WIN</option><option>LOSS</option></select>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-top:12px">
+            <div><label class="field">Entry</label><input type="number" step="any" id="jEntry"></div>
+            <div><label class="field">SL</label><input type="number" step="any" id="jSl"></div>
+            <div><label class="field">TP1</label><input type="number" step="any" id="jTp1"></div>
+          </div>
+          <div class="form-row" style="margin-top:12px">
+            <label class="field">Catatan pribadi</label>
+            <textarea id="jNotes"></textarea>
+          </div>
+          <div class="form-row">
+            <label class="field">Lesson learned (opsional)</label>
+            <textarea id="jLesson"></textarea>
+          </div>
+          <div class="form-row"><button class="btn" id="jSaveBtn">Simpan ke Trading Journal</button></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Prediction Log — Catat Prediksi Baru</h2>
+        <div class="panel">
+          <div class="form-grid">
+            <div>
+              <label class="field">Horizon</label>
+              <select id="pHorizon"><option>1w</option><option>2w</option><option>1m</option></select>
+            </div>
+            <div><label class="field">Confidence (%)</label><input type="number" id="pConfidence" min="0" max="100"></div>
+            <div><label class="field">Target date (jatuh tempo)</label><input type="date" id="pTargetDate"></div>
+          </div>
+          <div class="form-row" style="margin-top:12px">
+            <label class="field">Claim</label>
+            <input type="text" id="pClaim" placeholder="mis. BTC tembus $70K sebelum FOMC">
+          </div>
+          <div class="form-row">
+            <label class="field">Basis (data/lensa apa yang dipakai)</label>
+            <textarea id="pBasis"></textarea>
+          </div>
+          <div class="form-row"><button class="btn" id="pSaveBtn">Catat Prediksi</button></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Skor Prediksi — Jatuh Tempo</h2>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Dibuat</th><th>Target</th><th>Claim</th><th>Confidence</th><th>Skor</th></tr></thead>
+            <tbody id="dueBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
   </div>
 </main>
 
+<div class="toast" id="toast"></div>
+
 <script>
 const $ = (s) => document.querySelector(s);
+const today = () => new Date().toISOString().slice(0, 10);
+
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2200);
+}
 
 function fmt(v) {
   if (v === null || v === undefined) return null;
@@ -147,6 +489,23 @@ function fmt(v) {
   return v.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
+async function postJSON(url, body) {
+  const r = await fetch(url, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return r.json();
+}
+
+// ---------- Tabs ----------
+$("#tabs").addEventListener("click", (e) => {
+  if (e.target.tagName !== "BUTTON") return;
+  const tab = e.target.dataset.tab;
+  [...$("#tabs").children].forEach(b => b.classList.toggle("active", b === e.target));
+  document.querySelectorAll(".tabpanel").forEach(p => p.classList.toggle("active", p.id === "tab-" + tab));
+});
+
+// ---------- Panel 1: Snapshot + Backfill ----------
 async function loadLatest() {
   const d = await (await fetch("/api/latest")).json();
   if (d.empty) {
@@ -159,7 +518,6 @@ async function loadLatest() {
   $("#content").style.display = "block";
   $("#asOf").textContent = "per " + d.date + " · " + d.news_today + " berita hari itu";
 
-  // cards
   $("#cards").innerHTML = d.snapshot.map(s => {
     let val = fmt(s.value);
     if (s.column === "fear_greed_value" && d.fear_greed_label && val !== null)
@@ -169,7 +527,6 @@ async function loadLatest() {
       <div class="value ${na ? "na" : ""}">${na ? "n/a" : val}</div></div>`;
   }).join("");
 
-  // flags
   const order = { fail: 0, skip: 1, ok: 2 };
   const flags = Object.entries(d.source_flags)
     .sort((a, b) => (order[a[1]] - order[b[1]]) || a[0].localeCompare(b[0]));
@@ -178,51 +535,222 @@ async function loadLatest() {
     || '<span class="src">tidak ada flag</span>';
 }
 
-let chartData = [];
-function drawChart(rows) {
-  chartData = rows;
+let bfPreviewData = null;
+$("#bfPreviewBtn").addEventListener("click", async () => {
+  const body = { instrument: $("#bfInstrument").value, from: $("#bfFrom").value, to: $("#bfTo").value };
+  if (!body.from || !body.to) { toast("Isi rentang tanggal dulu"); return; }
+  const r = await postJSON("/api/backfill/preview", body);
+  bfPreviewData = body;
+  $("#bfResult").textContent = `Fetched ${r.fetched}, baru ${r.new}, duplikat ${r.dup}` +
+    (r.sample_from ? ` (contoh ${r.sample_from} .. ${r.sample_to})` : "");
+  $("#bfCommitBtn").style.display = r.new > 0 ? "inline-block" : "none";
+});
+$("#bfCommitBtn").addEventListener("click", async () => {
+  if (!bfPreviewData) return;
+  const r = await postJSON("/api/backfill/commit", bfPreviewData);
+  $("#bfResult").textContent = `OK — ${r.new} baris baru ditulis (${r.dup} duplikat di-skip).`;
+  $("#bfCommitBtn").style.display = "none";
+  toast("Backfill selesai");
+});
+
+// ---------- Panel 2: News ----------
+let impactFilter = "";
+async function loadNews() {
+  const q = impactFilter ? `?impact=${impactFilter}&limit=80` : "?limit=80";
+  const rows = await (await fetch("/api/news" + q)).json();
+  $("#newsBody").innerHTML = rows.map((r, i) => {
+    const link = r.raw_url
+      ? `<a href="${r.raw_url}" target="_blank" rel="noopener">${r.headline}</a>`
+      : r.headline;
+    return `<tr>
+      <td><span class="badge ${r.impact_level}">${r.impact_level}</span></td>
+      <td>${link}</td><td class="src">${r.source}</td><td class="src">${r.date}</td>
+      <td>${r.id !== undefined ? `<button class="btn small secondary" data-flagid="${r.id}">🚩 key</button>` : ""}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" class="src">tidak ada berita</td></tr>`;
+}
+$("#newsBody").addEventListener("click", async (e) => {
+  const id = e.target.dataset.flagid;
+  if (!id) return;
+  await postJSON("/api/news/flag_key", { id: Number(id), is_key: true });
+  toast("Ditandai key trigger");
+});
+$("#newsFilters").addEventListener("click", (e) => {
+  if (e.target.tagName !== "BUTTON") return;
+  impactFilter = e.target.dataset.impact;
+  [...$("#newsFilters").children].forEach(b => b.classList.toggle("active", b === e.target));
+  loadNews();
+});
+$("#artSaveBtn").addEventListener("click", async () => {
+  const headline = $("#artHeadline").value.trim();
+  if (!headline) { toast("Headline wajib diisi"); return; }
+  await postJSON("/api/articles/add", {
+    date: $("#artDate").value || today(), source: $("#artSource").value,
+    url: $("#artUrl").value, headline, notes: $("#artNotes").value,
+    tags: $("#artTags").value, key_event: $("#artKeyEvent").checked,
+  });
+  toast("Artikel tersimpan");
+  ["artSource","artUrl","artHeadline","artNotes","artTags"].forEach(id => $("#" + id).value = "");
+  $("#artKeyEvent").checked = false;
+});
+
+// ---------- Panel 3: Forward Panel ----------
+async function loadEconCalendar() {
+  const rows = await (await fetch("/api/econ_calendar")).json();
+  const now = new Date();
+  $("#calBody").innerHTML = rows.map(r => {
+    const days = Math.ceil((new Date(r.event_date) - now) / 86400000);
+    return `<tr><td>${r.event_date}</td><td class="src">${days <= 0 ? "hari ini/lewat" : "H-" + days}</td>
+      <td>${r.event_name}</td><td class="src">${r.country || "-"}</td>
+      <td><span class="badge ${r.importance}">${r.importance}</span></td></tr>`;
+  }).join("") || `<tr><td colspan="5" class="src">tidak ada event mendatang</td></tr>`;
+}
+async function loadPolicyNotes() {
+  const rows = await (await fetch("/api/policy?limit=15")).json();
+  $("#policyBody").innerHTML = rows.map(r => `<tr>
+    <td class="src">${r.date}</td><td>${r.speaker || "-"}</td>
+    <td>${(r.literal_statement || "").slice(0, 80)}</td>
+    <td>${(r.inference || "").slice(0, 80)}</td>
+    <td><span class="badge ${r.inference_flag === "SPEKULATIF" ? "MED" : "LOW"}">${r.inference_flag || "-"}</span></td>
+  </tr>`).join("") || `<tr><td colspan="5" class="src">belum ada entri</td></tr>`;
+}
+$("#polSaveBtn").addEventListener("click", async () => {
+  const literal = $("#polLiteral").value.trim();
+  if (!literal) { toast("Literal statement wajib diisi"); return; }
+  await postJSON("/api/policy/add", {
+    date: $("#polDate").value || today(), speaker: $("#polSpeaker").value,
+    institution: $("#polInstitution").value, source_url: $("#polUrl").value,
+    literal_statement: literal, stance_score: $("#polStance").value ? Number($("#polStance").value) : null,
+    inference: $("#polInference").value, inference_flag: $("#polFlag").value,
+    drift_note: $("#polDrift").value,
+  });
+  toast("Policy note tersimpan");
+  ["polSpeaker","polInstitution","polUrl","polLiteral","polStance","polInference","polDrift"].forEach(id => $("#" + id).value = "");
+  loadPolicyNotes();
+});
+
+// ---------- Panel 4: Reading Workspace ----------
+async function loadReadingEntries() {
+  const rows = await (await fetch(`/api/reading?date=${today()}`)).json();
+  $("#readingBody").innerHTML = rows.map(r =>
+    `<tr><td>${r.lens}</td><td>${r.notes}</td></tr>`
+  ).join("") || `<tr><td colspan="2" class="src">belum ada entri hari ini</td></tr>`;
+}
+$("#readingSaveBtn").addEventListener("click", async () => {
+  const r = await postJSON("/api/reading/save", {
+    date: today(), gema: $("#lensGema").value, leon: $("#lensLeon").value,
+    akela: $("#lensAkela").value, rivan: $("#lensRivan").value,
+    external_ai: $("#lensExternalAi").value, conflict: $("#lensConflict").value,
+  });
+  toast(`${r.ids.length} catatan tersimpan`);
+  loadReadingEntries();
+});
+
+// ---------- Panel 5: Chart + S&R + Signals ----------
+function drawCandleChart(rows, zones, signals) {
   const svg = $("#chart");
-  const W = 800, H = 220, pad = 6;
-  const closes = rows.map(r => r.close).filter(v => v !== null);
-  if (closes.length < 2) {
-    svg.innerHTML = `<text x="400" y="110" fill="#8b949e" text-anchor="middle">data kurang</text>`;
+  const W = 800, H = 280, padL = 6, padR = 6, padT = 10, padB = 10;
+  const valid = rows.filter(r => r.close !== null);
+  if (valid.length < 2) {
+    svg.innerHTML = `<text x="400" y="140" fill="#8b949e" text-anchor="middle">data kurang</text>`;
     $("#chartMeta").textContent = "";
     return;
   }
-  const min = Math.min(...closes), max = Math.max(...closes);
-  const span = (max - min) || 1;
+  let lo = Math.min(...valid.map(r => r.low ?? r.close));
+  let hi = Math.max(...valid.map(r => r.high ?? r.close));
+  zones.forEach(z => { lo = Math.min(lo, z.zone_lower); hi = Math.max(hi, z.zone_upper); });
+  const span = (hi - lo) || 1;
   const n = rows.length;
-  const x = i => pad + (i / (n - 1)) * (W - 2 * pad);
-  const y = v => H - pad - ((v - min) / span) * (H - 2 * pad);
-  let d = "", area = "";
+  const slot = (W - padL - padR) / n;
+  const x = i => padL + i * slot + slot / 2;
+  const y = v => H - padB - ((v - lo) / span) * (H - padT - padB);
+
+  let svgParts = [];
+
+  // S&R zone bands (background)
+  zones.forEach(z => {
+    const yTop = y(z.zone_upper), yBot = y(z.zone_lower);
+    const col = z.zone_type === "SUPPORT" ? "#3fb950" : "#f85149";
+    svgParts.push(`<rect x="0" y="${yTop.toFixed(1)}" width="${W}" height="${Math.max(1, yBot - yTop).toFixed(1)}"
+      fill="${col}" opacity="0.08"/>`);
+  });
+
+  // Candles
+  const bw = Math.max(1, slot * 0.6);
   rows.forEach((r, i) => {
     if (r.close === null) return;
-    const cmd = d === "" ? "M" : "L";
-    d += `${cmd}${x(i).toFixed(1)},${y(r.close).toFixed(1)} `;
+    const up = r.close >= r.open;
+    const col = up ? "#3fb950" : "#f85149";
+    const cx = x(i);
+    svgParts.push(`<line x1="${cx}" y1="${y(r.high).toFixed(1)}" x2="${cx}" y2="${y(r.low).toFixed(1)}" stroke="${col}" stroke-width="1"/>`);
+    const bodyTop = y(Math.max(r.open, r.close)), bodyBot = y(Math.min(r.open, r.close));
+    svgParts.push(`<rect x="${(cx - bw / 2).toFixed(1)}" y="${bodyTop.toFixed(1)}" width="${bw.toFixed(1)}"
+      height="${Math.max(1, bodyBot - bodyTop).toFixed(1)}" fill="${col}"/>`);
   });
-  const first = rows.findIndex(r => r.close !== null);
-  area = `M${x(first).toFixed(1)},${H - pad} ` + d.replace(/^M/, "L") +
-         `L${x(n - 1).toFixed(1)},${H - pad} Z`;
-  const up = closes[closes.length - 1] >= closes[0];
-  const col = up ? "#3fb950" : "#f85149";
-  svg.innerHTML =
-    `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-       <stop offset="0" stop-color="${col}" stop-opacity="0.25"/>
-       <stop offset="1" stop-color="${col}" stop-opacity="0"/>
-     </linearGradient></defs>
-     <path d="${area}" fill="url(#g)"/>
-     <path d="${d}" fill="none" stroke="${col}" stroke-width="1.6"/>`;
-  const last = rows[rows.length - 1];
-  const pct = ((closes[closes.length - 1] - closes[0]) / closes[0] * 100).toFixed(2);
+
+  // Breakout/retest markers
+  const dateIndex = {};
+  rows.forEach((r, i) => dateIndex[r.date] = i);
+  signals.forEach(s => {
+    const i = dateIndex[s.date];
+    if (i === undefined) return;
+    const cy = s.entry_price ? y(s.entry_price) : y(rows[i].close);
+    const col = s.signal_type === "BREAKOUT" ? "#3fb950" : "#4c9aff";
+    const shape = s.signal_type === "BREAKOUT"
+      ? `<circle cx="${x(i).toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="${col}"/>`
+      : `<circle cx="${x(i).toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="none" stroke="${col}" stroke-width="2"/>`;
+    svgParts.push(shape);
+  });
+
+  svg.innerHTML = svgParts.join("");
+  const last = valid[valid.length - 1];
+  const first = valid[0];
+  const pct = ((last.close - first.close) / first.close * 100).toFixed(2);
   $("#chartMeta").textContent =
-    `${rows[first].date} → ${last.date} · close ${fmt(last.close)} · ${pct >= 0 ? "+" : ""}${pct}% (range) · MA20 vol ${fmt(last.volume_ma20)}`;
+    `${first.date} → ${last.date} · close ${fmt(last.close)} · ${pct >= 0 ? "+" : ""}${pct}% (range) · ${zones.length} zona aktif`;
 }
 
 async function loadChart() {
   const inst = $("#instrument").value;
-  const rows = await (await fetch(`/api/asset_ohlcv?instrument=${encodeURIComponent(inst)}&limit=120`)).json();
-  drawChart(rows);
+  const [rows, zones, signals] = await Promise.all([
+    fetch(`/api/asset_ohlcv?instrument=${encodeURIComponent(inst)}&limit=120`).then(r => r.json()),
+    fetch(`/api/sr_zones?instrument=${encodeURIComponent(inst)}`).then(r => r.json()),
+    fetch(`/api/signals?instrument=${encodeURIComponent(inst)}`).then(r => r.json()),
+  ]);
+  drawCandleChart(rows, zones, signals);
+  renderSignalsTable(signals);
 }
+
+function renderSignalsTable(signals) {
+  const rows = signals.slice(0, 30);
+  $("#signalsBody").innerHTML = rows.map(s => {
+    const status = s.approved ? "APPROVED" : (s.notes ? "REJECTED" : "pending");
+    const badgeClass = status === "APPROVED" ? "LOW" : (status === "REJECTED" ? "HIGH" : "MED");
+    const priceStr = s.entry_price
+      ? `${fmt(s.entry_price)} / ${fmt(s.sl_price)} / ${fmt(s.tp1_price)}` : "-";
+    const rr = s.rr_ratio ? s.rr_ratio.toFixed(2) : "-";
+    const actions = status === "pending"
+      ? `<button class="btn small secondary" data-act="approve" data-id="${s.id}">Approve</button>
+         <button class="btn small danger" data-act="reject" data-id="${s.id}">Reject</button>`
+      : `<span class="badge ${badgeClass}">${status}</span>`;
+    return `<tr>
+      <td class="src">${s.date}</td><td><span class="badge ${s.signal_type}">${s.signal_type}</span></td>
+      <td>${priceStr}</td><td>${rr}</td>
+      <td>${status === "pending" ? `<span class="badge ${badgeClass}">${status}</span>` : ""}</td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6" class="src">belum ada sinyal untuk instrument ini</td></tr>`;
+}
+$("#signalsBody").addEventListener("click", async (e) => {
+  const act = e.target.dataset.act;
+  if (!act) return;
+  const id = e.target.dataset.id;
+  let notes = null;
+  if (act === "reject") notes = prompt("Alasan reject (opsional):") || "";
+  await postJSON("/api/signals/review", { id: Number(id), approved: act === "approve", notes });
+  toast(act === "approve" ? "Sinyal di-approve" : "Sinyal di-reject");
+  loadChart();
+});
 
 async function loadAssets() {
   const list = await (await fetch("/api/assets")).json();
@@ -231,36 +759,78 @@ async function loadAssets() {
   if (list.includes("BTC")) sel.value = "BTC";
   if (list.length) await loadChart();
 }
-
-let impactFilter = "";
-async function loadNews() {
-  const q = impactFilter ? `?impact=${impactFilter}&limit=80` : "?limit=80";
-  const rows = await (await fetch("/api/news" + q)).json();
-  $("#newsBody").innerHTML = rows.map(r => {
-    const link = r.raw_url
-      ? `<a href="${r.raw_url}" target="_blank" rel="noopener">${r.headline}</a>`
-      : r.headline;
-    return `<tr>
-      <td><span class="badge ${r.impact_level}">${r.impact_level}</span></td>
-      <td>${link}</td><td class="src">${r.source}</td><td class="src">${r.date}</td>
-    </tr>`;
-  }).join("") || `<tr><td colspan="4" class="src">tidak ada berita</td></tr>`;
-}
-
 $("#instrument").addEventListener("change", loadChart);
-$("#refresh").addEventListener("click", refreshAll);
-$("#newsFilters").addEventListener("click", (e) => {
-  if (e.target.tagName !== "BUTTON") return;
-  impactFilter = e.target.dataset.impact;
-  [...$("#newsFilters").children].forEach(b => b.classList.toggle("active", b === e.target));
-  loadNews();
+
+// ---------- Panel 6: Synthesis / Journal / Prediction ----------
+async function loadOutlookInstruments() {
+  const list = await (await fetch("/api/outlook_instruments")).json();
+  $("#outlookGrid").innerHTML = list.map(inst => `
+    <div class="card">
+      <div class="label">${inst}</div>
+      <select data-outlook="${inst}" style="margin-top:6px">
+        <option>Neutral</option><option>Bullish</option><option>Bearish</option>
+      </select>
+    </div>`).join("");
+}
+$("#synthSaveBtn").addEventListener("click", async () => {
+  const text = $("#synthText").value.trim();
+  if (!text) { toast("Isi synthesis dulu"); return; }
+  await postJSON("/api/synthesis/save", { date: today(), text });
+  toast("Synthesis tersimpan");
+});
+$("#jSaveBtn").addEventListener("click", async () => {
+  await postJSON("/api/journal/add", {
+    date: today(), instrument: $("#jInstrument").value, setup_type: $("#jSetup").value,
+    entry_price: $("#jEntry").value || null, sl_price: $("#jSl").value || null,
+    tp1_price: $("#jTp1").value || null, outcome: $("#jOutcome").value,
+    personal_notes: $("#jNotes").value, lesson_learned: $("#jLesson").value,
+  });
+  toast("Tersimpan ke trading journal");
+  ["jSetup","jEntry","jSl","jTp1","jNotes","jLesson"].forEach(id => $("#" + id).value = "");
+});
+$("#pSaveBtn").addEventListener("click", async () => {
+  const claim = $("#pClaim").value.trim();
+  if (!claim || !$("#pTargetDate").value) { toast("Claim & target date wajib diisi"); return; }
+  await postJSON("/api/prediction/add", {
+    date_made: today(), horizon: $("#pHorizon").value, claim,
+    confidence: $("#pConfidence").value || null, basis: $("#pBasis").value,
+    target_date: $("#pTargetDate").value,
+  });
+  toast("Prediksi tercatat");
+  ["pConfidence","pClaim","pBasis","pTargetDate"].forEach(id => $("#" + id).value = "");
+  loadDuePredictions();
+});
+async function loadDuePredictions() {
+  const rows = await (await fetch("/api/prediction/due")).json();
+  $("#dueBody").innerHTML = rows.map(r => `<tr>
+    <td class="src">${r.date_made}</td><td class="src">${r.target_date}</td>
+    <td>${r.claim}</td><td>${r.confidence ?? "-"}%</td>
+    <td>
+      <button class="btn small secondary" data-score="BENAR" data-id="${r.id}">Benar</button>
+      <button class="btn small danger" data-score="SALAH" data-id="${r.id}">Salah</button>
+      <button class="btn small secondary" data-score="PARTIAL" data-id="${r.id}">Partial</button>
+    </td>
+  </tr>`).join("") || `<tr><td colspan="5" class="src">tidak ada prediksi jatuh tempo</td></tr>`;
+}
+$("#dueBody").addEventListener("click", async (e) => {
+  const outcome = e.target.dataset.score;
+  if (!outcome) return;
+  await postJSON("/api/prediction/score", { id: Number(e.target.dataset.id), outcome });
+  toast("Prediksi di-skor: " + outcome);
+  loadDuePredictions();
 });
 
 async function refreshAll() {
   await loadLatest();
   await loadAssets();
   await loadNews();
+  await loadEconCalendar();
+  await loadPolicyNotes();
+  await loadReadingEntries();
+  await loadOutlookInstruments();
+  await loadDuePredictions();
 }
+$("#refresh").addEventListener("click", refreshAll);
 refreshAll();
 </script>
 </body>
