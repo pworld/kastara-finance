@@ -56,6 +56,11 @@
   .card .value { font-size: 20px; font-weight: 600; margin-top: 4px;
     font-variant-numeric: tabular-nums; }
   .card .value.na { color: var(--muted); font-weight: 400; font-size: 16px; }
+  .card .delta { font-size: 12px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .card .delta.up { color: var(--ok); }
+  .card .delta.down { color: var(--fail); }
+  .card .delta.flat { color: var(--muted); }
+  .card .delta.na { color: var(--muted); opacity: .6; }
   section { margin-top: 26px; }
   section:first-child { margin-top: 4px; }
   section h2 { font-size: 15px; color: var(--text); margin: 0 0 12px;
@@ -160,6 +165,12 @@
     <div class="tabpanel active" id="tab-p1">
       <section>
         <h2>Snapshot Pasar</h2>
+        <div class="news-filters" id="snapshotPeriodFilter">
+          <button data-period="day" class="active">Hari</button>
+          <button data-period="week">Minggu</button>
+          <button data-period="month">Bulan</button>
+          <button data-period="year">Tahun</button>
+        </div>
         <div class="grid cards" id="cards"></div>
       </section>
 
@@ -597,6 +608,42 @@ $("#tabs").addEventListener("click", (e) => {
 });
 
 // ---------- Panel 1: Snapshot + Backfill ----------
+let latestSnapshotData = null;
+let snapshotPeriod = "day";
+
+function renderSnapshotCards() {
+  if (!latestSnapshotData) return;
+  const d = latestSnapshotData;
+  $("#cards").innerHTML = d.snapshot.map(s => {
+    let val = fmt(s.value);
+    if (s.column === "fear_greed_value" && d.fear_greed_label && val !== null)
+      val = val + " · " + d.fear_greed_label;
+    const na = val === null;
+
+    const comp = s.compare && s.compare[snapshotPeriod];
+    let deltaClass = "na", deltaText = "n/a";
+    if (comp) {
+      const arrow = comp.delta > 0 ? "▲" : comp.delta < 0 ? "▼" : "–";
+      deltaClass = comp.delta > 0 ? "up" : comp.delta < 0 ? "down" : "flat";
+      const deltaStr = fmt(Math.abs(comp.delta));
+      const pctStr = comp.pct !== null && comp.pct !== undefined
+        ? ` (${comp.pct >= 0 ? "+" : "-"}${Math.abs(comp.pct).toFixed(2)}%)` : "";
+      deltaText = `${arrow} ${comp.delta >= 0 ? "+" : "-"}${deltaStr}${pctStr}`;
+    }
+
+    return `<div class="card"><div class="label">${s.label}</div>
+      <div class="value ${na ? "na" : ""}">${na ? "n/a" : val}</div>
+      <div class="delta ${deltaClass}">${deltaText}</div></div>`;
+  }).join("");
+}
+
+$("#snapshotPeriodFilter").addEventListener("click", (e) => {
+  if (e.target.tagName !== "BUTTON") return;
+  snapshotPeriod = e.target.dataset.period;
+  [...$("#snapshotPeriodFilter").children].forEach(b => b.classList.toggle("active", b === e.target));
+  renderSnapshotCards();
+});
+
 async function loadLatest() {
   const d = await (await fetch("/api/latest")).json();
   if (d.empty) {
@@ -609,14 +656,8 @@ async function loadLatest() {
   $("#content").style.display = "block";
   $("#asOf").textContent = "per " + d.date + " · " + d.news_today + " berita hari itu";
 
-  $("#cards").innerHTML = d.snapshot.map(s => {
-    let val = fmt(s.value);
-    if (s.column === "fear_greed_value" && d.fear_greed_label && val !== null)
-      val = val + " · " + d.fear_greed_label;
-    const na = val === null;
-    return `<div class="card"><div class="label">${s.label}</div>
-      <div class="value ${na ? "na" : ""}">${na ? "n/a" : val}</div></div>`;
-  }).join("");
+  latestSnapshotData = d;
+  renderSnapshotCards();
 
   const order = { fail: 0, skip: 1, ok: 2 };
   const flags = Object.entries(d.source_flags)

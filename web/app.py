@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timedelta
+from typing import Any
 
 from flask import Flask, jsonify, render_template, request
 
@@ -56,6 +58,24 @@ SNAPSHOT_FIELDS = {
     "Net Liquidity": "net_liquidity",
 }
 
+# Perbandingan snapshot Panel 1 (kartu Hari/Minggu/Bulan/Tahun) — offset
+# kalender kasar (bukan minggu/bulan/tahun ISO presisi), cukup utk "berapa
+# hari lalu" sebagai titik pembanding. Cari row daily_market TERDEKAT
+# <= tanggal target (bukan exact match) karena tidak tiap kalender hari
+# pasti ada row (run_daily jalan manual, bisa ada jeda).
+COMPARE_PERIODS = {"day": 1, "week": 7, "month": 30, "year": 365}
+
+# Kolom snapshot yang instrument-nya juga ada di asset_ohlcv (histori JAUH
+# lebih panjang di sana -- mis. BTC ~4300 baris sejak 2014 -- dibanding
+# daily_market yang cuma punya 4-5 baris utk kolom2 ini krn baru mulai
+# terisi sejak run_daily beneran jalan). Dipakai KHUSUS utk cari nilai masa
+# lalu (week/month/year); nilai "saat ini" yang ditampilkan tetap dari
+# daily_market seperti biasa.
+COLUMN_TO_INSTRUMENT = {
+    "btc_close": "BTC", "sp500_close": "SP500", "ihsg_close": "IHSG",
+    "usd_idr": "USDIDR", "usd_jpy": "USDJPY", "gold_close": "GOLD",
+}
+
 
 def _rows_to_dicts(rows) -> list[dict]:
     return [dict(r) for r in rows]
@@ -84,9 +104,39 @@ def health():
     return jsonify({"status": "ok", "db": str(get_db_path())})
 
 
+def _compare_from_series(series: list[tuple[str, float]], latest_date: str, cur_val) -> dict:
+    """Bandingkan `cur_val` (hari ini) vs D-1/W-1/M-1/Y-1 dari `series`
+    ([(date, value), ...] terurut DESC baru->lama). Cari titik pertama
+    dengan date <= target (bukan exact match) -- gap kalender wajar krn
+    run_daily manual / weekend tidak ada data equity."""
+    compare: dict[str, Any] = {}
+    latest_dt = datetime.strptime(latest_date, "%Y-%m-%d")
+    for period, days_ago in COMPARE_PERIODS.items():
+        target = (latest_dt - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+        past_date, past_val = None, None
+        for d, v in series:
+            if d <= target and v is not None:
+                past_date, past_val = d, v
+                break
+        if cur_val is None or past_val is None:
+            compare[period] = None
+            continue
+        delta = cur_val - past_val
+        compare[period] = {
+            "past_value": past_val,
+            "past_date": past_date,
+            "delta": delta,
+            "pct": (delta / past_val * 100) if past_val else None,
+        }
+    return compare
+
+
 @app.get("/api/latest")
 def latest():
-    """Snapshot daily_market terbaru + source_flags terurai."""
+    """Snapshot daily_market terbaru + source_flags terurai + perbandingan
+    Hari/Minggu/Bulan/Tahun per metric (utk kartu Panel 1). Kolom yang ada
+    padanan instrument-nya di asset_ohlcv (lihat COLUMN_TO_INSTRUMENT) pakai
+    histori dari sana utk pembanding (jauh lebih panjang dari daily_market)."""
     with get_connection() as conn:
         row = conn.execute(
             "SELECT * FROM daily_market ORDER BY date DESC LIMIT 1"
@@ -95,12 +145,33 @@ def latest():
             "SELECT COUNT(*) c FROM daily_news WHERE date = "
             "(SELECT MAX(date) FROM daily_news)"
         ).fetchone()["c"]
+        series_by_col: dict[str, list[tuple[str, float]]] = {}
+        if row is not None:
+            hist_rows = conn.execute(
+                "SELECT * FROM daily_market WHERE date <= ? "
+                "ORDER BY date DESC LIMIT 400",
+                (row["date"],),
+            ).fetchall()
+            market_hist = _rows_to_dicts(hist_rows)
+            for col in SNAPSHOT_FIELDS.values():
+                if col not in COLUMN_TO_INSTRUMENT:
+                    series_by_col[col] = [(r["date"], r.get(col)) for r in market_hist]
+            for col, instrument in COLUMN_TO_INSTRUMENT.items():
+                ohlcv_rows = conn.execute(
+                    "SELECT date, close FROM asset_ohlcv WHERE instrument = ? "
+                    "AND date <= ? ORDER BY date DESC LIMIT 2000",
+                    (instrument, row["date"]),
+                ).fetchall()
+                series_by_col[col] = [(r["date"], r["close"]) for r in ohlcv_rows]
     if row is None:
         return jsonify({"empty": True})
     data = dict(row)
     flags = _parse_flags(data.get("source_flags"))
     snapshot = [
-        {"label": label, "column": col, "value": data.get(col)}
+        {
+            "label": label, "column": col, "value": data.get(col),
+            "compare": _compare_from_series(series_by_col.get(col, []), data["date"], data.get(col)),
+        }
         for label, col in SNAPSHOT_FIELDS.items()
     ]
     return jsonify({

@@ -453,6 +453,24 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
 - [x] ~~`manual_articles` CLI~~ — `pipeline/add_article.py` selesai (add +
       list/search by tag/date-range/keyword), 5 test hijau. Dipakai buat
       riset historis (mis. dari 2010) yang RSS tidak bisa jangkau.
+- [x] ~~Panel 1 Snapshot: compare Hari/Minggu/Bulan/Tahun~~ — tombol filter
+      di atas kartu snapshot (pola sama dgn filter rentang Panel 5), tiap
+      kartu nampilin delta + panah (▲ hijau naik / ▼ merah turun) vs D-1/
+      W-1/M-1/Y-1. `web/app.py::_compare_from_series()` cari titik histori
+      terdekat <= tanggal target (bukan exact match, wajar ada gap kalender
+      krn `run_daily` manual). Kolom yang instrument-nya ada di
+      `asset_ohlcv` (BTC/SP500/IHSG/USDIDR/USDJPY/Gold) pakai histori dari
+      SANA (bisa >10 tahun), bukan `daily_market` (baru ~4-5 baris utk
+      kolom2 itu krn baru mulai keisi beneran) — tanpa ini, compare
+      week/month/year bakal selalu n/a utk harga instrument. Kolom lain
+      (DXY/US10Y/VIX/dll, di-backfill FRED sejak 2010) & kolom yang
+      genuinely belum ada histori panjang (BTC Vol MA20, Funding Rate, Fear
+      &amp; Greed, Net Liquidity) tetap `n/a` di periode yang datanya belum
+      cukup — bukan bug, jujur soal batas data. Satu fetch `/api/latest`
+      cukup (semua periode dihitung sekaligus di server), toggle di
+      frontend murni ganti tampilan tanpa fetch ulang. 5 test baru
+      (`tests/test_web_app.py`, test pertama utk `web/app.py`), 132 test
+      hijau total.
 
 **Dievaluasi, sengaja tidak dikerjakan:**
 - **NewsData.io** — dicek langsung: sentiment analysis **cuma tersedia di
