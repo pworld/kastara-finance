@@ -57,6 +57,15 @@ Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
     `trade_signals`. **Suggestion only** — `approved` selalu 0 dari kode.
   - `tools/review_signal.py` — CLI approve/reject sinyal by id eksplisit.
   - `pipeline/seed_context_weight.py` — seed pembobotan driver per aset.
+- **Telegram Daily Briefing Phase E** (`notify/`, `pipeline/` — lihat
+  [plan_e.txt](plan_e.txt)):
+  - `notify/telegram.py` — `send_message()` (push satu arah, bukan bot
+    dua-arah) + `get_latest_chat_id()` (helper setup sekali pakai).
+  - `pipeline/compose_briefing.py` — rakit teks briefing dari data yang
+    SUDAH kamu isi manual (4 lensa, sinyal approved) — tidak generate
+    apa pun sendiri.
+  - `pipeline/send_briefing.py` — CLI, dipicu manual (lihat
+    [Daily Briefing](#daily-briefing-ke-telegram-phase-e)).
 
 Semua scraper **tahan API-fail**: kalau satu source mati, ditandai `fail` di
 `source_flags` dan pipeline tetap lanjut (tidak crash, tidak silent).
@@ -75,13 +84,22 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 # 2. dependencies
 pip install -r requirements.txt
 
-# 3. konfigurasi (opsional, hanya untuk FRED)
+# 3. konfigurasi (opsional, hanya untuk FRED & Telegram)
 cp .env.example .env
 # edit .env, isi FRED_API_KEY (gratis: https://fred.stlouisfed.org/docs/api/api_key.html)
 ```
 
 FRED opsional — tanpa key, series FRED akan di-`skip` (bukan error), sisanya
 tetap jalan.
+
+**Setup Telegram (opsional, untuk Daily Briefing Phase E):**
+1. Chat ke `@BotFather` di Telegram, kirim `/newbot`, ikuti instruksi -> dapat `TELEGRAM_BOT_TOKEN`.
+2. Kirim 1 pesan apa saja (mis. `/start`) ke bot barumu dari akun Telegram-mu sendiri.
+3. `python -m notify.telegram` -> print `chat_id` dari update terakhir.
+4. Isi `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_CHAT_ID` di `.env`.
+
+Tanpa setup ini, tombol "Kirim ke Telegram" / `pipeline.send_briefing` tetap
+menampilkan teks briefing-nya, cuma `sent: false` (tidak benar-benar terkirim).
 
 ---
 
@@ -201,6 +219,20 @@ lihat `docs/ARCHITECTURE.md` §5.6): `/api/backfill/{preview,commit}`,
 `/api/journal/add`, `/api/prediction/{add,due,score}`,
 `/api/outlook_instruments`. Endpoint Phase D:
 `/api/expectations{,/add}`, `/api/positioning{,/add}`, `/api/disonansi`.
+Endpoint Phase E: `/api/briefing/send`.
+
+### Daily Briefing ke Telegram (Phase E)
+```bash
+python -m pipeline.send_briefing --dry-run     # print teks, tidak kirim
+python -m pipeline.send_briefing               # kirim ke Telegram hari ini
+python -m pipeline.send_briefing --date 2026-07-08
+```
+Dijalankan **manual** oleh kamu sendiri setelah selesai Panel 4-6 (4 lensa +
+approve sinyal terisi) — bukan bagian dari `run_daily`, karena isi briefing
+baru lengkap setelah rutinitas pagi selesai (~07:20), bukan pas data pull
+jam 07:00. Ada juga tombol "Kirim ke Telegram" di Panel 6 dashboard yang
+melakukan hal sama. Section yang belum kamu isi tampil `(belum diisi)` —
+bukan disembunyikan — supaya kelihatan kalau ada yang kelewat.
 
 ### Test
 ```bash

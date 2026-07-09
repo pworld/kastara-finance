@@ -28,6 +28,8 @@ import pipeline.backfill as backfill_mod
 import tools.review_signal as review_signal
 import web.writes as writes
 from db.connection import get_connection, get_db_path, init_db
+from notify.telegram import send_message
+from pipeline.compose_briefing import compose_daily_briefing
 from scrapers.base import today_wib
 
 app = Flask(__name__)
@@ -412,6 +414,20 @@ def journal_add():
         )
         conn.commit()
     return jsonify({"id": new_id})
+
+
+@app.post("/api/briefing/send")
+def briefing_send():
+    """Rakit Daily Briefing (Phase E) + kirim ke Telegram. Dipicu manual
+    dari tombol Panel 6 setelah Giel selesai isi Panel 4-6 — lihat
+    plan_e.txt. Return teks yang dirakit + status kirim, supaya tetap
+    kelihatan hasilnya walau TELEGRAM_BOT_TOKEN belum di-set (ok=False)."""
+    body = request.get_json(force=True) if request.data else {}
+    date = body.get("date") or today_wib()
+    with get_connection() as conn:
+        text = compose_daily_briefing(conn, date)
+    ok = send_message(text)
+    return jsonify({"text": text, "sent": ok})
 
 
 @app.post("/api/prediction/add")

@@ -452,3 +452,54 @@ yang bakal jalan di produksi, bukan proxy tool yang beda fingerprint.
 CFTC COT sebaliknya: dites langsung pakai Socrata API (`publicreporting.
 cftc.gov/resource/<id>.json`), gratis, TANPA API key — dikonfirmasi bekerja
 persis seperti riset awal, tidak ada kejutan.
+
+### 6.12 Telegram Daily Briefing — PUSH manual, sengaja TIDAK nempel `run_daily`
+
+Master Plan §5/§8 (Phase E) menyebut "push daily briefing" seolah itu
+proses otomatis harian seperti scraper lain. Tapi isi briefing (4 Lensa,
+Signal approved) baru lengkap SETELAH Giel selesai Panel 4-6 (~07:20) —
+`run_daily` jalan jam 07:00, jauh sebelum itu. Kalau `compose_daily_
+briefing()` dipanggil otomatis di akhir `run_daily`, isinya SELALU kosong
+di bagian yang paling penting (lensa & sinyal), padahal `pull data` dan
+`analisa manual Giel` adalah dua peristiwa terpisah waktu.
+
+Keputusan: `pipeline/send_briefing.py` adalah AKSI TERPISAH (CLI + tombol
+Panel 6), dipicu Giel sendiri kapan siap — bukan langkah otomatis di
+`pipeline/run_daily.py`. Ini konsisten dengan prinsip "mesin merakit, Giel
+memprediksi": `compose_daily_briefing()` cuma merakit teks dari row yang
+SUDAH ada di DB (ditulis manual oleh Giel di Panel 4-6), tidak pernah
+menunggu/polling data yang belum ada.
+
+**Pola test berbeda dari scraper lain (sengaja):** semua scraper
+(`scrapers/*.py`) di-test dengan LIVE network call (lihat `test_econ_
+calendar.py`, `test_positioning.py`) karena itu operasi READ — aman
+diulang berkali-kali. `notify/telegram.py` adalah operasi SEND (push
+pesan ke chat asli) — kalau test-nya live juga, tiap `pytest` run bakal
+benar-benar ngirim pesan ke Telegram Giel. Jadi `tests/test_notify_
+telegram.py` di-mock pakai `monkeypatch` (pertama kalinya test suite ini
+pakai mocking) — satu-satunya pengecualian yang disengaja dari kebiasaan
+"test scraper pakai network asli".
+
+### 6.13 Bug ditemukan saat setup asli: `notify/telegram.py` tidak `load_dotenv()` sendiri
+
+Semua modul yang baca env var (`scrapers/macro_fred.py` via `FRED_API_KEY`,
+dll) selama ini "gratis" dapat `.env` ter-load karena tiap entry point
+(`run_daily`, `backfill`, `web.app`) import `db.connection` duluan, dan
+`db/connection.py` yang panggil `load_dotenv()`. `notify/telegram.py`
+didesain juga bisa dijalankan BERDIRI SENDIRI (`python -m notify.telegram`
+— cara resmi ambil `chat_id` pertama kali, lihat README), tapi modul ini
+tidak import `db.connection` sama sekali -> `.env` tidak pernah ke-load,
+`os.getenv("TELEGRAM_BOT_TOKEN")` selalu kosong walau sudah diisi di `.env`.
+
+Ketemu pas Giel benar-benar setup token asli (bukan di test — testnya pakai
+`token=`/`chat_id=` eksplisit jadi tidak kena masalah ini). Fix: `notify/
+telegram.py` panggil `load_dotenv()` sendiri di level modul, tidak
+bergantung pada modul lain di-import duluan.
+
+**Bug kedua (bukan kode, tapi konfigurasi)**: nilai `TELEGRAM_CHAT_ID` yang
+sempat diisi Giel salah 1 digit dari chat_id asli (`...443` vs `...442`
+yang benar) — baru ketahuan setelah `get_latest_chat_id()` dipanggil
+SETELAH Giel benar-benar kirim pesan ke bot (chat_id yang valid cuma bisa
+didapat dari update asli, bukan ditebak/disalin dari sumber lain). Pesan
+error Telegram `"Bad Request: chat not found"` jadi sinyal diagnostik yang
+tepat untuk kasus ini — sudah divalidasi cocok.

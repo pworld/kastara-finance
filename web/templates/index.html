@@ -542,6 +542,15 @@
           </table>
         </div>
       </section>
+
+      <section>
+        <h2>Daily Briefing — Kirim ke Telegram</h2>
+        <div class="panel">
+          <div class="form-row"><button class="btn" id="briefingSendBtn">Kirim ke Telegram</button></div>
+          <pre id="briefingPreview" class="src" style="white-space:pre-wrap;margin-top:12px"></pre>
+        </div>
+        <div class="src" style="margin-top:6px">Jalankan setelah Panel 4-6 terisi (4 lensa + signal approved) — bukan otomatis. Butuh TELEGRAM_BOT_TOKEN &amp; TELEGRAM_CHAT_ID di .env (lihat README §Setup).</div>
+      </section>
     </div>
 
   </div>
@@ -1121,6 +1130,13 @@ $("#dueBody").addEventListener("click", async (e) => {
   await postJSON("/api/prediction/score", { id: Number(e.target.dataset.id), outcome });
   toast("Prediksi di-skor: " + outcome);
   loadDuePredictions();
+});
+
+// ---------- Panel 6: Daily Briefing -> Telegram (Phase E) ----------
+$("#briefingSendBtn").addEventListener("click", async () => {
+  const r = await postJSON("/api/briefing/send", { date: today() });
+  $("#briefingPreview").textContent = r.text;
+  toast(r.sent ? "Briefing terkirim ke Telegram" : "Gagal kirim — cek TELEGRAM_BOT_TOKEN/CHAT_ID di .env");
 });
 
 async function refreshAll() {

@@ -15,7 +15,7 @@
 | **B** | S&R detection, breakout/retest engine | ✅ **Selesai untuk BTC** — [plan_b.txt](../plan_b.txt) dieksekusi penuh, 46 test baru, diverifikasi data asli |
 | **C** | Dashboard/UI penuh (6 panel, write-enabled) | ✅ **Selesai** — [plan_c.txt](../plan_c.txt) dieksekusi penuh, semua panel diverifikasi via browser |
 | **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — [plan_d.txt](../plan_d.txt) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
-| **E** | Telegram bot | ⬜ Belum mulai |
+| **E** | Telegram bot | ✅ **Selesai (push satu arah)** — [plan_e.txt](../plan_e.txt) dieksekusi penuh, Daily Briefing manual (CLI + tombol Panel 6); bot commands dua-arah ditunda ke backlog |
 | **F+** | Multi-aset expansion | ⬜ Belum mulai |
 
 ---
@@ -278,10 +278,41 @@ lebih awal di Phase C (independen dari urutan Phase D). Sisa scope:
 
 ---
 
-## ⬜ Phase E — Telegram Bot
+## ✅ Phase E — Telegram Bot
 
-**Belum mulai.** Scope: notifikasi push (mis. `daily_news` impact HIGH,
-`trade_signals` baru) lewat Telegram, sebagai alternatif/pelengkap dashboard.
+**Selesai (push satu arah)** — [plan_e.txt](../plan_e.txt) dieksekusi penuh.
+
+- **Kenapa PUSH MANUAL, bukan auto dari `run_daily`**: isi briefing (4
+  Lensa, Signal approved) baru lengkap SETELAH Giel selesai Panel 4-6
+  (~07:20) — `run_daily` jalan jam 07:00, jauh sebelum itu. Auto-push
+  nempel di `run_daily` bakal selalu kosong di bagian terpenting. Detail
+  lengkap: [ARCHITECTURE.md §6.12](ARCHITECTURE.md#612-telegram-daily-briefing--push-manual-sengaja-tidak-nempel-run_daily).
+- **`notify/telegram.py`**: `send_message()` (push Bot API `sendMessage`,
+  pakai `requests` biasa — TIDAK nambah dependency berat) + `get_latest_
+  chat_id()` (helper setup sekali pakai lewat `getUpdates`).
+- **`pipeline/compose_briefing.py`**: rakit teks briefing PERSIS format
+  Master Plan §8 (Market Snapshot, Key Events, 4 Lensa, Signal,
+  disclaimer wajib) — pure function, murni baca data yang SUDAH Giel isi
+  manual, tidak generate apa pun.
+- **`pipeline/send_briefing.py`**: CLI (`--dry-run`/`--date`) + tombol
+  "Kirim ke Telegram" di Panel 6 dashboard (`POST /api/briefing/send`).
+- **Section kosong** (mis. lensa belum diisi) tampil `(belum diisi)` —
+  bukan disembunyikan, biar Giel sadar ada yang kelewat. Key Events
+  dihilangkan total kalau memang tidak ada news yang di-flag key-trigger
+  hari itu (beda kasus — bukan "wajib diisi Giel").
+- **>1 sinyal approved** hari yang sama -> semua ditampilkan, 1 baris per
+  sinyal (bukan cuma yang terbaru).
+- **Test**: `tests/test_compose_briefing.py` (pure function, tanpa
+  network) + `tests/test_notify_telegram.py` (di-mock pakai `monkeypatch`
+  — SATU-SATUNYA scraper/notify module yang test-nya tidak live-network,
+  karena ini operasi SEND, bukan READ — lihat ARCHITECTURE.md §6.12).
+- **Ditunda ke backlog** (butuh host always-on, bukan gap): bot commands
+  dua-arah (`/snapshot`, `/news` on-demand) — perlu proses long-polling
+  yang selalu nyala, laptop lokal tidak selalu on. Konsisten dengan
+  keputusan DB & scheduler "local dulu, VPS nanti".
+- **Setup manual yang tidak bisa diotomasi**: Giel perlu bikin bot lewat
+  `@BotFather` + ambil `chat_id` sendiri (lihat README §Setup Telegram) —
+  sama pola dengan `FRED_API_KEY`.
 
 ---
 
