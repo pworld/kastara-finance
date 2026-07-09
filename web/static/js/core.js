@@ -1,6 +1,18 @@
 const $ = (s) => document.querySelector(s);
 const today = () => new Date().toISOString().slice(0, 10);
 
+// 4 analisa persona -- kode (dipakai sebagai `lens` value di DB, jangan
+// diubah) dipetakan ke label ANONIM (codename GEMA/LEON/AKELA/RIVAN
+// sengaja tidak ditampilkan di UI) buat ditampilkan.
+const LENS_LABELS = {
+  GEMA: "Global & Capital Flow",
+  LEON: "Policy & Sistem Domestik",
+  AKELA: "Dinamika Pasar & Waktu",
+  RIVAN: "Fundamental & Realist",
+  EXTERNAL_AI: "External AI Check",
+  CONFLICT: "Conflict Notes",
+};
+
 function toast(msg) {
   const t = $("#toast");
   t.textContent = msg;

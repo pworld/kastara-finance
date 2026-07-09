@@ -3,13 +3,18 @@
 Dipisah dari `web/app.py` supaya testable tanpa Flask (pola sama seperti
 `pipeline/add_article.py`: fungsi insert murni terpisah dari CLI/route
 wrapper). Semua fungsi di sini murni CRUD manual — **tidak ada** logic
-AI/LLM, tidak ada execution/trading, sesuai plan_c.txt §0.
+AI/LLM, tidak ada execution/trading, sesuai plan_c.txt §0. Pengecualian:
+`save_persona_analysis()` MENYIMPAN teks yang sudah digenerate LLM (lihat
+`llm/persona_analysis.py`, deviasi eksplisit dari plan_c.txt §0 utk Panel 4
+4-Lensa) -- fungsi ini sendiri tetap CRUD murni (cuma tulis string ke DB),
+pemanggilan LLM-nya terjadi di modul lain sebelum teksnya sampai ke sini.
 
 Konvensi `reading_workspace.lens` (Panel 4 & 6, bukan enum ketat di DB):
-  GEMA / LEON / AKELA / RIVAN  -> 4 lensa Panel 4
-  EXTERNAL_AI                  -> catatan banding AI eksternal (opsional)
-  CONFLICT                     -> conflict notes (opsional)
-  SYNTHESIS                    -> paragraf sintesis Panel 6
+  GEMA / LEON / AKELA / RIVAN  -> 4 analisa Panel 4 (AI-generated via
+                                  llm/persona_analysis.py, lihat save_persona_analysis())
+  EXTERNAL_AI                  -> catatan banding AI eksternal (opsional, manual)
+  CONFLICT                     -> conflict notes (opsional, manual)
+  SYNTHESIS                    -> paragraf sintesis Panel 6 (manual)
   OUTLOOK:<INSTRUMENT>         -> stance outlook Panel 6 (Bullish/Bearish/
                                   Neutral) per instrument, 1 baris per hari
                                   (upsert), lihat save_outlook()
@@ -208,6 +213,18 @@ def list_reading_entries(conn: sqlite3.Connection, date: str) -> list[dict[str, 
         "SELECT * FROM reading_workspace WHERE date = ? ORDER BY id", (date,)
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def save_persona_analysis(conn: sqlite3.Connection, date: str, lens: str, text: str) -> int:
+    """Simpan hasil analisa AI (llm/persona_analysis.py) utk 1 persona
+    (GEMA/LEON/AKELA/RIVAN). Upsert (DELETE lalu INSERT, pola sama dengan
+    save_outlook) -- re-run persona yang sama di hari yang sama OVERWRITE,
+    tidak numpuk duplikat di histori Panel 7 (beda dari SYNTHESIS yang
+    sengaja append-only). Caller (route) yang validasi `lens` valid."""
+    conn.execute(
+        "DELETE FROM reading_workspace WHERE date = ? AND lens = ?", (date, lens)
+    )
+    return save_reading_entry(conn, date, lens, text)
 
 
 # ---------- Panel 6: Synthesis + Trading Journal + Prediction Log ----------

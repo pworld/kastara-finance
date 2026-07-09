@@ -57,7 +57,7 @@ function renderLensaHistoryTable() {
     searchFields: ["lens", "notes"],
   });
   $("#histLensaBody").innerHTML = pageRows.map(r =>
-    `<tr><td class="src">${r.date}</td><td>${r.lens}</td><td>${r.notes}</td></tr>`
+    `<tr><td class="src">${r.date}</td><td>${LENS_LABELS[r.lens] || r.lens}</td><td>${r.notes}</td></tr>`
   ).join("") || `<tr><td colspan="3" class="src">belum ada catatan reading</td></tr>`;
   renderTableBar("histlensa", total, totalPages, renderLensaHistoryTable);
 }

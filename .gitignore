@@ -1,6 +1,11 @@
 # Secrets
 .env
 
+# Persona system prompts (Panel 4 4-Analisa AI) -- Giel's own analytical
+# "IP" (Master Plan frames the 4-lens framework as his personal
+# methodology), kept local/untracked like .env. prompts/README.md stays tracked.
+prompts/persona_*.txt
+
 # Database (generated)
 *.db
 *.db-journal

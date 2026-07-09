@@ -21,6 +21,7 @@ from web.writes import (
     list_trading_journal,
     save_outlook,
     save_panel4,
+    save_persona_analysis,
     save_reading_entry,
     save_synthesis,
     score_prediction,
@@ -253,6 +254,33 @@ def test_save_panel4_with_external_ai_and_conflict(tmp_path):
         assert len(entries) == 6
         lenses = {e["lens"] for e in entries}
         assert lenses == {"GEMA", "LEON", "AKELA", "RIVAN", "EXTERNAL_AI", "CONFLICT"}
+
+
+def test_save_persona_analysis_upserts_same_day(tmp_path):
+    """Re-run persona yang sama di hari yang sama harus OVERWRITE, bukan
+    numpuk duplikat (beda dari SYNTHESIS yang sengaja append-only)."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_persona_analysis(conn, "2026-01-01", "GEMA", "analisa versi 1")
+        save_persona_analysis(conn, "2026-01-01", "GEMA", "analisa versi 2")
+        conn.commit()
+        entries = list_reading_entries(conn, "2026-01-01")
+        gema_entries = [e for e in entries if e["lens"] == "GEMA"]
+        assert len(gema_entries) == 1
+        assert gema_entries[0]["notes"] == "analisa versi 2"
+
+
+def test_save_persona_analysis_isolated_per_lens(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_persona_analysis(conn, "2026-01-01", "GEMA", "analisa gema")
+        save_persona_analysis(conn, "2026-01-01", "LEON", "analisa leon")
+        conn.commit()
+        entries = list_reading_entries(conn, "2026-01-01")
+        by_lens = {e["lens"]: e["notes"] for e in entries}
+        assert by_lens == {"GEMA": "analisa gema", "LEON": "analisa leon"}
 
 
 def test_save_reading_entry_single(tmp_path):

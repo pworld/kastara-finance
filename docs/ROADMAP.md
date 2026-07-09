@@ -568,6 +568,65 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       backend), live browser check tiap panel (1/2/5/7 dicek eksplisit —
       snapshot cards, news table+pagination, chart SVG 335 elemen, sub-tab
       Riwayat) tanpa console error, semua asset ke-load 200/304.
+- [x] ~~Panel 4: label 4 lensa deskriptif + hapus "Entri Hari Ini"~~ — 2
+      keluhan UX:
+      1. Label kartu 4 lensa cuma kode (GEMA/LEON/AKELA/RIVAN) tanpa
+         konteks fungsinya. Sekarang jadi "GEMA · Makro Global" / "LEON ·
+         Makro Lokal" / "AKELA · On-chain/Fundamental" / "RIVAN · Sentimen
+         &amp; Psikologi Pasar" (`LENS_LABELS` map baru di `core.js`, dipakai
+         juga di Panel 7 histori 4 Lensa biar konsisten). **Kode `lens` di
+         DB TIDAK berubah** (tetap GEMA/LEON/AKELA/RIVAN) — cuma label
+         tampilan, biar histori lama tetap kompatibel.
+      2. Section "Entri Hari Ini" (tabel kecil di bawah 4 lensa, cuma
+         nampilin entri hari ini) dihapus dari Panel 4 — sudah redundan
+         sejak Panel 7 "Riwayat &gt; 4 Lensa" ada (nampilin SEMUA histori
+         termasuk hari ini, di baris teratas). `loadReadingEntries()` di
+         `panel4.js` dihapus, `main.js::refreshAll()` disesuaikan.
+      Diverifikasi live: label baru muncul di kartu Panel 4 & kolom Lensa
+      Panel 7, "Entri Hari Ini" sudah tidak ada, save 4 lensa masih jalan
+      (dicek row tersimpan lewat query DB langsung, lalu dibersihkan).
+- [x] ~~Panel 4: 4 Analisa jadi AI-generated (OpenRouter)~~ — **deviasi
+      eksplisit & disengaja** dari prinsip Phase C (`web/writes.py` §0 /
+      Master Plan: "4 lensa diisi manual, bukan AI agent"). Atas permintaan
+      Giel langsung, 4 analisa (GEMA/LEON/AKELA/RIVAN) sekarang di-generate
+      lewat OpenRouter, dipicu manual per kartu (tombol "Jalankan Analisa"),
+      ditampilkan read-only di popup modal (bukan textarea yang bisa diedit).
+      Codename dianonimkan dari UI (cuma label fungsi yang tampil: Makro
+      Global / Makro Lokal / On-chain-Fundamental / Sentimen &amp; Psikologi
+      Pasar) — kode `lens` di DB TIDAK berubah, histori lama tetap kompatibel.
+      1. **`llm/persona_analysis.py`** (paket baru, pola sama `notify/telegram.py`)
+         — panggil OpenRouter chat completion via `requests` (sudah dependency,
+         tanpa SDK baru). Model dari env `OPENROUTER_MODEL` (default
+         `anthropic/claude-3.7-sonnet`). System prompt tiap persona ditulis
+         manual Giel di `prompts/persona_&lt;lens&gt;.txt` — **TIDAK dibuat
+         otomatis, TIDAK di-commit** (gitignored, dianggap IP analisa
+         pribadi Giel, cuma `prompts/README.md` yang di-track). Kalau file
+         kosong/belum ada, `run_persona_analysis()` raise
+         `PersonaPromptMissing` — endpoint balikin error yang jelas ke UI,
+         BUKAN diam-diam skip atau jalan dengan prompt kosong (sesuai
+         permintaan eksplisit: "jika belum ada prompt persona beri tahu saya").
+      2. **`pipeline/compose_persona_context.py`** — pure function (pola sama
+         `compose_briefing.py`), rakit SATU blob konteks (snapshot pasar +
+         berita key hari ini) yang dikirim SAMA ke ke-4 persona; system
+         prompt masing-masing yang nentuin sudut pandang (bukan konteks
+         beda-beda per persona — disederhanakan karena kita tidak punya
+         data on-chain asli terpisah).
+      3. **`web/writes.py::save_persona_analysis()`** — upsert (DELETE lalu
+         INSERT, pola sama `save_outlook`) sehingga re-run persona yang sama
+         di hari yang sama OVERWRITE, tidak numpuk duplikat di histori Panel 7.
+      4. **`web/app.py`**: `POST /api/persona/run` (body `{lens}, jalankan 1
+         persona) + `GET /api/persona/status` (cek prompt sudah diisi atau
+         belum, dipakai render kartu). Reuse `GET /api/reading?date=X` yang
+         sudah ada buat load hasil tersimpan (tidak perlu route baru).
+      5. Manual note lain (External AI Check, Conflict Notes, Synthesis,
+         Outlook, Trading Journal, Prediction Log) **TIDAK berubah** — tetap
+         100% manual, scope deviasi ini SENGAJA dibatasi ke 4 analisa saja.
+      Diverifikasi: 14 test baru (`test_persona_analysis.py`,
+      `test_compose_persona_context.py`, + 2 test upsert di
+      `test_web_writes.py`, semua di-mock — tidak hit OpenRouter asli),
+      162 test hijau total. Live browser: path "prompt belum diisi" (semua
+      status `false`, tombol kasih toast, tidak ada panggilan API) diverifikasi
+      dulu sebelum prompt asli diisi Giel.
 
 **Dievaluasi, sengaja tidak dikerjakan:**
 - **NewsData.io** — dicek langsung: sentiment analysis **cuma tersedia di

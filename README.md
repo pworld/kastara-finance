@@ -106,6 +106,15 @@ tetap jalan.
 Tanpa setup ini, tombol "Kirim ke Telegram" / `pipeline.send_briefing` tetap
 menampilkan teks briefing-nya, cuma `sent: false` (tidak benar-benar terkirim).
 
+**Setup OpenRouter (opsional, untuk Panel 4 "4 Analisa (AI)"):**
+1. Daftar di https://openrouter.ai, generate API key.
+2. Isi `OPENROUTER_API_KEY` (dan opsional `OPENROUTER_MODEL`, default
+   `anthropic/claude-3.7-sonnet`) di `.env`.
+3. Tulis system prompt tiap persona di `prompts/persona_<gema|leon|akela|rivan>.txt`
+   (lihat `prompts/README.md`) — file ini TIDAK dibuat otomatis & TIDAK
+   di-commit. Tanpa ini, tombol "Jalankan Analisa" akan kasih tahu di UI
+   kalau prompt-nya belum diisi.
+
 ---
 
 ## 3. Cara pakai

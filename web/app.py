@@ -8,7 +8,8 @@ Endpoint baru Phase C (backfill, articles, policy, reading, signals,
 synthesis, journal, prediction) MENULIS — lihat plan_c.txt. Semua tulisan
 manual (form Giel) atau reuse fungsi yang sudah ada & teruji
 (pipeline.backfill, pipeline.add_article, tools.review_signal, web.writes)
-— TIDAK ADA logic AI/LLM atau execution/trading di sini.
+— TIDAK ADA logic AI/LLM atau execution/trading di sini, KECUALI
+/api/persona/run (Panel 4, deviasi eksplisit -- lihat llm/persona_analysis.py).
 
 Jalankan:
     python -m web.app
@@ -25,6 +26,7 @@ from typing import Any
 
 from flask import Flask, jsonify, render_template, request
 
+import llm.persona_analysis as persona_analysis
 import pipeline.add_article as add_article
 import pipeline.backfill as backfill_mod
 import tools.review_signal as review_signal
@@ -32,6 +34,7 @@ import web.writes as writes
 from db.connection import get_connection, get_db_path, init_db
 from notify.telegram import send_message
 from pipeline.compose_briefing import compose_daily_briefing
+from pipeline.compose_persona_context import compose_persona_context
 from scrapers.base import today_wib
 
 app = Flask(__name__)
@@ -532,6 +535,36 @@ def reading_save():
         )
         conn.commit()
     return jsonify({"ids": ids})
+
+
+@app.get("/api/persona/status")
+def persona_status_route():
+    return jsonify(persona_analysis.persona_status())
+
+
+@app.post("/api/persona/run")
+def persona_run():
+    """Generate 1 analisa persona via OpenRouter (deviasi eksplisit dari
+    plan_c.txt §0 -- lihat llm/persona_analysis.py). Konteks (snapshot pasar
+    + berita key hari ini) SAMA utk ke-4 persona; system prompt masing-masing
+    yang menentukan sudut pandang."""
+    body = request.get_json(force=True)
+    lens = (body.get("lens") or "").upper()
+    if lens not in persona_analysis.PERSONA_LABELS:
+        return jsonify({"error": f"lens tidak dikenal: {lens}"}), 400
+    date = today_wib()
+    with get_connection() as conn:
+        context_text = compose_persona_context(conn, date)
+    try:
+        text = persona_analysis.run_persona_analysis(lens, context_text)
+    except persona_analysis.PersonaPromptMissing as exc:
+        return jsonify({"error": str(exc), "prompt_missing": True}), 400
+    except Exception as exc:  # noqa: BLE001 -- kasih tahu Giel penyebabnya, bukan diam-diam gagal
+        return jsonify({"error": f"Gagal panggil OpenRouter: {exc}"}), 502
+    with get_connection() as conn:
+        writes.save_persona_analysis(conn, date, lens, text)
+        conn.commit()
+    return jsonify({"lens": lens, "date": date, "text": text})
 
 
 # ---------- PHASE C: Panel 5 — S&R zones, signals, approve/reject ----------

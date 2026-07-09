@@ -17,8 +17,8 @@ async function refreshAll() {
   await loadPositioning();
   await loadDisonansi();
   await loadPolicyNotes();
-  await loadReadingEntries();
   await loadKeyNews();
+  await loadPersonaAnalysis();
   await loadOutlookInstruments();
   await loadSynthesisForDate();
   await loadDuePredictions();
