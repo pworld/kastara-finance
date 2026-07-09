@@ -10,6 +10,9 @@ Konvensi `reading_workspace.lens` (Panel 4 & 6, bukan enum ketat di DB):
   EXTERNAL_AI                  -> catatan banding AI eksternal (opsional)
   CONFLICT                     -> conflict notes (opsional)
   SYNTHESIS                    -> paragraf sintesis Panel 6
+  OUTLOOK:<INSTRUMENT>         -> stance outlook Panel 6 (Bullish/Bearish/
+                                  Neutral) per instrument, 1 baris per hari
+                                  (upsert), lihat save_outlook()
 """
 from __future__ import annotations
 
@@ -217,6 +220,40 @@ def save_synthesis(conn: sqlite3.Connection, date: str, text: str) -> int | None
     return save_reading_entry(conn, date, "SYNTHESIS", text.strip())
 
 
+def latest_synthesis(conn: sqlite3.Connection, date: str) -> str | None:
+    """Teks synthesis TERBARU utk 1 tanggal (buat auto-load Panel 6 saat
+    ganti tanggal). None kalau belum ada. Synthesis append-only, jadi ambil
+    id terbesar."""
+    row = conn.execute(
+        "SELECT notes FROM reading_workspace WHERE date = ? AND lens = 'SYNTHESIS' "
+        "ORDER BY id DESC LIMIT 1", (date,),
+    ).fetchone()
+    return row["notes"] if row else None
+
+
+# ---------- Panel 6: Outlook per instrumen (reuse reading_workspace,
+# lens="OUTLOOK:<INSTRUMENT>", 1 stance per instrument per hari -> upsert) ----------
+
+def save_outlook(conn: sqlite3.Connection, date: str, instrument: str, stance: str) -> None:
+    """Simpan stance outlook (Bullish/Bearish/Neutral) utk 1 instrument di 1
+    tanggal. Upsert manual (DELETE lalu INSERT) karena reading_workspace
+    tidak punya UNIQUE index -> pastikan cuma 1 baris per (date, instrument)."""
+    lens = f"OUTLOOK:{instrument.upper()}"
+    conn.execute(
+        "DELETE FROM reading_workspace WHERE date = ? AND lens = ?", (date, lens)
+    )
+    save_reading_entry(conn, date, lens, stance)
+
+
+def list_outlook(conn: sqlite3.Connection, date: str) -> dict[str, str]:
+    """Return {instrument: stance} utk 1 tanggal (buat restore dropdown Panel 6)."""
+    rows = conn.execute(
+        "SELECT lens, notes FROM reading_workspace WHERE date = ? AND lens LIKE 'OUTLOOK:%' "
+        "ORDER BY id", (date,),
+    ).fetchall()
+    return {r["lens"].split(":", 1)[1]: r["notes"] for r in rows}
+
+
 def insert_trading_journal(
     conn: sqlite3.Connection, *, date: str, instrument: str, setup_type: str | None,
     entry_price: float | None, sl_price: float | None, tp1_price: float | None,
@@ -266,3 +303,47 @@ def score_prediction(conn: sqlite3.Connection, prediction_id: int, outcome: str,
         (outcome, lesson, prediction_id),
     )
     return True
+
+
+# ---------- Panel 7: Riwayat (arsip input manual — history read-only) ----------
+# Chart/news/snapshot sudah punya view historis sendiri; input manual (synthesis,
+# prediksi, trading journal, 4 lensa) belum. Fungsi di bawah CUMA baca, buat
+# ditampilkan sebagai jurnal/arsip di Panel 7.
+
+def list_synthesis_log(conn: sqlite3.Connection, limit: int = 200) -> list[dict[str, Any]]:
+    """Semua entri synthesis (reading_workspace lens=SYNTHESIS) lintas tanggal,
+    terbaru dulu. Append-only -> revisi muncul sebagai riwayat."""
+    rows = conn.execute(
+        "SELECT date, notes, created_at FROM reading_workspace WHERE lens = 'SYNTHESIS' "
+        "ORDER BY date DESC, id DESC LIMIT ?", (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def list_predictions(conn: sqlite3.Connection, limit: int = 200) -> list[dict[str, Any]]:
+    """Seluruh track-record prediction_log (bukan cuma yang jatuh tempo),
+    terbaru dulu — 'jurnal book' prediksi."""
+    rows = conn.execute(
+        "SELECT * FROM prediction_log ORDER BY date_made DESC, id DESC LIMIT ?", (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def list_trading_journal(conn: sqlite3.Connection, limit: int = 200) -> list[dict[str, Any]]:
+    """Seluruh riwayat trading_journal, terbaru dulu — 'jurnal book' entry trading."""
+    rows = conn.execute(
+        "SELECT * FROM trading_journal ORDER BY date DESC, id DESC LIMIT ?", (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def list_reading_history(conn: sqlite3.Connection, limit: int = 200) -> list[dict[str, Any]]:
+    """Riwayat 4 lensa & catatan reading (reading_workspace) lintas tanggal,
+    KECUALI SYNTHESIS (punya view sendiri) & OUTLOOK:* (bukan analisa naratif).
+    Terbaru dulu."""
+    rows = conn.execute(
+        "SELECT date, lens, notes, created_at FROM reading_workspace "
+        "WHERE lens != 'SYNTHESIS' AND lens NOT LIKE 'OUTLOOK:%' "
+        "ORDER BY date DESC, id ASC LIMIT ?", (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]

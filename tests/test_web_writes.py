@@ -8,11 +8,18 @@ from web.writes import (
     insert_positioning_manual,
     insert_prediction,
     insert_trading_journal,
+    latest_synthesis,
     list_due_predictions,
     list_expectations,
+    list_outlook,
     list_policy_notes,
     list_positioning,
+    list_predictions,
     list_reading_entries,
+    list_reading_history,
+    list_synthesis_log,
+    list_trading_journal,
+    save_outlook,
     save_panel4,
     save_reading_entry,
     save_synthesis,
@@ -344,3 +351,104 @@ def test_score_prediction_unknown_id(tmp_path):
     init_db(db)
     with get_connection(db) as conn:
         assert score_prediction(conn, 9999, "BENAR") is False
+
+
+# ---------- Panel 6: Outlook persistence (reuse reading_workspace) ----------
+
+def test_save_and_list_outlook(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_outlook(conn, "2026-01-01", "BTC", "Bullish")
+        save_outlook(conn, "2026-01-01", "GOLD", "Bearish")
+        conn.commit()
+        result = list_outlook(conn, "2026-01-01")
+        assert result == {"BTC": "Bullish", "GOLD": "Bearish"}
+
+
+def test_save_outlook_upsert_overwrites_same_instrument(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_outlook(conn, "2026-01-01", "BTC", "Neutral")
+        save_outlook(conn, "2026-01-01", "BTC", "Bullish")  # ganti stance hari sama
+        conn.commit()
+        assert list_outlook(conn, "2026-01-01") == {"BTC": "Bullish"}
+        # cuma 1 baris, bukan 2
+        n = conn.execute(
+            "SELECT COUNT(*) c FROM reading_workspace WHERE lens='OUTLOOK:BTC'"
+        ).fetchone()["c"]
+        assert n == 1
+
+
+def test_outlook_not_leaking_into_reading_entries_view(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_reading_entry(conn, "2026-01-01", "GEMA", "analisa makro")
+        save_outlook(conn, "2026-01-01", "BTC", "Bullish")
+        save_synthesis(conn, "2026-01-01", "kesimpulan hari ini")
+        conn.commit()
+        # list_reading_entries mengembalikan SEMUA (view Panel 4 memfilter di FE),
+        # tapi list_reading_history HARUS mengecualikan SYNTHESIS & OUTLOOK:*.
+        hist = list_reading_history(conn)
+        lenses = {r["lens"] for r in hist}
+        assert lenses == {"GEMA"}
+
+
+# ---------- Panel 6/7: synthesis latest + log ----------
+
+def test_latest_synthesis_returns_most_recent(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_synthesis(conn, "2026-01-01", "revisi pertama")
+        save_synthesis(conn, "2026-01-01", "revisi kedua (final)")
+        conn.commit()
+        assert latest_synthesis(conn, "2026-01-01") == "revisi kedua (final)"
+        assert latest_synthesis(conn, "2026-01-02") is None
+
+
+def test_list_synthesis_log_newest_first_only_synthesis(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_synthesis(conn, "2026-01-01", "hari pertama")
+        save_synthesis(conn, "2026-01-03", "hari ketiga")
+        save_reading_entry(conn, "2026-01-02", "GEMA", "bukan synthesis")
+        conn.commit()
+        log = list_synthesis_log(conn)
+        assert [r["date"] for r in log] == ["2026-01-03", "2026-01-01"]
+        assert all("notes" in r and "created_at" in r for r in log)
+
+
+# ---------- Panel 7: predictions + journal history ----------
+
+def test_list_predictions_returns_all(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        insert_prediction(conn, date_made="2026-01-01", horizon="1w", claim="a",
+                          confidence=50, basis="x", target_date="2026-01-08")
+        insert_prediction(conn, date_made="2026-01-05", horizon="1m", claim="b",
+                          confidence=70, basis="y", target_date="2026-02-05")
+        conn.commit()
+        rows = list_predictions(conn)
+        assert len(rows) == 2
+        assert rows[0]["date_made"] == "2026-01-05"  # newest first
+
+
+def test_list_trading_journal_returns_all(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        insert_trading_journal(conn, date="2026-01-01", instrument="BTC", setup_type="breakout",
+                               entry_price=1, sl_price=1, tp1_price=1, outcome="WIN",
+                               personal_notes=None, lesson_learned=None)
+        insert_trading_journal(conn, date="2026-01-04", instrument="GOLD", setup_type="retest",
+                               entry_price=1, sl_price=1, tp1_price=1, outcome="LOSS",
+                               personal_notes=None, lesson_learned=None)
+        conn.commit()
+        rows = list_trading_journal(conn)
+        assert len(rows) == 2
+        assert rows[0]["date"] == "2026-01-04"  # newest first

@@ -78,10 +78,19 @@ kastara-finance/
 ├── tools/
 │   └── review_signal.py       # CLI approve/reject trade_signals (by id eksplisit)
 ├── web/                      # dashboard: read-only (Phase 1) + write (Phase C)
-│   ├── app.py                 # Flask, endpoint JSON + halaman, 6 tab panel
+│   ├── app.py                 # Flask, endpoint JSON + halaman, 7 tab panel
 │   ├── writes.py               # pure functions tulis-DB Phase C (testable
 │   │                             tanpa Flask, pola sama add_article.py)
-│   └── templates/index.html   # UI single-page 6-tab, tanpa build step/CDN
+│   ├── templates/
+│   │   ├── index.html         # shell tipis: head+nav+{% include %} tiap
+│   │   │                         panel+<script src> tiap JS, tanpa build step/CDN
+│   │   └── partials/panelN_*.html  # 1 file per tab (HTML saja)
+│   └── static/
+│       ├── css/dashboard.css  # semua style (dulu inline di index.html)
+│       └── js/{core,panel1..7,main}.js  # core = shared helpers + table
+│                                 utility; per-panel JS terpisah; main.js
+│                                 = refreshAll()+init. Load order penting
+│                                 (semua fungsi global, bukan module).
 ├── tests/                    # 1 test file per modul utama
 └── docs/                     # dokumen ini
 ```

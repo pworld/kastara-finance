@@ -1,0 +1,135 @@
+<!-- ===================== PANEL 3: FORWARD PANEL ===================== -->
+<div class="tabpanel" id="tab-p3">
+  <section>
+    <h2>Economic Calendar</h2>
+    <div class="panel">
+      <div class="tbl-bar" data-tblbar="econcal"></div>
+      <table data-tblkey="econcal">
+        <thead><tr>
+          <th data-sort="event_date">Tanggal</th><th>Countdown</th>
+          <th data-sort="event_name">Event</th>
+          <th data-sort="country">Negara</th>
+          <th data-sort="importance">Importance</th>
+          <th>Forecast</th><th>Previous</th><th>Actual</th></tr></thead>
+        <tbody id="calBody"></tbody>
+      </table>
+      <div class="tbl-foot" data-tblfoot="econcal"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Expectations (Layer B)</h2>
+    <div class="panel">
+      <div class="form-grid">
+        <div><label class="field">Tanggal</label><input type="date" id="expDate"></div>
+        <div>
+          <label class="field">Metric</label>
+          <select id="expMetric">
+            <option value="cme_fedwatch_cut_prob">CME FedWatch cut probability</option>
+            <option value="dot_plot_median">Fed Dot Plot median</option>
+          </select>
+        </div>
+        <div><label class="field">Value</label><input type="number" step="any" id="expValue" placeholder="mis. 0.72"></div>
+        <div><label class="field">Horizon</label><input type="text" id="expHorizon" placeholder="mis. next_meeting / EOY2026"></div>
+      </div>
+      <div class="form-row" style="margin-top:4px">
+        <button class="btn" id="expSaveBtn">+ Add Expectation</button>
+      </div>
+      <table style="margin-top:12px">
+        <thead><tr><th>Tgl</th><th>Metric</th><th>Value</th><th>Horizon</th></tr></thead>
+        <tbody id="expBody"></tbody>
+      </table>
+    </div>
+    <div class="src" style="margin-top:6px">Manual — CME FedWatch API resmi berbayar, Fed Dot Plot rilis PDF kuartalan (tidak ada sumber gratis yang scrape-able).</div>
+  </section>
+
+  <section>
+    <h2>Positioning (Layer C)</h2>
+    <div class="panel">
+      <div class="tbl-bar" data-tblbar="positioning"></div>
+      <table data-tblkey="positioning">
+        <thead><tr>
+          <th data-sort="date">Tgl</th>
+          <th data-sort="instrument">Instrument</th>
+          <th data-sort="metric">Metric</th>
+          <th data-sort="value">Value</th>
+          <th data-sort="source">Source</th>
+        </tr></thead>
+        <tbody id="posBody"></tbody>
+      </table>
+      <div class="tbl-foot" data-tblfoot="positioning"></div>
+      <div class="form-grid" style="margin-top:12px">
+        <div><label class="field">Tanggal</label><input type="date" id="posDate"></div>
+        <div>
+          <label class="field">Instrument</label>
+          <select id="posInstrument"><option>SBN</option><option>BTC</option><option>DXY</option><option>GOLD</option><option>SP500</option></select>
+        </div>
+        <div><label class="field">Metric</label><input type="text" id="posMetric" placeholder="mis. sbn_foreign_flow / etf_net_flow"></div>
+        <div><label class="field">Value</label><input type="number" step="any" id="posValue"></div>
+      </div>
+      <div class="form-row" style="margin-top:4px">
+        <button class="btn" id="posSaveBtn">+ Add/Override Positioning</button>
+      </div>
+    </div>
+    <div class="src" style="margin-top:6px">COT (CFTC) &amp; BTC ETF flow terisi otomatis tiap run_daily. Form ini utk SBN foreign flow (manual — sumber DJPPR tidak scrape-able) dan koreksi manual kalau perlu.</div>
+  </section>
+
+  <section>
+    <h2>Policy Tracker (Layer A)</h2>
+    <div class="panel">
+      <div class="form-grid">
+        <div><label class="field">Tanggal</label><input type="date" id="polDate"></div>
+        <div><label class="field">Speaker</label><input type="text" id="polSpeaker" placeholder="mis. Powell"></div>
+        <div><label class="field">Institusi</label><input type="text" id="polInstitution" placeholder="mis. Fed"></div>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <label class="field">Literal statement (apa yang BENAR-BENAR dikatakan)</label>
+        <textarea id="polLiteral"></textarea>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label class="field">Stance score (-2 dovish .. +2 hawkish)</label>
+          <input type="number" id="polStance" min="-2" max="2" step="1">
+        </div>
+        <div>
+          <label class="field">Inference flag</label>
+          <select id="polFlag"><option>TESTABLE</option><option>SPEKULATIF</option></select>
+        </div>
+        <div><label class="field">Source URL (opsional)</label><input type="url" id="polUrl"></div>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <label class="field">Inference (pembacaan arah/intent — subjektif)</label>
+        <textarea id="polInference"></textarea>
+      </div>
+      <div class="form-row">
+        <label class="field">Drift note (opsional — berubah dari pernyataan sebelumnya?)</label>
+        <textarea id="polDrift"></textarea>
+      </div>
+      <div class="form-row" style="margin-top:4px">
+        <button class="btn" id="polSaveBtn">+ Add Policy Note</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Entri Policy Tracker Terbaru</h2>
+    <div class="panel">
+      <div class="tbl-bar" data-tblbar="policy"></div>
+      <table data-tblkey="policy">
+        <thead><tr>
+          <th data-sort="date">Tgl</th>
+          <th data-sort="speaker">Speaker</th>
+          <th>Literal</th><th>Inference</th>
+          <th data-sort="inference_flag">Flag</th>
+        </tr></thead>
+        <tbody id="policyBody"></tbody>
+      </table>
+      <div class="tbl-foot" data-tblfoot="policy"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Disonansi Flag</h2>
+    <div id="disonansiBody" class="empty-inline">Memuat...</div>
+  </section>
+</div>

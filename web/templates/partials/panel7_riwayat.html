@@ -1,0 +1,87 @@
+<!-- ===================== PANEL 7: RIWAYAT (arsip input manual) ===================== -->
+<div class="tabpanel" id="tab-p7">
+  <div class="subtabs" id="historySubtabs">
+    <button data-sub="synthesis" class="active">Synthesis</button>
+    <button data-sub="prediksi">Prediksi</button>
+    <button data-sub="journal">Trading Journal</button>
+    <button data-sub="lensa">4 Lensa</button>
+  </div>
+
+  <div class="subpanel active" id="sub-synthesis">
+    <section>
+      <h2>Riwayat Synthesis Harian</h2>
+      <div class="panel">
+        <div class="tbl-bar" data-tblbar="histsynth"></div>
+        <table data-tblkey="histsynth">
+          <thead><tr>
+            <th data-sort="date">Tanggal</th><th>Synthesis</th>
+            <th data-sort="created_at">Disimpan</th>
+          </tr></thead>
+          <tbody id="histSynthBody"></tbody>
+        </table>
+        <div class="tbl-foot" data-tblfoot="histsynth"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="subpanel" id="sub-prediksi">
+    <section>
+      <h2>Jurnal Prediksi (track record)</h2>
+      <div class="panel">
+        <div class="tbl-bar" data-tblbar="histpred"></div>
+        <table data-tblkey="histpred">
+          <thead><tr>
+            <th data-sort="date_made">Dibuat</th>
+            <th data-sort="target_date">Target</th>
+            <th>Claim</th>
+            <th data-sort="horizon">Horizon</th>
+            <th data-sort="confidence">Conf</th>
+            <th data-sort="outcome">Hasil</th>
+            <th>Lesson</th>
+          </tr></thead>
+          <tbody id="histPredBody"></tbody>
+        </table>
+        <div class="tbl-foot" data-tblfoot="histpred"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="subpanel" id="sub-journal">
+    <section>
+      <h2>Jurnal Trading (entry)</h2>
+      <div class="panel">
+        <div class="tbl-bar" data-tblbar="histjournal"></div>
+        <table data-tblkey="histjournal">
+          <thead><tr>
+            <th data-sort="date">Tanggal</th>
+            <th data-sort="instrument">Instrument</th>
+            <th data-sort="setup_type">Setup</th>
+            <th>Entry/SL/TP1</th>
+            <th data-sort="outcome">Outcome</th>
+            <th>Catatan</th><th>Lesson</th>
+          </tr></thead>
+          <tbody id="histJournalBody"></tbody>
+        </table>
+        <div class="tbl-foot" data-tblfoot="histjournal"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="subpanel" id="sub-lensa">
+    <section>
+      <h2>Riwayat 4 Lensa (Reading)</h2>
+      <div class="panel">
+        <div class="tbl-bar" data-tblbar="histlensa"></div>
+        <table data-tblkey="histlensa">
+          <thead><tr>
+            <th data-sort="date">Tanggal</th>
+            <th data-sort="lens">Lensa</th>
+            <th>Catatan</th>
+          </tr></thead>
+          <tbody id="histLensaBody"></tbody>
+        </table>
+        <div class="tbl-foot" data-tblfoot="histlensa"></div>
+      </div>
+    </section>
+  </div>
+</div>

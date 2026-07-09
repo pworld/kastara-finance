@@ -294,7 +294,10 @@ def asset_ohlcv():
 def news():
     limit = min(request.args.get("limit", 50, type=int), 500)
     impact = request.args.get("impact")  # HIGH/MED/LOW filter opsional
-    date = request.args.get("date")
+    date = request.args.get("date")            # exact match (dipakai Panel 4 key news)
+    date_from = request.args.get("date_from")  # rentang (Panel 2 filter from/to)
+    date_to = request.args.get("date_to")
+    key_only = request.args.get("key_only")  # "1"/truthy -> cuma yang di-flag key
     sql = "SELECT id, date, source, headline, raw_url, impact_level, is_key_trigger FROM daily_news"
     where, params = [], []
     if impact:
@@ -303,6 +306,14 @@ def news():
     if date:
         where.append("date = ?")
         params.append(date)
+    if date_from:
+        where.append("date >= ?")
+        params.append(date_from)
+    if date_to:
+        where.append("date <= ?")
+        params.append(date_to)
+    if key_only and key_only not in ("0", "false", ""):
+        where.append("is_key_trigger = 1")
     if where:
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY date DESC, id DESC LIMIT ?"
@@ -572,6 +583,34 @@ def synthesis_save():
     return jsonify({"id": new_id})
 
 
+@app.get("/api/synthesis")
+def synthesis_get():
+    """Teks synthesis terbaru utk 1 tanggal (auto-load Panel 6 saat ganti tanggal)."""
+    date = request.args.get("date") or today_wib()
+    with get_connection() as conn:
+        text = writes.latest_synthesis(conn, date)
+    return jsonify({"date": date, "text": text or ""})
+
+
+@app.get("/api/outlook")
+def outlook_get():
+    """{instrument: stance} outlook tersimpan utk 1 tanggal (restore dropdown)."""
+    date = request.args.get("date") or today_wib()
+    with get_connection() as conn:
+        result = writes.list_outlook(conn, date)
+    return jsonify(result)
+
+
+@app.post("/api/outlook/save")
+def outlook_save():
+    body = request.get_json(force=True)
+    date = body.get("date") or today_wib()
+    with get_connection() as conn:
+        writes.save_outlook(conn, date, body["instrument"], body["stance"])
+        conn.commit()
+    return jsonify({"ok": True})
+
+
 @app.post("/api/journal/add")
 def journal_add():
     body = request.get_json(force=True)
@@ -628,6 +667,36 @@ def prediction_score():
         ok = writes.score_prediction(conn, int(body["id"]), body["outcome"], body.get("lesson"))
         conn.commit()
     return jsonify({"ok": ok})
+
+
+# ---------- Panel 7: Riwayat (arsip input manual — read-only) ----------
+
+@app.get("/api/synthesis/log")
+def synthesis_log():
+    with get_connection() as conn:
+        rows = writes.list_synthesis_log(conn, limit=request.args.get("limit", 200, type=int))
+    return jsonify(rows)
+
+
+@app.get("/api/predictions")
+def predictions_all():
+    with get_connection() as conn:
+        rows = writes.list_predictions(conn, limit=request.args.get("limit", 200, type=int))
+    return jsonify(rows)
+
+
+@app.get("/api/journal")
+def journal_all():
+    with get_connection() as conn:
+        rows = writes.list_trading_journal(conn, limit=request.args.get("limit", 200, type=int))
+    return jsonify(rows)
+
+
+@app.get("/api/reading/history")
+def reading_history():
+    with get_connection() as conn:
+        rows = writes.list_reading_history(conn, limit=request.args.get("limit", 200, type=int))
+    return jsonify(rows)
 
 
 def main() -> None:

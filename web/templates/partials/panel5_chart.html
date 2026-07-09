@@ -1,0 +1,69 @@
+<!-- ===================== PANEL 5: CHART + TECHNICAL ANALYSIS ===================== -->
+<div class="tabpanel" id="tab-p5">
+  <section>
+    <h2>Chart Harga + S&amp;R + Sinyal</h2>
+    <div class="panel">
+      <div class="chart-head">
+        <label class="src">Instrument</label>
+        <select id="instrument"></select>
+        <span class="ma-legend">
+          <span class="ma-swatch" style="background:#e3b341"></span>MA50
+          <span class="ma-swatch" style="background:#a371f7"></span>MA100
+          <span class="ma-swatch" style="background:#f778ba"></span>MA200
+        </span>
+      </div>
+      <div class="chart-head">
+        <label class="src">Rentang</label>
+        <select id="chartRangeSelect" style="width:auto">
+          <option value="30">1 Bulan</option>
+          <option value="90" selected>3 Bulan</option>
+          <option value="180">6 Bulan</option>
+          <option value="365">1 Tahun</option>
+          <option value="9999">Semua</option>
+        </select>
+        <span id="chartMeta"></span>
+      </div>
+      <svg id="chart" viewBox="0 0 800 400" preserveAspectRatio="none"></svg>
+    </div>
+  </section>
+
+  <section>
+    <h2>Sinyal (Breakout/Retest)</h2>
+    <div class="panel">
+      <div class="tbl-bar" data-tblbar="signals"></div>
+      <table data-tblkey="signals">
+        <thead><tr>
+          <th data-sort="date">Tgl</th>
+          <th data-sort="signal_type">Tipe</th>
+          <th>Entry/SL/TP1</th>
+          <th data-sort="rr_ratio">R:R</th>
+          <th>Status</th><th></th>
+        </tr></thead>
+        <tbody id="signalsBody"></tbody>
+      </table>
+      <div class="tbl-foot" data-tblfoot="signals"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Context Charts (30 hari)</h2>
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+      <div class="panel">
+        <h3>DXY</h3>
+        <svg class="ctx-chart" data-ctx="dxy_close" viewBox="0 0 300 100" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="panel">
+        <h3>S&amp;P 500</h3>
+        <svg class="ctx-chart" data-ctx="sp500_close" viewBox="0 0 300 100" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="panel">
+        <h3>US10Y</h3>
+        <svg class="ctx-chart" data-ctx="us10y_yield" viewBox="0 0 300 100" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="panel">
+        <h3>Fear &amp; Greed</h3>
+        <svg class="ctx-chart" data-ctx="fear_greed_value" viewBox="0 0 300 100" preserveAspectRatio="none"></svg>
+      </div>
+    </div>
+  </section>
+</div>

@@ -1,0 +1,43 @@
+<!-- ===================== PANEL 4: READING WORKSPACE ===================== -->
+<div class="tabpanel" id="tab-p4">
+  <section>
+    <h2>Berita Key Hari Ini</h2>
+    <div class="panel">
+      <div id="keyNewsBody"></div>
+    </div>
+    <div class="src" style="margin-top:6px">Berita yang kamu flag "key" di Panel 2 — bahan buat nulis 4 lensa di bawah.</div>
+  </section>
+
+  <section>
+    <h2>Reading Workspace — 4 Lensa</h2>
+    <div class="panel">
+      <div class="lens-grid">
+        <div class="lens-box GEMA"><h4>GEMA</h4><textarea id="lensGema"></textarea></div>
+        <div class="lens-box LEON"><h4>LEON</h4><textarea id="lensLeon"></textarea></div>
+        <div class="lens-box AKELA"><h4>AKELA</h4><textarea id="lensAkela"></textarea></div>
+        <div class="lens-box RIVAN"><h4>RIVAN</h4><textarea id="lensRivan"></textarea></div>
+      </div>
+      <div class="form-row">
+        <label class="field">External AI Check (opsional — paste hasil banding TradingAgents/qrak/dll, MANUAL)</label>
+        <textarea id="lensExternalAi"></textarea>
+      </div>
+      <div class="form-row">
+        <label class="field">Conflict Notes (poin yang belum sepakat antar lensa)</label>
+        <textarea id="lensConflict"></textarea>
+      </div>
+      <div class="form-row" style="margin-top:4px">
+        <button class="btn" id="readingSaveBtn">Simpan Reading Workspace</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Entri Hari Ini</h2>
+    <div class="panel">
+      <table>
+        <thead><tr><th>Lensa</th><th>Catatan</th></tr></thead>
+        <tbody id="readingBody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>

@@ -1,0 +1,61 @@
+<!-- ===================== PANEL 2: NEWS BRIEFING ===================== -->
+<div class="tabpanel" id="tab-p2">
+  <section>
+    <h2>Berita &amp; Impact</h2>
+    <div class="panel">
+      <div class="chart-head" style="margin-bottom:12px">
+        <label class="src">Dari</label>
+        <input type="date" id="newsDateFrom" style="width:auto">
+        <label class="src">Sampai</label>
+        <input type="date" id="newsDateTo" style="width:auto">
+        <label class="src">Impact</label>
+        <select id="newsImpactSelect" style="width:auto">
+          <option value="">Semua</option>
+          <option value="HIGH">HIGH</option>
+          <option value="MED">MED</option>
+          <option value="LOW">LOW</option>
+          <option value="__KEY__">🚩 Key saja</option>
+        </select>
+      </div>
+      <div class="tbl-bar" data-tblbar="news"></div>
+      <table data-tblkey="news">
+        <thead><tr>
+          <th data-sort="impact_level">Impact</th>
+          <th data-sort="headline">Headline</th>
+          <th data-sort="source">Sumber</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="newsBody"></tbody>
+      </table>
+      <div class="tbl-foot" data-tblfoot="news"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>+ Add Manual Article</h2>
+    <div class="panel">
+      <div class="form-grid">
+        <div><label class="field">Tanggal</label><input type="date" id="artDate"></div>
+        <div><label class="field">Sumber</label><input type="text" id="artSource" placeholder="mis. CNBC"></div>
+        <div><label class="field">URL (opsional)</label><input type="url" id="artUrl"></div>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <label class="field">Headline</label>
+        <input type="text" id="artHeadline">
+      </div>
+      <div class="form-row">
+        <label class="field">Catatan pribadi</label>
+        <textarea id="artNotes"></textarea>
+      </div>
+      <div class="form-grid">
+        <div><label class="field">Tags (comma-separated)</label><input type="text" id="artTags"></div>
+        <div style="align-self:end">
+          <label class="field"><input type="checkbox" id="artKeyEvent"> Flag sebagai key event</label>
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <button class="btn" id="artSaveBtn">Simpan Artikel</button>
+      </div>
+    </div>
+  </section>
+</div>

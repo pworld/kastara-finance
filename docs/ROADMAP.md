@@ -493,6 +493,81 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
          rentang tanggalnya, Giel yang putuskan itu wajar atau perlu
          backfill, tools cuma kasih visibilitas). 9 test baru
          (`tests/test_web_app.py`), 141 test hijau total.
+- [x] ~~News "key trigger" visibility + rework Synthesis + tab Riwayat~~
+      — keluhan: tombol "key" di Panel 2 tidak kelihatan sudah di-flag atau
+      belum, dan hasil flag cuma muncul di Telegram, jadi bingung gunanya.
+      1. **Panel 2 News**: filter tanggal (default hari ini) + filter impact +
+         tombol "🚩 Key saja"; baris ter-flag beda warna (`.news-key`); tombol
+         flag jadi TOGGLE (★ Key / 🚩 key, klik lagi buat lepas). `/api/news`
+         sudah balikin `is_key_trigger` & terima `date` sejak awal — cuma
+         ditambah param `key_only`.
+      2. **Panel 4 Reading**: section "Berita Key Hari Ini" (read-only) di atas
+         4 lensa — berita yang di-flag jadi bahan nulis analisa. Ini yang
+         kasih "guna" ke tombol key di dalam dashboard, bukan cuma Telegram.
+      3. **Panel 6 Synthesis**: date-picker + auto-load (synthesis & outlook
+         hari yang dipilih), dan **fix Outlook yang tadinya tidak tersimpan
+         ke mana-mana** — sekarang persist (reuse `reading_workspace`
+         lens=`OUTLOOK:<INSTRUMENT>`, upsert 1 stance/instrument/hari, tanpa
+         perubahan schema).
+      4. **Panel 7 "Riwayat" (BARU)**: arsip input manual yang belum punya
+         view historis (chart/news/snapshot sudah punya). Tab dengan sub-tab:
+         Synthesis / Prediksi (track record penuh) / Trading Journal / 4 Lensa.
+         Read-only list helpers baru di `web/writes.py` + route GET di
+         `web/app.py`.
+      7 test writes baru, 148 test hijau total; semua panel diverifikasi live
+      di browser (toggle key, Key-saja filter, key news Panel 4, outlook
+      persist + reload, synthesis save/load, sub-tab Riwayat), data uji
+      dibersihkan.
+- [x] ~~UI: filter single-select jadi `<select>` + search/sort/pagination
+      di semua tabel~~ — 2 keluhan UX sekaligus:
+      1. **3 filter button-group yang cuma single-select** (tidak pernah
+         multi-select) diganti `<select>` biar hemat tempat: Snapshot
+         Hari/Minggu/Bulan/Tahun (`#snapshotPeriodSelect`), News
+         Impact/Key-saja (`#newsImpactSelect`), Chart rentang
+         1B/3B/6B/1T/Semua (`#chartRangeSelect`). CSS `.news-filters`
+         (button-group lama) dihapus, sudah tidak dipakai.
+      2. **Search + sort + pagination generik** ditambah ke SEMUA tabel data
+         (News, Signals, Econ Calendar, Positioning, Policy Notes, dan
+         ke-4 sub-tabel Panel 7 Riwayat — 9 tabel total). 1 utility JS
+         reusable (`applyTableControls()`/`renderTableBar()`, dipakai
+         ulang, bukan reimplementasi per tabel): cari (debounce 250ms),
+         sort per kolom (klik header `<th data-sort="field">`, delegated
+         click listener), pagination (10/20/50/100 baris per halaman).
+         Cari/sort/page beroperasi di `tableCache[key]` (data yang SUDAH
+         di-fetch) — ganti halaman/urutan TIDAK fetch ulang ke server,
+         cuma filter server-side (date range, impact, dll) yang trigger
+         fetch baru. `renderSignalsTable()`'s hardcoded `.slice(0, 30)`
+         dihapus, sekarang tabel Signal Panel 5 bisa akses semua ~200
+         sinyal via pagination, bukan cuma 30 pertama.
+      **Keputusan arsitektur**: tetap vanilla JS/HTML, TIDAK pindah ke
+      framework frontend (React/Vue/dll) — single-user, local-only, tanpa
+      build pipeline; search/sort/pagination cuma ~80 baris utility, tidak
+      butuh framework. Migrasi framework baru relevan kalau nanti jadi
+      multi-user/komersial (Master Plan Phase 2/3), bukan buat polish UX.
+      Diverifikasi live di semua 9 tabel (search filter benar, sort
+      asc/desc benar, pagination page-count & Prev/Next benar).
+
+- [x] ~~`index.html` dipecah jadi partials/static assets~~ — file tunggal
+      1700 baris (HTML+CSS+JS campur) dipecah, TANPA ubah perilaku apa pun
+      dan TANPA pindah dari Jinja2/vanilla JS (konsisten dengan keputusan
+      arsitektur di atas):
+      1. **CSS** → `web/static/css/dashboard.css` (dilink via
+         `url_for('static', ...)`).
+      2. **HTML per-panel** → `web/templates/partials/panelN_*.html` (7
+         file, 1 per tab), di-`{% include %}` dari `index.html`.
+      3. **JS per-panel** → `web/static/js/{core,panel1..7,main}.js` (9
+         file: shared helpers/table-utility di `core.js`, tiap panel
+         dipisah biar gampang dicari, `main.js` isinya `refreshAll()` +
+         init), di-load via `<script src>` berurutan (dependency order:
+         core dulu, baru panel1-7, baru main — karena semua fungsi masih
+         global, bukan module, urutan load penting).
+      `index.html` sekarang ~57 baris (shell doang: head+nav+includes+script
+      tags). Flask default `static_folder`/`template_folder` (relatif ke
+      `web/`) dipakai apa adanya, tidak perlu config baru. Diverifikasi:
+      148 test tetap hijau (murni restructure frontend, tidak sentuh
+      backend), live browser check tiap panel (1/2/5/7 dicek eksplisit —
+      snapshot cards, news table+pagination, chart SVG 335 elemen, sub-tab
+      Riwayat) tanpa console error, semua asset ke-load 200/304.
 
 **Dievaluasi, sengaja tidak dikerjakan:**
 - **NewsData.io** — dicek langsung: sentiment analysis **cuma tersedia di
