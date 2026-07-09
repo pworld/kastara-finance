@@ -1,15 +1,18 @@
-"""Orchestrator Phase B — analysis engine.
+"""Orchestrator Phase B/F+ — analysis engine.
 
-Baca asset_ohlcv (BTC, hardcode di sini — analysis/*.py TETAP generic per
-plan_b.txt §4), deteksi zona S&R + sinyal breakout/retest, UPSERT sr_zones,
-INSERT trade_signals (dedup manual, approved SELALU 0).
+Baca asset_ohlcv per instrument, deteksi zona S&R + sinyal breakout/retest,
+UPSERT sr_zones, INSERT trade_signals (dedup manual, approved SELALU 0).
+`analysis/*.py` generic sejak awal (plan_b.txt §4) — orchestrator ini yang
+menentukan instrument mana yang diproses.
 
 Dijadwalkan MANUAL untuk sekarang (plan_b.txt §7.6 — lokal cuma dev, cron
 dipindah ke server nanti):
-    python -m pipeline.run_analysis
+    python -m pipeline.run_analysis                  # semua INSTRUMENTS
+    python -m pipeline.run_analysis --instrument GOLD # 1 instrument saja
 """
 from __future__ import annotations
 
+import argparse
 import sqlite3
 from typing import Any
 
@@ -19,9 +22,15 @@ from analysis.sr_zones import detect_zones, zone_bucket_key
 from db.connection import get_connection, init_db
 from scrapers.base import created_at
 
-# Phase B cuma proses BTC dulu (plan_b.txt §4, §1 "disiplin build" Master
-# Plan §3) — filter di orchestrator, BUKAN di modul analysis/ yang generic.
+# Phase B cuma proses BTC dulu (plan_b.txt §4). Default `run_analysis()`
+# tanpa argumen tetap BTC (kompatibel dgn caller lama/test).
 INSTRUMENT = "BTC"
+
+# Phase F+ (expansion, Master Plan §10): "pipeline sama, replikasi ke aset
+# lain" — dijalankan bareng tiap `python -m pipeline.run_analysis` tanpa
+# flag. USDJPY awalnya dikecualikan (keputusan #5 plan_c.txt) tapi
+# datanya sudah lengkap sejak Phase A -> diikutkan juga per keputusan Giel.
+INSTRUMENTS = ["BTC", "GOLD", "IHSG", "SP500", "USDIDR", "USDJPY"]
 
 VOLUME_MA_PERIOD = 20
 
@@ -192,5 +201,18 @@ def _print_summary(s: dict[str, Any]) -> None:
     print("=========================================\n")
 
 
+def main(argv: list[str] | None = None) -> None:
+    p = argparse.ArgumentParser(description="Kastara analysis engine (Phase B/F+)")
+    p.add_argument(
+        "--instrument", default=None,
+        help=f"1 instrument saja (default: semua — {', '.join(INSTRUMENTS)})",
+    )
+    args = p.parse_args(argv)
+
+    targets = [args.instrument] if args.instrument else INSTRUMENTS
+    for inst in targets:
+        run_analysis(instrument=inst)
+
+
 if __name__ == "__main__":
-    run_analysis()
+    main()

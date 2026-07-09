@@ -16,7 +16,7 @@
 | **C** | Dashboard/UI penuh (6 panel, write-enabled) | ✅ **Selesai** — [plan_c.txt](../plan_c.txt) dieksekusi penuh, semua panel diverifikasi via browser |
 | **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — [plan_d.txt](../plan_d.txt) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
 | **E** | Telegram bot | ✅ **Selesai (push satu arah)** — [plan_e.txt](../plan_e.txt) dieksekusi penuh, Daily Briefing manual (CLI + tombol Panel 6); bot commands dua-arah ditunda ke backlog |
-| **F+** | Multi-aset expansion | ⬜ Belum mulai |
+| **F+** | Multi-aset expansion | 🟡 **GOLD/SP500/IHSG/USDIDR/USDJPY aktif** (S&R+signals+context weight) — altcoin/saham/komoditas lain belum |
 
 ---
 
@@ -316,12 +316,43 @@ lebih awal di Phase C (independen dari urutan Phase D). Sisa scope:
 
 ---
 
-## ⬜ Phase F+ — Multi-Aset Expansion
+## 🟡 Phase F+ — Multi-Aset Expansion
 
-**Belum mulai.** Scope: perluas cakupan instrument di luar 6 yang ada saat
-ini (BTC, SP500, IHSG, GOLD, USDIDR, USDJPY) — mis. altcoin lain, saham
-individual, komoditas tambahan. Kemungkinan di titik ini juga saat SQLite
-ditinjau ulang kalau volume/concurrency berubah signifikan (lihat
+**GOLD/SP500/IHSG/USDIDR/USDJPY selesai diaktifkan** (Master Plan §10,
+Phase F/G/H/I digabung 1 pass — `analysis/*.py` sudah generic sejak Phase B,
+jadi ini murni "nyalain buat instrument lain", bukan bikin fitur baru).
+USDJPY awalnya dikecualikan (keputusan #5 plan_c.txt, khusus utk Panel 6
+outlook dropdown) tapi karena datanya sudah lengkap sejak Phase A, Giel
+minta diikutkan juga di analysis engine ini.
+
+Yang sebelumnya cuma jalan utk BTC, sekarang jalan utk keenam instrument:
+- **`pipeline/run_analysis.py`**: `INSTRUMENTS = ["BTC","GOLD","IHSG","SP500",
+  "USDIDR","USDJPY"]` — `python -m pipeline.run_analysis` (tanpa flag)
+  proses SEMUA sekaligus; `--instrument X` masih bisa jalan 1 saja.
+  `sr_zones`/`trade_signals` sekarang terisi utk keenam instrument (GOLD 74
+  zona/433 sinyal, IHSG 73/251, SP500 90/123, USDIDR 65/0, USDJPY 64/0 —
+  USDIDR & USDJPY belum ada breakout/retest valid di histori saat ini,
+  bukan bug).
+- **`pipeline/seed_context_weight.py`**: `GOLD_WEIGHTS`/`SP500_WEIGHTS`/
+  `IHSG_WEIGHTS`/`FOREX_WEIGHTS` (USDIDR)/`USDJPY_WEIGHTS` ditambah, persis
+  contoh driver Master Plan §4.3 (mis. GOLD: real_yield/dxy/geopolitik;
+  USDJPY: rate_differential BOJ-vs-Fed/trade_balance Jepang-AS). `main()`
+  seed keenam instrument sekaligus.
+- **Dashboard Panel 5**: TIDAK perlu diubah — dropdown instrument &
+  `/api/asset_ohlcv`, `/api/sr_zones`, `/api/signals` sudah generic sejak
+  Phase C, chart+zona+sinyal langsung tampil begitu data ada. Diverifikasi
+  di browser: GOLD/IHSG/SP500/USDIDR/USDJPY semua render chart+zona
+  relevan+tabel sinyal dengan benar.
+- **Test baru**: `test_seed_context_weight.py` nambah 1 test utk 5
+  instrument baru. 121 test hijau total.
+- **Catatan**: Panel 6 "Outlook per Instrumen" (`OUTLOOK_INSTRUMENTS` di
+  `web/app.py`) MASIH 5 instrumen tanpa USDJPY — itu keputusan #5
+  `plan_c.txt` yang terpisah dari analysis engine ini, belum diminta
+  diubah.
+
+**Belum dikerjakan** (di luar scope "pastikan 4 instrument ini jalan"):
+altcoin lain, saham individual, komoditas tambahan, tinjau ulang SQLite
+kalau volume/concurrency berubah signifikan (lihat
 [ARCHITECTURE.md §6.1](ARCHITECTURE.md#61-sqlite-vs-postgres-vs-nosql)).
 
 ---
@@ -395,9 +426,27 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
 - [ ] Index/monitoring ukuran DB berkala saat volume bertambah (sanity check,
       bukan berarti perlu migrasi — lihat rationale SQLite di
       ARCHITECTURE.md).
-- [ ] Evaluasi ulang daftar RSS feed di `scrapers/news.py` — beberapa
-      (Reuters, Bisnis.com, Kontan) sempat gagal saat verifikasi; cek apakah
-      URL sudah pindah/berubah.
+- [x] ~~Evaluasi ulang daftar RSS feed~~ — registry dipindah ke
+      `scrapers/feeds_config.py` (satu-satunya tempat kelola feed, ganti
+      URL/enabled di sana, bukan di `news.py`) + `check_feed_health()`
+      per feed tiap run (status ok/dead masuk `source_flags` dgn prefix
+      `rss_`, sama pola dengan API lain — feed mati langsung kelihatan di
+      log, bukan backlog tersembunyi). Semua URL DIVERIFIKASI LANGSUNG
+      (bukan asumsi): **Reuters** & **Kontan** (`kontan.co.id/feed` DAN
+      `/rss`) dikonfirmasi mati beneran (Kontan return HTML homepage
+      biasa, bukan XML, bahkan dgn browser UA — bukan bot-block, memang
+      sudah dimatikan) → di-`enabled: False` + note. **Bisnis.com**
+      TERNYATA masih hidup tapi di subdomain lain (`rss.bisnis.com`, bukan
+      `bisnis.com/rss/market` yang 404) — ditemukan lewat riset ulang.
+      Hasil akhir: **7 feed aktif** (Fed FOMC, CNBC Finance, CNBC Economy,
+      Investing ID, CNBC Indonesia, ANTARA Ekonomi, Bisnis.com), dites
+      live via `run_daily`: **7 ok, 0 dead**. `pipeline/run_daily.py`
+      print ringkasan `RSS: X ok, Y dead → [...]` tiap run. 9 test baru
+      di `tests/test_news.py` (pindah dari `test_macro.py`), 127 test
+      hijau total. `IMPACT_KEYWORDS["HIGH"]` sempat kelewat `"bi rate"`
+      (cuma `"bank indonesia"` versi lengkap) — ketemu saat porting test
+      lama, sudah ditambah balik jadi headline singkatan "BI Rate ..."
+      tetap HIGH.
 - [ ] Backfill/isi `econ_calendar` untuk event yang sudah lewat kalau perlu
       histori kalender (scraper ini hanya kasih rolling window "minggu ini",
       bukan sumber histori — butuh sumber lain kalau memang perlu).

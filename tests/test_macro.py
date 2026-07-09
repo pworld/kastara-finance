@@ -1,9 +1,8 @@
-"""Test macro scrapers (yfinance + FRED) dan news scoring."""
+"""Test macro scrapers (yfinance + FRED). Tes news scraper ada di test_news.py."""
 import pytest
 
 from scrapers.macro_yf import fetch_macro_yf
 from scrapers.macro_fred import fetch_macro_fred
-from scrapers.news import fetch_news, score_impact
 
 
 # ---------- yfinance ----------
@@ -39,24 +38,3 @@ def test_fred_no_crash_without_key():
     assert "source_flags" in out
     for k in ("dxy_close", "us10y_yield", "vix_close", "walcl", "rrp", "tga"):
         assert k in out
-
-
-# ---------- News ----------
-def test_score_impact_buckets():
-    assert score_impact("Fed signals rate cut") == "HIGH"
-    assert score_impact("BI rate decision today") == "HIGH"
-    assert score_impact("Bitcoin ETF inflows rise") == "MED"
-    assert score_impact("Local startup launches app") == "LOW"
-
-
-def test_score_impact_always_valid():
-    for h in ["", "random headline", "GDP data", "FOMC minutes"]:
-        assert score_impact(h) in {"HIGH", "MED", "LOW"}
-
-
-def test_news_dedup():
-    out = fetch_news()
-    headlines = [it["headline"].lower() for it in out["items"]]
-    assert len(headlines) == len(set(headlines)), "ada headline duplikat"
-    for it in out["items"]:
-        assert it["impact_level"] in {"HIGH", "MED", "LOW"}

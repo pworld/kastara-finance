@@ -32,8 +32,11 @@ Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
   - `scrapers/macro_yf.py` — yfinance (S&P 500, IHSG, Gold, USD/IDR, USD/JPY).
   - `scrapers/macro_fred.py` — FRED (DXY, US10Y, VIX, WALCL, RRP, TGA, HY spread).
     Butuh `FRED_API_KEY`.
-  - `scrapers/news.py` — RSS (CNBC, Fed, CNBC Indonesia, dll) + scoring
-    rule-based HIGH/MED/LOW (bukan AI).
+  - `scrapers/news.py` — RSS (7 feed aktif: Fed FOMC, CNBC Finance/Economy/
+    Indonesia, Investing ID, ANTARA, Bisnis.com — daftar di
+    `scrapers/feeds_config.py`) + scoring rule-based HIGH/MED/LOW (bukan
+    AI). `check_feed_health()` per feed tiap run — feed mati kelihatan
+    langsung di `source_flags`/log, bukan backlog tersembunyi.
   - `scrapers/econ_calendar.py` — ForexFactory (event ekonomi masa depan:
     FOMC/CPI/dll), endpoint JSON gratis tidak resmi. Forecast/previous ikut
     tersimpan; `actual` (hasil rilis) diisi **manual** lewat dashboard —
@@ -48,15 +51,18 @@ Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
 - **Manual article** `pipeline/add_article.py` — isi `manual_articles` untuk riset
   historis (RSS tidak bisa backfill — lihat [Artikel manual](#artikel-manual-riset-historis)).
 - **Indikator Phase A** `indicators/calc.py` — `net_liquidity`, `volume_ma20`.
-- **Analysis engine Phase B** (`analysis/`, BTC dulu — lihat
-  [plan_b.txt](plan_b.txt)):
+- **Analysis engine** (`analysis/`, generic sejak Phase B — lihat
+  [plan_b.txt](plan_b.txt)), aktif utk **BTC/GOLD/IHSG/SP500/USDIDR/USDJPY**
+  (Phase F+ expansion):
   - `analysis/sr_zones.py` — deteksi zona support/resistance (swing
     high/low + clustering + touch count).
   - `analysis/signals.py` — deteksi breakout/retest + R:R calculator.
   - `pipeline/run_analysis.py` — orchestrator, tulis ke `sr_zones` +
     `trade_signals`. **Suggestion only** — `approved` selalu 0 dari kode.
+    Tanpa `--instrument`, proses ke-6 instrument sekaligus.
   - `tools/review_signal.py` — CLI approve/reject sinyal by id eksplisit.
-  - `pipeline/seed_context_weight.py` — seed pembobotan driver per aset.
+  - `pipeline/seed_context_weight.py` — seed pembobotan driver per aset
+    (persis contoh Master Plan §4.3, mis. GOLD: real_yield/dxy/geopolitik).
 - **Telegram Daily Briefing Phase E** (`notify/`, `pipeline/` — lihat
   [plan_e.txt](plan_e.txt)):
   - `notify/telegram.py` — `send_message()` (push satu arah, bukan bot
@@ -162,11 +168,15 @@ Kalau URL yang sama sudah pernah ditambah, tool cuma **kasih tahu** (bukan
 blok) lalu minta konfirmasi — re-visit artikel yang sama dengan catatan baru
 itu valid.
 
-### Analysis engine (Phase B — S&R + breakout/retest, BTC)
+### Analysis engine (S&R + breakout/retest, 6 instrument sejak Phase F+)
 
 ```bash
-# Jalankan deteksi zona S&R + sinyal breakout/retest untuk BTC
+# Jalankan deteksi zona S&R + sinyal breakout/retest untuk SEMUA instrument
+# (BTC, GOLD, IHSG, SP500, USDIDR, USDJPY)
 python -m pipeline.run_analysis
+
+# Atau 1 instrument saja
+python -m pipeline.run_analysis --instrument GOLD
 ```
 Idempotent (re-run tidak duplikat zona/sinyal, tidak menimpa
 `validated`/`notes` yang sudah direview manual). **Manual trigger**
@@ -345,8 +355,11 @@ Scheduler library (APScheduler dll) tetap belum dipakai — cron OS cukup.
   (juga menegakkan dedup by headline di level DB), `idx_daily_news_impact_date`.
   Pindah ke Postgres baru relevan kalau nanti multi-user concurrent atau butuh
   hosting cloud managed — bukan soal volume data historisnya.
-- **RSS feed bisa mati/pindah.** Daftar feed ada di `scrapers/news.py`
-  (`RSS_FEEDS`) — gampang ditambah/ganti. Feed mati ditandai `fail`, di-skip.
+- **RSS feed bisa mati/pindah.** Registry di `scrapers/feeds_config.py`
+  (`FEEDS`) — satu-satunya tempat ganti url/enabled, jangan sentuh
+  `news.py`. `check_feed_health()` cek tiap feed tiap run (status masuk
+  `source_flags` prefix `rss_`, `run_daily` print ringkasan `RSS: X ok, Y
+  dead`) — feed mati langsung kelihatan di log, bukan backlog tersembunyi.
 - **FRED series id kadang berubah.** Lihat `scrapers/macro_fred.py` (`SERIES`).
   Series gagal ditandai `fail` per-series, pipeline lanjut.
 - **Tidak ada API key di source code.** Semua via `.env` + `python-dotenv`.

@@ -21,7 +21,7 @@ from scrapers.crypto import fetch_btc
 from scrapers.econ_calendar import fetch_econ_calendar
 from scrapers.macro_fred import fetch_macro_fred
 from scrapers.macro_yf import fetch_macro_yf
-from scrapers.news import fetch_news
+from scrapers.news import fetch_all_news
 from scrapers.positioning import fetch_positioning
 
 # Kolom daily_market yang boleh ditulis pipeline (sisanya untuk Phase B+).
@@ -174,13 +174,16 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
     crypto = fetch_btc(date)
     yf = fetch_macro_yf(date)
     fred = fetch_macro_fred(date)
-    news = fetch_news(date)
+    news_items, news_health = fetch_all_news(date)
     econ = fetch_econ_calendar()
     positioning = fetch_positioning()
 
     flags = SourceFlags()
-    for part in (crypto, yf, fred, news, econ, positioning):
+    for part in (crypto, yf, fred, econ, positioning):
         flags.merge(part.get("source_flags", {}))
+    # health_report RSS digabung ke source_flags dgn prefix "rss_" (pola sama
+    # dengan scraper lain) -- feed mati langsung kelihatan di log tiap run.
+    flags.merge({f"rss_{name}": status for name, status in news_health.items()})
 
     # Gabungkan asset_ohlcv rows: BTC (dari crypto) + rows dari yfinance.
     asset_rows: list[dict[str, Any]] = []
@@ -227,7 +230,7 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
         upsert_daily_market(conn, date, market)
 
         # 4) news
-        n_news = insert_news_dedup(conn, news.get("items", []))
+        n_news = insert_news_dedup(conn, news_items)
 
         # 5) economic calendar (event masa depan, upsert by natural key)
         n_econ = upsert_econ_calendar(conn, econ.get("items", []))
@@ -244,6 +247,8 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
         "sources_skip": flags.count("skip"),
         "asset_rows": len(asset_rows),
         "news_inserted": n_news,
+        "rss_ok": sum(1 for v in news_health.values() if v == "ok"),
+        "rss_dead": [name for name, status in news_health.items() if status == "dead"],
         "econ_events_new": n_econ,
         "positioning_new": n_positioning,
         "source_flags": flags.as_dict(),
@@ -260,6 +265,10 @@ def _print_summary(s: dict[str, Any]) -> None:
     print(f"  source skip   : {s['sources_skip']}")
     print(f"  asset rows    : {s['asset_rows']}")
     print(f"  news inserted : {s['news_inserted']}")
+    rss_line = f"  RSS           : {s['rss_ok']} ok, {len(s['rss_dead'])} dead"
+    if s["rss_dead"]:
+        rss_line += f" → {s['rss_dead']}"
+    print(rss_line)
     print(f"  econ events   : {s['econ_events_new']} baru")
     print(f"  positioning   : {s['positioning_new']} baru")
     print("  flags:")

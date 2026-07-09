@@ -1,11 +1,19 @@
-"""News scraper: RSS feeds + rule-based impact scoring (BUKAN AI/LLM).
+"""News scraper: RSS feeds (registry di scrapers/feeds_config.py) + rule-based
+impact scoring (BUKAN AI/LLM).
 
 Output ke daily_news: source, headline, raw_url, impact_level (HIGH/MED/LOW).
 is_key_trigger DEFAULT 0 (Giel flag manual nanti).
 
+Health check per feed tiap run (`check_feed_health`) — pola sama dengan
+`source_flags` API di Phase A: feed mati harus KELIHATAN tiap run lewat
+`health_report`, bukan jadi backlog tersembunyi yang baru ketahuan
+seminggu kemudian.
+
 Acceptance:
   - Dedup by headline (jangan masuk 2x untuk headline sama)
   - impact_level selalu salah satu HIGH/MED/LOW
+  - Feed mati -> di-skip, dicatat di health_report, TIDAK menghentikan
+    feed lain (tidak pernah raise ke pemanggil)
 """
 from __future__ import annotations
 
@@ -13,34 +21,19 @@ import re
 from typing import Any
 
 import feedparser
+import requests
 
-from scrapers.base import SourceFlags, safe_call, today_wib
+from scrapers.base import today_wib
+from scrapers.feeds_config import FEEDS, IMPACT_KEYWORDS
 
-# RSS feeds (verifikasi aktif saat implementasi; kalau mati -> skip + log).
-RSS_FEEDS = {
-    "Reuters Business": "https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best",
-    "CNBC Finance": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
-    "CNBC Economy": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258",
-    "Fed Press": "https://www.federalreserve.gov/feeds/press_all.xml",
-    "CNBC Indonesia": "https://www.cnbcindonesia.com/market/rss",
-    "Bisnis.com Market": "https://www.bisnis.com/rss/market",
-    "Kontan": "https://www.kontan.co.id/rss",
-}
-
-# Keyword scoring — mudah ditambah. Case-insensitive substring match.
-HIGH_KEYWORDS = [
-    "fed", "rate", "fomc", "cpi", "bi rate", "inflation",
-    "rate cut", "rate hike", "suku bunga",
-]
-MED_KEYWORDS = ["etf", "earnings", "gdp", "unemployment", "nasdaq"]
+DEFAULT_TIMEOUT = 10
+HEADERS = {"User-Agent": "kastara-finance/0.1 (news feed health check)"}
 
 
 def _matches(text: str, keywords: list[str]) -> bool:
-    """True kalau salah satu keyword muncul sebagai kata utuh (word boundary).
-
-    Pakai \\b supaya 'rate' tidak match 'moderate'/'separate', tapi frasa
-    multi-kata seperti 'rate cut' tetap cocok.
-    """
+    """True kalau salah satu keyword muncul sebagai kata/frasa utuh (word
+    boundary) -- 'rate' tidak match 'moderate'/'separate', tapi frasa
+    multi-kata seperti 'rate cut' tetap cocok."""
     for kw in keywords:
         if re.search(rf"\b{re.escape(kw)}\b", text):
             return True
@@ -48,58 +41,84 @@ def _matches(text: str, keywords: list[str]) -> bool:
 
 
 def score_impact(headline: str) -> str:
-    """Return 'HIGH' | 'MED' | 'LOW' berdasar keyword rule-based."""
+    """Return 'HIGH' | 'MED' | 'LOW' berdasar keyword rule-based.
+    HIGH menang atas MED kalau headline cocok keduanya."""
     h = (headline or "").lower()
-    if _matches(h, HIGH_KEYWORDS):
+    if _matches(h, IMPACT_KEYWORDS["HIGH"]):
         return "HIGH"
-    if _matches(h, MED_KEYWORDS):
+    if _matches(h, IMPACT_KEYWORDS["MED"]):
         return "MED"
     return "LOW"
 
 
-def _parse_feed(name: str, url: str) -> list[dict[str, Any]]:
-    """Parse satu feed -> list item {source, headline, raw_url, impact_level}."""
-    parsed = feedparser.parse(url)
-    if getattr(parsed, "bozo", 0) and not parsed.entries:
-        raise ValueError(f"feed gagal/kosong: {name}")
-    items: list[dict[str, Any]] = []
-    for entry in parsed.entries:
-        headline = (getattr(entry, "title", "") or "").strip()
-        if not headline:
-            continue
-        items.append({
-            "source": name,
-            "headline": headline,
-            "raw_url": getattr(entry, "link", "") or "",
-            "impact_level": score_impact(headline),
-        })
-    return items
+def check_feed_health(url: str) -> tuple[str, str, list[Any]]:
+    """Cek 1 feed: ('ok'|'dead', reason, entries). TIDAK PERNAH raise.
+
+    'dead' kalau: request gagal, status != 200, parse gagal (bozo tanpa
+    entries), atau 0 entry. 'ok' kalau parse sukses DAN ada >= 1 entry.
+    """
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=DEFAULT_TIMEOUT)
+    except Exception as exc:  # noqa: BLE001
+        return "dead", f"{type(exc).__name__}: {exc}", []
+
+    if resp.status_code != 200:
+        return "dead", f"HTTP {resp.status_code}", []
+
+    parsed = feedparser.parse(resp.content)
+    if not parsed.entries:
+        reason = "parse gagal / bukan RSS valid" if getattr(parsed, "bozo", 0) else "0 entry"
+        return "dead", reason, []
+
+    return "ok", "", parsed.entries
 
 
-def fetch_news(date: str | None = None) -> dict[str, Any]:
-    """Return dict: 'items' (list, sudah dedup) + 'date' + 'source_flags'."""
-    date = date or today_wib()
-    flags = SourceFlags()
+def fetch_all_news(target_date: str | None = None) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Loop semua FEEDS enabled=True. Return (articles, health_report).
+
+    articles: list {date, source, headline, raw_url, impact_level}, sudah
+    dedup by headline (case-insensitive).
+    health_report: {feed_name: "ok"|"dead"} untuk SEMUA feed enabled.
+    """
+    target_date = target_date or today_wib()
+    health_report: dict[str, str] = {}
     seen: set[str] = set()
-    items: list[dict[str, Any]] = []
+    articles: list[dict[str, Any]] = []
 
-    for name, url in RSS_FEEDS.items():
-        feed_items = safe_call(
-            f"rss_{name}", lambda u=url, n=name: _parse_feed(n, u), flags, default=[]
-        )
-        for it in feed_items or []:
-            key = it["headline"].lower()
+    for feed in FEEDS:
+        if not feed.get("enabled"):
+            continue
+        name, url = feed["name"], feed["url"]
+        status, reason, entries = check_feed_health(url)
+        health_report[name] = status
+        if status == "dead":
+            print(f"[news] feed mati: {name} ({reason})")
+            continue
+        for entry in entries:
+            headline = (getattr(entry, "title", "") or "").strip()
+            if not headline:
+                continue
+            key = headline.lower()
             if key in seen:
                 continue
             seen.add(key)
-            it["date"] = date
-            items.append(it)
+            articles.append({
+                "date": target_date,
+                "source": name,
+                "headline": headline,
+                "raw_url": getattr(entry, "link", "") or "",
+                "impact_level": score_impact(headline),
+            })
 
-    return {"date": date, "items": items, "source_flags": flags.as_dict()}
+    return articles, health_report
 
 
 if __name__ == "__main__":
-    out = fetch_news()
-    print(f"{len(out['items'])} headline (dedup). flags={out['source_flags']}")
-    for it in out["items"][:10]:
+    items, health = fetch_all_news()
+    n_ok = sum(1 for v in health.values() if v == "ok")
+    n_dead = sum(1 for v in health.values() if v == "dead")
+    dead_names = [name for name, status in health.items() if status == "dead"]
+    print(f"{len(items)} headline (dedup). RSS: {n_ok} ok, {n_dead} dead"
+          + (f" → {dead_names}" if dead_names else ""))
+    for it in items[:10]:
         print(f"  [{it['impact_level']:>4}] {it['source']}: {it['headline'][:80]}")
