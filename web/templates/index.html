@@ -47,6 +47,10 @@
 
   .grid { display: grid; gap: 14px; }
   .cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .cat-group { margin-top: 18px; }
+  .cat-group:first-child { margin-top: 0; }
+  .cat-title { color: var(--muted); font-size: 12px; text-transform: uppercase;
+    letter-spacing: .5px; margin-bottom: 8px; }
   .card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
     padding: 12px 14px;
@@ -67,6 +71,13 @@
     border-left: 3px solid var(--accent); padding-left: 10px; }
   section h3 { font-size: 13px; color: var(--muted); margin: 0 0 10px;
     text-transform: uppercase; letter-spacing: .4px; }
+  .collapsible summary { font-size: 15px; color: var(--text); margin: 0 0 12px;
+    border-left: 3px solid var(--accent); padding-left: 10px; cursor: pointer;
+    list-style: none; }
+  .collapsible summary::-webkit-details-marker { display: none; }
+  .collapsible summary::before { content: "▸ "; color: var(--muted); }
+  .collapsible[open] summary::before { content: "▾ "; }
+  .collapsible[open] summary { margin-bottom: 12px; }
   .panel { background: var(--panel); border: 1px solid var(--border);
     border-radius: 8px; padding: 16px; }
   .flags { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -171,14 +182,16 @@
           <button data-period="month">Bulan</button>
           <button data-period="year">Tahun</button>
         </div>
-        <div class="grid cards" id="cards"></div>
+        <div id="cards"></div>
       </section>
 
       <section>
-        <h2>Status Sumber Data (source_flags)</h2>
-        <div class="panel">
-          <div class="flags" id="flags"></div>
-        </div>
+        <details id="flagsDetails" class="collapsible">
+          <summary>Status Sumber Data (source_flags)</summary>
+          <div class="panel">
+            <div class="flags" id="flags"></div>
+          </div>
+        </details>
       </section>
 
       <section>
@@ -203,6 +216,7 @@
               <input type="date" id="bfTo">
             </div>
           </div>
+          <div id="bfGapInfo" class="src" style="margin-top:8px">Memuat info data...</div>
           <div class="form-row" style="margin-top:12px">
             <button class="btn secondary" id="bfPreviewBtn">Preview</button>
             <button class="btn" id="bfCommitBtn" style="display:none">Confirm &amp; Commit</button>
@@ -614,7 +628,8 @@ let snapshotPeriod = "day";
 function renderSnapshotCards() {
   if (!latestSnapshotData) return;
   const d = latestSnapshotData;
-  $("#cards").innerHTML = d.snapshot.map(s => {
+
+  function cardHtml(s) {
     let val = fmt(s.value);
     if (s.column === "fear_greed_value" && d.fear_greed_label && val !== null)
       val = val + " · " + d.fear_greed_label;
@@ -634,7 +649,21 @@ function renderSnapshotCards() {
     return `<div class="card"><div class="label">${s.label}</div>
       <div class="value ${na ? "na" : ""}">${na ? "n/a" : val}</div>
       <div class="delta ${deltaClass}">${deltaText}</div></div>`;
-  }).join("");
+  }
+
+  // Kelompokkan per kategori (dari server, urutan kemunculan pertama
+  // dipertahankan) biar 14 kartu tidak numpuk jadi 1 grid rata.
+  const byCategory = new Map();
+  for (const s of d.snapshot) {
+    if (!byCategory.has(s.category)) byCategory.set(s.category, []);
+    byCategory.get(s.category).push(s);
+  }
+
+  $("#cards").innerHTML = [...byCategory.entries()].map(([cat, items]) => `
+    <div class="cat-group">
+      <h4 class="cat-title">${cat}</h4>
+      <div class="grid cards">${items.map(cardHtml).join("")}</div>
+    </div>`).join("");
 }
 
 $("#snapshotPeriodFilter").addEventListener("click", (e) => {
@@ -666,6 +695,28 @@ async function loadLatest() {
     `<span class="flag"><span class="dot ${v}"></span>${k}</span>`).join("")
     || '<span class="src">tidak ada flag</span>';
 }
+
+async function loadDataGaps() {
+  const inst = $("#bfInstrument").value;
+  $("#bfGapInfo").textContent = "Memuat info data...";
+  const g = await (await fetch(`/api/data_gaps?instrument=${encodeURIComponent(inst)}`)).json();
+  if (!g.total_rows) { $("#bfGapInfo").textContent = "Belum ada data untuk instrument ini."; return; }
+
+  const range = `${g.total_rows.toLocaleString("id-ID")} baris · ${g.date_from} s.d. ${g.date_to}`;
+  if (g.calendar === "WEEKLY_WED") {
+    $("#bfGapInfo").innerHTML = `${range} <span class="src">(rilis mingguan tiap Rabu — jeda antar-Rabu wajar, bukan gap)</span>`;
+    return;
+  }
+  if (g.gaps_total_count === 0) {
+    $("#bfGapInfo").innerHTML = `${range} <span style="color:var(--ok)">· tidak ada gap terdeteksi</span>`;
+    return;
+  }
+  const shown = g.gaps.slice(0, 5)
+    .map(gap => `${gap.from} s.d. ${gap.to} (${gap.days} hari)`).join(", ");
+  const more = g.gaps_total_count > 5 ? ` · +${g.gaps_total_count - 5} gap lain` : "";
+  $("#bfGapInfo").innerHTML = `${range} <span style="color:var(--fail)">· ${g.gaps_total_count} gap terdeteksi</span>: ${shown}${more}`;
+}
+$("#bfInstrument").addEventListener("change", loadDataGaps);
 
 let bfPreviewData = null;
 $("#bfPreviewBtn").addEventListener("click", async () => {
@@ -1182,6 +1233,7 @@ $("#briefingSendBtn").addEventListener("click", async () => {
 
 async function refreshAll() {
   await loadLatest();
+  await loadDataGaps();
   await loadAssets();
   await loadContextCharts();
   await loadNews();

@@ -10,8 +10,9 @@ keputusan akhir tetap manual (`approved`, direview via
 Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
 **tanpa pemanggilan AI/LLM otomatis** di mana pun.
 
-> Scope dikunci di `plan.txt` (Phase A), `plan_b.txt` (Phase B), dan
-> `plan_c.txt` (Phase C).
+> Scope dikunci di `plan.txt` (Phase A). Execution plan Phase B-E
+> (`plan_b.txt`-`plan_e.txt`) dihapus setelah masing-masing selesai
+> dieksekusi — ringkasan hasilnya ada di `docs/ROADMAP.md`.
 
 📄 **Dokumen lengkap ada di [`docs/`](docs/):**
 [ARCHITECTURE.md](docs/ARCHITECTURE.md) (desain teknis & rationale),
@@ -24,7 +25,7 @@ Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
 
 - **SQLite** `kastara-finance.db` dengan 14 tabel (`db/schema.sql`) — 11
   tabel Phase A + 3 tabel forward-layer (`expectations`/`positioning`/
-  `policy_tracker`, diisi Phase D — lihat [plan_d.txt](plan_d.txt)).
+  `policy_tracker`, diisi Phase D — lihat `docs/ROADMAP.md` §Phase D).
 - **6 scraper** modular (tiap source bisa jalan sendiri):
   - `scrapers/crypto.py` — CoinGecko + Binance + Alternative.me (BTC OHLCV,
     dominance, funding, OI, Fear & Greed). *Binance ke-block? otomatis fallback
@@ -51,9 +52,8 @@ Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
 - **Manual article** `pipeline/add_article.py` — isi `manual_articles` untuk riset
   historis (RSS tidak bisa backfill — lihat [Artikel manual](#artikel-manual-riset-historis)).
 - **Indikator Phase A** `indicators/calc.py` — `net_liquidity`, `volume_ma20`.
-- **Analysis engine** (`analysis/`, generic sejak Phase B — lihat
-  [plan_b.txt](plan_b.txt)), aktif utk **BTC/GOLD/IHSG/SP500/USDIDR/USDJPY**
-  (Phase F+ expansion):
+- **Analysis engine** (`analysis/`, generic sejak Phase B), aktif utk
+  **BTC/GOLD/IHSG/SP500/USDIDR/USDJPY** (Phase F+ expansion):
   - `analysis/sr_zones.py` — deteksi zona support/resistance (swing
     high/low + clustering + touch count).
   - `analysis/signals.py` — deteksi breakout/retest + R:R calculator.
@@ -63,8 +63,7 @@ Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
   - `tools/review_signal.py` — CLI approve/reject sinyal by id eksplisit.
   - `pipeline/seed_context_weight.py` — seed pembobotan driver per aset
     (persis contoh Master Plan §4.3, mis. GOLD: real_yield/dxy/geopolitik).
-- **Telegram Daily Briefing Phase E** (`notify/`, `pipeline/` — lihat
-  [plan_e.txt](plan_e.txt)):
+- **Telegram Daily Briefing Phase E** (`notify/`, `pipeline/`):
   - `notify/telegram.py` — `send_message()` (push satu arah, bukan bot
     dua-arah) + `get_latest_chat_id()` (helper setup sekali pakai).
   - `pipeline/compose_briefing.py` — rakit teks briefing dari data yang
@@ -180,7 +179,7 @@ python -m pipeline.run_analysis --instrument GOLD
 ```
 Idempotent (re-run tidak duplikat zona/sinyal, tidak menimpa
 `validated`/`notes` yang sudah direview manual). **Manual trigger**
-untuk sekarang, belum di-cron (lokal cuma dev — lihat [plan_b.txt](plan_b.txt) §7.6).
+untuk sekarang, belum di-cron (lokal cuma dev).
 
 ```bash
 # Review sinyal (WAJIB by id eksplisit — tidak ada mode approve-semua)

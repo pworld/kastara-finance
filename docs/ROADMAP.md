@@ -12,10 +12,10 @@
 |---|---|---|
 | **A** | Database & Scraper (data layer) | ✅ **Selesai penuh** — sesuai `plan.txt` **dan** checklist Master Plan §10 (lihat [status](#anchor-gap-phase-a)); cron daemon butuh 1 langkah manual sudo, lihat catatan |
 | **1** | Dashboard read-only (Flask) | ✅ Selesai — jadi fondasi Panel 1/2/5 di Phase C |
-| **B** | S&R detection, breakout/retest engine | ✅ **Selesai untuk BTC** — [plan_b.txt](../plan_b.txt) dieksekusi penuh, 46 test baru, diverifikasi data asli |
-| **C** | Dashboard/UI penuh (6 panel, write-enabled) | ✅ **Selesai** — [plan_c.txt](../plan_c.txt) dieksekusi penuh, semua panel diverifikasi via browser |
-| **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — [plan_d.txt](../plan_d.txt) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
-| **E** | Telegram bot | ✅ **Selesai (push satu arah)** — [plan_e.txt](../plan_e.txt) dieksekusi penuh, Daily Briefing manual (CLI + tombol Panel 6); bot commands dua-arah ditunda ke backlog |
+| **B** | S&R detection, breakout/retest engine | ✅ **Selesai untuk BTC** — `plan_b.txt` (dihapus setelah selesai) dieksekusi penuh, 46 test baru, diverifikasi data asli |
+| **C** | Dashboard/UI penuh (6 panel, write-enabled) | ✅ **Selesai** — `plan_c.txt` (dihapus setelah selesai) dieksekusi penuh, semua panel diverifikasi via browser |
+| **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — `plan_d.txt` (dihapus setelah selesai) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
+| **E** | Telegram bot | ✅ **Selesai (push satu arah)** — `plan_e.txt` (dihapus setelah selesai) dieksekusi penuh, Daily Briefing manual (CLI + tombol Panel 6); bot commands dua-arah ditunda ke backlog |
 | **F+** | Multi-aset expansion | 🟡 **GOLD/SP500/IHSG/USDIDR/USDJPY aktif** (S&R+signals+context weight) — altcoin/saham/komoditas lain belum |
 
 ---
@@ -142,7 +142,7 @@ status aktif:
 
 ## ✅ Phase B — S&R Detection & Breakout/Retest Engine (selesai, BTC)
 
-**Execution plan: [plan_b.txt](../plan_b.txt)** — 7 Open Questions di §7
+**Execution plan: `plan_b.txt` (dihapus setelah selesai)** — 7 Open Questions di §7
 sudah direview & dikunci Giel, dieksekusi persis sesuai itu.
 
 **Deliverable:**
@@ -183,7 +183,7 @@ button (Phase C), instrument selain BTC (Phase F+), forward layer (Phase D).
 <a id="anchor-phase-c-status"></a>
 ## ✅ Phase C — Dashboard/UI Penuh (selesai)
 
-**Execution plan: [plan_c.txt](../plan_c.txt)** — 5 Open Questions §6
+**Execution plan: `plan_c.txt` (dihapus setelah selesai)** — 5 Open Questions §6
 direview & dikunci Giel, dieksekusi persis sesuai itu. Dashboard sekarang
 **write-enabled** (pertama kalinya, sebelumnya 100% read-only di Phase 1) —
 navigasi 6 tab sesuai alur pagi Master Plan §0/§6.
@@ -232,7 +232,7 @@ perlu — local-only). Panel 5 MA/volume/context-chart yang tadinya backlog
 
 ## ✅ Phase D — Forward Layer
 
-**Selesai** — [plan_d.txt](../plan_d.txt) dieksekusi penuh. Scope (Master
+**Selesai** — `plan_d.txt` (dihapus setelah selesai) dieksekusi penuh. Scope (Master
 Plan §4.2, 3 stage): Policy Tracker (Stage 3/Layer A) sudah dikerjakan
 lebih awal di Phase C (independen dari urutan Phase D). Sisa scope:
 
@@ -280,7 +280,7 @@ lebih awal di Phase C (independen dari urutan Phase D). Sisa scope:
 
 ## ✅ Phase E — Telegram Bot
 
-**Selesai (push satu arah)** — [plan_e.txt](../plan_e.txt) dieksekusi penuh.
+**Selesai (push satu arah)** — `plan_e.txt` (dihapus setelah selesai) dieksekusi penuh.
 
 - **Kenapa PUSH MANUAL, bukan auto dari `run_daily`**: isi briefing (4
   Lensa, Signal approved) baru lengkap SETELAH Giel selesai Panel 4-6
@@ -471,6 +471,28 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       frontend murni ganti tampilan tanpa fetch ulang. 5 test baru
       (`tests/test_web_app.py`, test pertama utk `web/app.py`), 132 test
       hijau total.
+- [x] ~~Panel 1: kategori kartu, collapse source_flags, deteksi data gap~~
+      — 3 keluhan UX sekaligus:
+      1. **Kartu snapshot dikelompokkan** jadi 3 kategori (Crypto (BTC),
+         Makro Global, Ekuitas &amp; FX) — `SNAPSHOT_FIELDS` di `web/app.py`
+         diubah dari dict flat jadi list-of-dict berisi `category`, render
+         per-grup di frontend (bukan 1 grid rata 14 kartu).
+      2. **"Status Sumber Data (source_flags)" jadi collapsible** — native
+         `<details>`/`<summary>` (bukan JS custom), default TERTUTUP,
+         segitiga ▸/▾ nunjukin state.
+      3. **Deteksi data gap di Manual Backfill** — endpoint baru
+         `GET /api/data_gaps?instrument=X`, jalan otomatis tiap instrument
+         dropdown berubah (`web/app.py::_detect_gaps()`). Tiap instrument
+         dipetakan ke kalender-ekspektasi (`INSTRUMENT_SOURCE`): `DAILY`
+         (BTC, RRP — RRP dikonfirmasi rilis harian via FRED metadata),
+         `WEEKDAY` (ekuitas/forex/DXY/US10Y/VIX/HY), `WEEKLY_WED` (WALCL/
+         TGA — dikonfirmasi rilis mingguan, jeda antar-Rabu SENGAJA tidak
+         dianggap gap). Gap 1-hari (libur biasa) tidak dilaporkan, cuma
+         >=2 hari-ekspektasi berturut-turut. Nemu real gap pas dites: IHSG
+         58 gap (kebanyakan minggu libur Lebaran — kelihatan jelas dari
+         rentang tanggalnya, Giel yang putuskan itu wajar atau perlu
+         backfill, tools cuma kasih visibilitas). 9 test baru
+         (`tests/test_web_app.py`), 141 test hijau total.
 
 **Dievaluasi, sengaja tidak dikerjakan:**
 - **NewsData.io** — dicek langsung: sentiment analysis **cuma tersedia di

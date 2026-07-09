@@ -40,23 +40,24 @@ app = Flask(__name__)
 # USDJPY dikecualikan atas permintaan eksplisit Giel).
 OUTLOOK_INSTRUMENTS = ["BTC", "SP500", "IHSG", "GOLD", "USDIDR"]
 
-# Kolom daily_market yang ditampilkan di snapshot (label -> kolom).
-SNAPSHOT_FIELDS = {
-    "BTC Close": "btc_close",
-    "BTC Vol MA20": "btc_volume_ma20",
-    "BTC Dominance %": "btc_dominance",
-    "Funding Rate": "btc_funding_rate",
-    "Fear & Greed": "fear_greed_value",
-    "DXY": "dxy_close",
-    "S&P 500": "sp500_close",
-    "US10Y %": "us10y_yield",
-    "VIX": "vix_close",
-    "IHSG": "ihsg_close",
-    "USD/IDR": "usd_idr",
-    "USD/JPY": "usd_jpy",
-    "Gold": "gold_close",
-    "Net Liquidity": "net_liquidity",
-}
+# Kolom daily_market yang ditampilkan di snapshot, dikelompokkan per
+# kategori (dashboard render per-grup, bukan 1 grid rata biar tidak menumpuk).
+SNAPSHOT_FIELDS = [
+    {"label": "BTC Close", "column": "btc_close", "category": "Crypto (BTC)"},
+    {"label": "BTC Vol MA20", "column": "btc_volume_ma20", "category": "Crypto (BTC)"},
+    {"label": "BTC Dominance %", "column": "btc_dominance", "category": "Crypto (BTC)"},
+    {"label": "Funding Rate", "column": "btc_funding_rate", "category": "Crypto (BTC)"},
+    {"label": "DXY", "column": "dxy_close", "category": "Makro Global"},
+    {"label": "US10Y %", "column": "us10y_yield", "category": "Makro Global"},
+    {"label": "VIX", "column": "vix_close", "category": "Makro Global"},
+    {"label": "Fear & Greed", "column": "fear_greed_value", "category": "Makro Global"},
+    {"label": "Net Liquidity", "column": "net_liquidity", "category": "Makro Global"},
+    {"label": "S&P 500", "column": "sp500_close", "category": "Ekuitas & FX"},
+    {"label": "IHSG", "column": "ihsg_close", "category": "Ekuitas & FX"},
+    {"label": "USD/IDR", "column": "usd_idr", "category": "Ekuitas & FX"},
+    {"label": "USD/JPY", "column": "usd_jpy", "category": "Ekuitas & FX"},
+    {"label": "Gold", "column": "gold_close", "category": "Ekuitas & FX"},
+]
 
 # Perbandingan snapshot Panel 1 (kartu Hari/Minggu/Bulan/Tahun) — offset
 # kalender kasar (bukan minggu/bulan/tahun ISO presisi), cukup utk "berapa
@@ -75,6 +76,66 @@ COLUMN_TO_INSTRUMENT = {
     "btc_close": "BTC", "sp500_close": "SP500", "ihsg_close": "IHSG",
     "usd_idr": "USDIDR", "usd_jpy": "USDJPY", "gold_close": "GOLD",
 }
+
+# Data gap detection (Manual Backfill Panel 1) — tiap instrument dari
+# pipeline.backfill.py, dipetakan ke (tabel sumber, kolom [None utk
+# asset_ohlcv], kalender). Kalender menentukan tanggal mana yang "seharusnya
+# ada": DAILY = tiap hari kalender (crypto, RRP -- dicek: RRP rilis harian
+# per FRED), WEEKDAY = Senin-Jumat (ekuitas/forex/FRED harian biasa),
+# WEEKLY_WED = rilis mingguan tiap Rabu (WALCL/TGA, dicek langsung ke FRED
+# metadata) -- TIDAK di-gap-check krn "kosong" antar-Rabu itu NORMAL, bukan
+# gap, cuma akan bikin false-positive kalau dipaksa cek harian.
+INSTRUMENT_SOURCE = {
+    "BTC": ("asset_ohlcv", None, "DAILY"),
+    "SP500": ("asset_ohlcv", None, "WEEKDAY"),
+    "IHSG": ("asset_ohlcv", None, "WEEKDAY"),
+    "GOLD": ("asset_ohlcv", None, "WEEKDAY"),
+    "USDIDR": ("asset_ohlcv", None, "WEEKDAY"),
+    "USDJPY": ("asset_ohlcv", None, "WEEKDAY"),
+    "DXY": ("daily_market", "dxy_close", "WEEKDAY"),
+    "US10Y": ("daily_market", "us10y_yield", "WEEKDAY"),
+    "VIX": ("daily_market", "vix_close", "WEEKDAY"),
+    "HY": ("daily_market", "hy_credit_spread", "WEEKDAY"),
+    "WALCL": ("daily_market", "walcl", "WEEKLY_WED"),
+    "TGA": ("daily_market", "tga", "WEEKLY_WED"),
+    "RRP": ("daily_market", "rrp", "DAILY"),
+}
+
+
+def _detect_gaps(dates: list[str], calendar: str) -> list[dict]:
+    """Cari rentang tanggal yang "seharusnya ada" (sesuai `calendar`) tapi
+    kosong di `dates`. Grup gap dihitung dari kerapatan tanggal EXPECTED
+    (bukan kalender mentah), jadi weekend otomatis tidak dianggap gap utk
+    kalender WEEKDAY. Cuma gap >= 2 hari expected berturut-turut yang
+    dilaporkan (gap 1 hari = wajar/hari libur biasa, bukan tanda-tanda
+    perlu backfill)."""
+    if not dates or calendar == "WEEKLY_WED":
+        return []
+    existing = set(dates)
+    date_objs = sorted(datetime.strptime(d, "%Y-%m-%d") for d in dates)
+    start, end = date_objs[0], date_objs[-1]
+
+    expected = []
+    d = start
+    while d <= end:
+        if calendar == "DAILY" or d.weekday() < 5:
+            expected.append(d.strftime("%Y-%m-%d"))
+        d += timedelta(days=1)
+
+    gaps = []
+    run_start, run_len = None, 0
+    for i, ds in enumerate(expected):
+        if ds not in existing:
+            if run_start is None:
+                run_start = ds
+            run_len += 1
+        else:
+            if run_start is not None and run_len >= 2:
+                gaps.append({"from": run_start, "to": expected[i - 1], "days": run_len})
+            run_start, run_len = None, 0
+    if run_start is not None and run_len >= 2:
+        gaps.append({"from": run_start, "to": expected[-1], "days": run_len})
+    return gaps
 
 
 def _rows_to_dicts(rows) -> list[dict]:
@@ -153,7 +214,8 @@ def latest():
                 (row["date"],),
             ).fetchall()
             market_hist = _rows_to_dicts(hist_rows)
-            for col in SNAPSHOT_FIELDS.values():
+            for field in SNAPSHOT_FIELDS:
+                col = field["column"]
                 if col not in COLUMN_TO_INSTRUMENT:
                     series_by_col[col] = [(r["date"], r.get(col)) for r in market_hist]
             for col, instrument in COLUMN_TO_INSTRUMENT.items():
@@ -169,10 +231,13 @@ def latest():
     flags = _parse_flags(data.get("source_flags"))
     snapshot = [
         {
-            "label": label, "column": col, "value": data.get(col),
-            "compare": _compare_from_series(series_by_col.get(col, []), data["date"], data.get(col)),
+            "label": field["label"], "column": field["column"], "category": field["category"],
+            "value": data.get(field["column"]),
+            "compare": _compare_from_series(
+                series_by_col.get(field["column"], []), data["date"], data.get(field["column"])
+            ),
         }
-        for label, col in SNAPSHOT_FIELDS.items()
+        for field in SNAPSHOT_FIELDS
     ]
     return jsonify({
         "empty": False,
@@ -248,6 +313,41 @@ def news():
 
 
 # ---------- PHASE C: Panel 1 — Manual Backfill ----------
+
+@app.get("/api/data_gaps")
+def data_gaps():
+    """Cek data bolong utk 1 instrument (dipanggil dashboard Manual Backfill
+    tiap instrument dropdown berubah) — biar kelihatan ada gap SEBELUM
+    Giel harus tebak sendiri lewat trial-and-error backfill."""
+    instrument = request.args.get("instrument", "BTC").upper()
+    if instrument not in INSTRUMENT_SOURCE:
+        return jsonify({"error": f"instrument tidak dikenal: {instrument}"}), 400
+    source, col, calendar = INSTRUMENT_SOURCE[instrument]
+    with get_connection() as conn:
+        if source == "asset_ohlcv":
+            rows = conn.execute(
+                "SELECT date FROM asset_ohlcv WHERE instrument = ? ORDER BY date", (instrument,)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"SELECT date FROM daily_market WHERE {col} IS NOT NULL ORDER BY date"
+            ).fetchall()
+    dates = [r["date"] for r in rows]
+
+    if not dates:
+        return jsonify({
+            "instrument": instrument, "calendar": calendar, "total_rows": 0,
+            "date_from": None, "date_to": None, "gaps": [], "gaps_total_count": 0,
+        })
+
+    gaps = _detect_gaps(dates, calendar)
+    gaps.sort(key=lambda g: g["days"], reverse=True)
+    return jsonify({
+        "instrument": instrument, "calendar": calendar, "total_rows": len(dates),
+        "date_from": dates[0], "date_to": dates[-1],
+        "gaps": gaps[:20], "gaps_total_count": len(gaps),
+    })
+
 
 @app.post("/api/backfill/preview")
 def backfill_preview():
