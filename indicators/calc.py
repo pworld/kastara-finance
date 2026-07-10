@@ -2,12 +2,49 @@
 
 - net_liquidity = walcl - rrp - tga
 - volume_ma20   = rata-rata 20 nilai volume terakhir (butuh histori di DB)
+- compare_from_series = delta Hari/Minggu/Bulan/Tahun (dipakai Panel 1
+  web/app.py DAN pipeline/compose_persona_context.py Track D -- dipindah ke
+  sini dari web/app.py biar bisa dipakai bareng tanpa pipeline import dari
+  web (layering salah arah))
 """
 from __future__ import annotations
 
-from typing import Optional
+from datetime import datetime, timedelta
+from typing import Any, Optional
 
 from db.connection import get_connection
+
+# Jarak hari per periode compare -- "week"=7 dst BUKAN exact calendar
+# week/month, cuma pendekatan hari mundur dari tanggal target (cukup akurat
+# utk delta pasar, tidak perlu presisi kalender kabisat/dll).
+COMPARE_PERIODS = {"day": 1, "week": 7, "month": 30, "year": 365}
+
+
+def compare_from_series(series: list[tuple[str, float]], latest_date: str, cur_val) -> dict:
+    """Bandingkan `cur_val` (hari ini) vs D-1/W-1/M-1/Y-1 dari `series`
+    ([(date, value), ...] terurut DESC baru->lama). Cari titik pertama
+    dengan date <= target (bukan exact match) -- gap kalender wajar krn
+    run_daily manual / weekend tidak ada data equity."""
+    compare: dict[str, Any] = {}
+    latest_dt = datetime.strptime(latest_date, "%Y-%m-%d")
+    for period, days_ago in COMPARE_PERIODS.items():
+        target = (latest_dt - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+        past_date, past_val = None, None
+        for d, v in series:
+            if d <= target and v is not None:
+                past_date, past_val = d, v
+                break
+        if cur_val is None or past_val is None:
+            compare[period] = None
+            continue
+        delta = cur_val - past_val
+        compare[period] = {
+            "past_value": past_val,
+            "past_date": past_date,
+            "delta": delta,
+            "pct": (delta / past_val * 100) if past_val else None,
+        }
+    return compare
 
 
 def net_liquidity(

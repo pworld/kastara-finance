@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS daily_market (
     usd_idr REAL,
     gold_close REAL,
     btc_long_short_ratio REAL, btc_liquidation_24h REAL,
+    btc_oi_aggregate REAL, btc_liq_long_24h REAL, btc_liq_short_24h REAL,
     stablecoin_supply REAL, hy_credit_spread REAL, bi_fed_spread REAL,
     created_at TEXT,
     source_flags TEXT  -- JSON string: {"coingecko":"ok","fred":"fail",...}

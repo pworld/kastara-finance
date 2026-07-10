@@ -17,8 +17,10 @@ from typing import Any
 from db.connection import get_connection, init_db
 from indicators.calc import net_liquidity, volume_ma20_for_instrument
 from scrapers.base import SourceFlags, created_at, today_wib
+from scrapers.coinalyze import fetch_coinalyze
 from scrapers.crypto import fetch_btc
 from scrapers.econ_calendar import fetch_econ_calendar
+from scrapers.idx_foreign_flow import fetch_idx_foreign_flow
 from scrapers.macro_fred import fetch_macro_fred
 from scrapers.macro_yf import fetch_macro_yf
 from scrapers.news import fetch_all_news
@@ -34,6 +36,7 @@ DAILY_MARKET_COLS = [
     "fear_greed_value", "fear_greed_label",
     "ihsg_close", "ihsg_change_pct", "usd_idr", "gold_close",
     "hy_credit_spread",
+    "btc_oi_aggregate", "btc_long_short_ratio", "btc_liq_long_24h", "btc_liq_short_24h",
 ]
 
 
@@ -172,14 +175,16 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
     print(f"[run_daily] target date (WIB) = {date}")
 
     crypto = fetch_btc(date)
+    coinalyze = fetch_coinalyze(date)
     yf = fetch_macro_yf(date)
     fred = fetch_macro_fred(date)
     news_items, news_health = fetch_all_news(date)
     econ = fetch_econ_calendar()
     positioning = fetch_positioning()
+    idx_flow = fetch_idx_foreign_flow(date)
 
     flags = SourceFlags()
-    for part in (crypto, yf, fred, econ, positioning):
+    for part in (crypto, coinalyze, yf, fred, econ, positioning, idx_flow):
         flags.merge(part.get("source_flags", {}))
     # health_report RSS digabung ke source_flags dgn prefix "rss_" (pola sama
     # dengan scraper lain) -- feed mati langsung kelihatan di log tiap run.
@@ -212,9 +217,9 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
                     (ma20, row["date"], row["instrument"]),
                 )
 
-        # 3) susun daily_market merge crypto + yf + fred
+        # 3) susun daily_market merge crypto + coinalyze + yf + fred
         market: dict[str, Any] = {}
-        for part in (crypto, yf, fred):
+        for part in (crypto, coinalyze, yf, fred):
             for k, v in part.items():
                 if k in DAILY_MARKET_COLS:
                     market[k] = v
@@ -236,7 +241,11 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
         n_econ = upsert_econ_calendar(conn, econ.get("items", []))
 
         # 6) positioning (Phase D — COT + BTC ETF flow, upsert by natural key)
-        n_positioning = upsert_positioning(conn, positioning.get("items", []))
+        #    + IHSG foreign flow (Track C, IDX) -- item list yang sama, natural
+        #    key (date,instrument,metric) dedupe otomatis.
+        n_positioning = upsert_positioning(
+            conn, positioning.get("items", []) + idx_flow.get("items", [])
+        )
 
         conn.commit()
 

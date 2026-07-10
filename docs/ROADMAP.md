@@ -627,6 +627,137 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       162 test hijau total. Live browser: path "prompt belum diisi" (semua
       status `false`, tombol kasih toast, tidak ada panggilan API) diverifikasi
       dulu sebelum prompt asli diisi Giel.
+- [x] ~~Panel 1: OI agregat + Long/Short Ratio + Liquidation Long/Short 24h
+      (Coinalyze)~~ — scraper baru `scrapers/coinalyze.py` (pola sama
+      `scrapers/crypto.py`), 3 endpoint Coinalyze dites LIVE sebelum ditulis
+      (`/open-interest`, `/liquidation-history`, `/long-short-ratio-history`,
+      auth `Authorization: Bearer <key>`, no key = di-skip bukan error).
+      **OI agregat = jumlah 3 exchange utama** (Binance/OKX/Bybit — API
+      Coinalyze TIDAK punya simbol gabungan siap pakai, harus dijumlah
+      manual; simbol per-exchange formatnya beda-beda, mis. Binance
+      `BTCUSDT_PERP.A` vs Bybit `BTCUSDT.6` tanpa suffix `_PERP` — dicek
+      satu-satu, bukan ditebak). **Liquidation dipisah long vs short** (2
+      kolom baru `btc_liq_long_24h`/`btc_liq_short_24h`), BUKAN 1 angka
+      gabungan — kolom lama `btc_liquidation_24h` (sejak Phase A,
+      diperuntukkan CoinGlass) dibiarkan kosong/tidak dipakai, bukan
+      dihapus (hindari migrasi berisiko). Kolom `btc_long_short_ratio`
+      (sejak Phase A, sama-sama pernah kosong) akhirnya terisi juga.
+      `btc_oi_aggregate` kolom baru, BEDA dari `btc_oi` yang sudah ada sejak
+      Phase A (itu single-exchange Binance saja) — keduanya tetap ada,
+      tidak saling gantikan. **Migrasi kolom ke DB lama**: `CREATE TABLE IF
+      NOT EXISTS` di `schema.sql` tidak menambah kolom ke tabel yang sudah
+      ada isinya — ditambah `db/connection.py::_migrate_columns()` (cek
+      `PRAGMA table_info` lalu `ALTER TABLE ADD COLUMN` idempotent),
+      dipanggil dari `init_db()`, dites terhadap DB asli (bukan cuma DB
+      test) sebelum lanjut. 5 test baru (`test_coinalyze.py`, live network
+      pola sama `test_crypto.py`), 167 test hijau total. Diverifikasi live:
+      `python -m pipeline.run_daily` penuh (bukan cuma scraper isolated),
+      4 card baru muncul di Panel 1 kategori "Crypto (BTC)" dengan angka
+      asli (OI agregat ≈$12.35B, L/S ratio 1.46, liq long/short terpisah).
+- [x] ~~Panel 3: IHSG Foreign Net Buy/Sell (IDX)~~ — scraper baru
+      `scrapers/idx_foreign_flow.py`, sumber internal JSON API idx.co.id
+      "Digital Statistic" (bukan API resmi publik, ditemukan lewat source
+      code proyek open-source `NeaByteLab/IDX-API` dan dikonfirmasi LIVE
+      sebelum dipakai — endpoint `primary/DigitalStatistic/GetApiData`,
+      TANPA API key, cuma session cookie). **Simpan 3 komponen mentah
+      TERPISAH** (`ihsg_ff_foreign_foreign`, `ihsg_ff_foreign_domestic`,
+      `ihsg_ff_domestic_foreign`) + 1 net terhitung
+      (`foreign_net_buy_value`), bukan cuma net — GEMA/LEON persona (Track
+      D) butuh baca F2F vs F2D vs D2F sendiri-sendiri sesuai aturan
+      interpretasi masing-masing. **Koreksi penting** atas library
+      referensi `NeaByteLab/IDX-API`: field `foreignForeign*`/
+      `foreignDomestic*` BUKAN "buy"/"sell" langsung seperti yang
+      dipetakan library itu — label kolom ASLI dari IDX (dari
+      `columns[].Title` di response): `foreignForeign` = "Foreign Investor
+      Sell − Foreign Investor Buy" (F2F, asing-ke-asing, BUKAN sinyal
+      arah), `foreignDomestic` = "Foreign Investor Sell − Domestic
+      Investor Buy" (F2D, sisi distribusi). Rumus benar: **Foreign Net Buy
+      = domesticForeignValue (D2F, dari endpoint kembaran) −
+      foreignDomesticValue (F2D)** — dites & tervalidasi terhadap angka
+      nyata (2026-06-02: −Rp 1,39 triliun, magnitude masuk akal).
+      **Temuan teknis penting**: idx.co.id di belakang Cloudflare
+      bot-management — header browser-realistis SAJA TIDAK CUKUP (beda
+      dari farside.co.uk yang juga Cloudflare tapi cukup dengan header,
+      lihat `scrapers/positioning.py`). Dikonfirmasi lewat testing
+      langsung: curl CLI tembus konsisten (3/3), tapi `requests`/urllib3
+      Python KONSISTEN kena halaman JS-challenge ("Just a moment...", 403)
+      walau header identik — soal TLS fingerprint (JA3), bukan header.
+      Fix: dependency baru **`curl_cffi`** (requirements.txt) yang meniru
+      TLS handshake browser asli — SATU-SATUNYA scraper di project ini
+      yang butuh ini. `positioning` table dipakai apa adanya (metric
+      generik per-instrument per-hari, TIDAK perlu kolom baru di
+      `daily_market`), reuse `upsert_positioning` yang sudah ada (natural
+      key `date+instrument+metric` dedupe otomatis) — cuma nambah item
+      list, pola persis sama dengan COT/ETF flow yang sudah ada. Pola
+      tarik-rentang-bukan-1-hari (mirror `fetch_btc_etf_flow`) dipilih
+      karena data "hari ini" sering belum terbit saat `run_daily` jalan
+      (dikonfirmasi: bulan berjalan selalu balik array kosong) — jadi
+      scraper tarik SELURUH bulan tiap run, biar hari-hari sebelumnya
+      ke-backfill otomatis kalau run sebelumnya sempat gagal/terlewat. 5
+      test baru (`test_idx_foreign_flow.py`, live network pola sama
+      scraper lain), 172 test hijau total. Diverifikasi live penuh:
+      `pipeline.run_daily` untuk tanggal Juni 2026 (bulan lengkap) — 80
+      row masuk `positioning` (20 hari bursa × 4 metric), angka 2026-06-02
+      cocok PERSIS dengan perhitungan manual saat riset plan, Panel 3
+      browser nampilin ke-4 baris dengan benar.
+- [x] ~~Panel 4: rewrite konteks 4 Persona jadi Shared Core + Slice per
+      persona (system prompt v4)~~ — **pivot arsitektur eksplisit dari
+      Giel**, membalik keputusan awal ("Sama untuk ke-4 (Recommended)" saat
+      Panel 4 pertama dibangun). Alasan: 4 analis yang membaca data BERBEDA
+      menghasilkan sudut pandang independen yang bisa didebat (konflik
+      produktif), bukan 4 analis baca data identik yang cuma beda gaya
+      bicara.
+      1. **`indicators/calc.py`**: `COMPARE_PERIODS`/`compare_from_series`
+         (delta Hari/Minggu/Bulan/Tahun) dipindah dari `web/app.py` ke sini
+         — dipakai BARENG oleh Panel 1 (`web/app.py`) dan konteks persona
+         (`pipeline/compose_persona_context.py`), hindari `pipeline`
+         import dari `web` (layering salah arah kalau tetap di app.py).
+      2. **`pipeline/compose_persona_context.py`** — rewrite total,
+         signature jadi `compose_persona_context(conn, date, lens)`.
+         **SHARED CORE** (semua persona): tanggal, berita key, BTC
+         close+delta H/M. **SLICE per lens**: GEMA (DXY/US10Y/VIX/Net
+         Liquidity/HY+delta, USD/JPY/Gold/SP500/BTCDom tanpa delta,
+         USD/IDR+delta, IHSG foreign flow F2F/F2D/D2F dari Track C, COT
+         DXY+ETF flow, Policy Tracker speaker ASING), LEON (IHSG/USD-IDR+
+         delta, IHSG foreign flow — framing BEDA dari GEMA: "rapor
+         kepercayaan kebijakan" bukan "arah arus modal", econ_calendar
+         country=ID, Policy Tracker speaker DOMESTIK), AKELA (econ_calendar
+         penuh, Disonansi Flag, Fear&Greed+delta, VIX, BTC Vol MA20,
+         funding rate, delta H/M/B/T instrumen utama), RIVAN (funding rate,
+         OI agregat+delta dari Track B, liquidation long/short 24h, L/S
+         ratio, ETF flow, BTC Dominance, volume vs Vol MA20). IHSG foreign
+         flow SENGAJA tidak diberikan ke AKELA/RIVAN (disiplin slice).
+         Policy Tracker speaker asing/domestik diklasifikasi lewat keyword
+         match nama institusi (`DOMESTIC_INSTITUTION_KEYWORDS`) — tabel
+         `policy_tracker` tidak punya kolom terstruktur utk ini.
+      3. **`web/app.py::persona_run()`** — teruskan `lens` ke
+         `compose_persona_context`.
+      4. **`prompts/persona_{gema,leon,akela,rivan}.txt`** — diganti PENUH
+         (verbatim) dengan system prompt v4 dari Giel, termasuk panduan
+         interpretasi F2F/F2D/D2F eksplisit di prompt GEMA & LEON.
+      5. Prompt Orkestrator (panel debat 4-sekaligus + sintesis konflik,
+         juga ada di dokumen v4) **DICATAT sebagai backlog**, TIDAK
+         dibangun — Panel 4 saat ini jalankan 1 persona per klik, bukan
+         panel debat serentak; butuh desain UI terpisah.
+      **Temuan saat implementasi**: `econ_calendar country='ID'` SELALU
+      kosong saat ini — sumber ForexFactory tidak cover kalender Indonesia
+      sama sekali (dicek: `SELECT DISTINCT country` cuma NZ/AU/CA/GB/US/
+      EU/CH/JP/CN, tidak ada ID). Bukan bug Track D — keterbatasan sumber
+      data yang sudah ada, dicatat apa adanya di teks konteks LEON
+      ("sumber ForexFactory saat ini tidak cover kalender ID") bukan
+      disembunyikan.
+      **Urutan eksekusi**: Track B → Track C → Track D (keras, bukan
+      preferensi) — slice GEMA/LEON butuh field Track C, slice RIVAN butuh
+      field Track B; pasang prompt v4 sebelum data-nya ada akan bikin
+      persona mengklaim data yang sebenarnya kosong.
+      9 test baru (`test_compose_persona_context.py` full rewrite, fokus
+      verifikasi ISOLASI slice — field GEMA tidak bocor ke RIVAN dst),
+      178 test hijau total. Diverifikasi live: ke-4 slice dipanggil dengan
+      tanggal sama terhadap DB asli, konfirmasi isi 100% beda (bukan
+      identik lagi), 1 run RIVAN asli lewat OpenRouter — hasilnya
+      mengutip angka liquidation long/short SUNGGUHAN dan menerapkan
+      aturan interpretasi "short-covering" dari prompt v4 dengan benar,
+      row test dibersihkan setelah verifikasi.
 
 **Dievaluasi, sengaja tidak dikerjakan:**
 - **NewsData.io** — dicek langsung: sentiment analysis **cuma tersedia di
@@ -638,6 +769,50 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
 - **NewsAPI.org** — free tier "non-commercial only" (konflik dengan rencana
   monetisasi Phase 2/3 di Master Plan), dan historical depth cuma ~1 bulan.
   Skip.
+- **Net exchange flow (BTC)** — dicek: Glassnode/CryptoQuant memang **berbayar**
+  untuk metric ini (sesuai catatan awal), dan tidak ada pengganti gratis yang
+  setara kualitasnya. Metric ini butuh database alamat exchange yang
+  di-labeling & di-maintain terus-menerus (siapa pemilik alamat mana) — justru
+  itu yang jadi nilai jual berbayar Glassnode/CryptoQuant, bukan sekadar akses
+  data blockchain (yang publik/gratis). Opsi yang ada, semua kurang layak:
+  - **Dune Analytics** (gratis) — beberapa dashboard komunitas replikasi
+    netflow-style CryptoQuant via SQL query atas data on-chain ter-indeks,
+    tapi ini "pakai/adaptasi query orang lain" bukan REST endpoint stabil —
+    bentuk integrasi beda sendiri dari semua scraper lain di project ini.
+  - **DIY** (maintain sendiri daftar alamat exchange + query chain indexer) —
+    effort tinggi, kualitas data di bawah vendor berbayar, tidak sepadan untuk
+    dashboard personal. **Tetap Backlog** — tidak ada jalan gratis yang worth
+    effort-nya saat ini.
+  - **Update (dicoba CryptoQuant API key berbayar milik Giel, diverifikasi
+    LIVE)**: key valid (endpoint lain seperti `market-data/price-ohlcv`
+    berhasil 200 + data asli), TAPI seluruh kategori `exchange-flows`
+    (`netflow`, `inflow`, `outflow`, `reserve`, dll — 6 endpoint dicoba
+    semua) balikin 403 "no authority for this request". Bukan soal free vs
+    berbayar lagi — plan CryptoQuant yang Giel punya SEKARANG tidak
+    mencakup kategori ini sama sekali, kemungkinan butuh tier lebih
+    tinggi/add-on terpisah (granularitas entitlement per-endpoint, bukan
+    per-tier rapi — `open-interest` juga 403 padahal sama-sama "market-data"
+    dengan `price-ohlcv` yang jalan). Tidak ada workaround (coba hitung
+    manual dari inflow−outflow juga mentok, keduanya sama-sama 403). **Giel
+    putuskan drop** — tidak worth dikejar lebih jauh. Tetap Backlog.
+- **Whale / long-term holder (LTH) accumulation (BTC)** — sama, Coin Metrics
+  punya tier "Community" gratis, TAPI metric age-band/LTH-split spesifik
+  (`SOPRLth`, realized cap by coin age, dll) ternyata di-gate ke tier
+  "Network Data Pro" (berbayar) — tier gratisnya tidak mencakup ini. Satu-
+  satunya proxy yang genuinely gratis & bisa dipakai:
+  - **Whale Alert API** (free tier) — feed transaksi besar individual
+    real-time (mis. "$X pindah dari wallet A ke exchange B"). Ini proxy
+    **pergerakan whale**, BUKAN metric "LTH supply accumulating" yang
+    sebenarnya (beda konsep: transfer individual vs UTXO age analysis), tapi
+    arahnya related (whale pindahin dana ke/dari exchange). Rate limit tier
+    gratis belum dikonfirmasi persis — perlu dicek dokumentasi resminya
+    kalau mau dipakai. **Tetap Backlog** — kalau nanti mau proxy kasar, Whale
+    Alert adalah pilihan paling realistis, bukan metric asli LTH.
+  - **Update**: dicoba juga lewat CryptoQuant API key Giel (endpoint
+    `network-indicator/utxo-age-distribution`, proxy LTH/STH via UTXO age) —
+    403 sama seperti `exchange-flows` di atas, tidak termasuk plan yang
+    dipunya. **Giel putuskan drop** bareng item di atas — tidak worth
+    dikejar lebih jauh. Tetap Backlog.
 
 ## Prinsip Perubahan Roadmap
 

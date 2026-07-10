@@ -1,13 +1,9 @@
 """Test web/app.py pure helpers (Panel 1 snapshot compare + data-gap detection)."""
 import pytest
 
-from web.app import (
-    COMPARE_PERIODS,
-    INSTRUMENT_SOURCE,
-    SNAPSHOT_FIELDS,
-    _compare_from_series,
-    _detect_gaps,
-)
+from indicators.calc import COMPARE_PERIODS
+from indicators.calc import compare_from_series as _compare_from_series
+from web.app import INSTRUMENT_SOURCE, SNAPSHOT_FIELDS, _detect_gaps
 
 
 def test_compare_from_series_all_periods_available():

@@ -96,12 +96,35 @@ def get_connection(db_path: str | os.PathLike | None = None) -> sqlite3.Connecti
     return conn
 
 
+# Kolom yang ditambahkan ke tabel yang SUDAH ADA setelah rilis awal (`CREATE
+# TABLE IF NOT EXISTS` di schema.sql tidak menambah kolom ke DB lama yang
+# sudah punya data -- perlu ALTER TABLE eksplisit, idempotent lewat cek
+# PRAGMA table_info dulu). Tambah entri baru di sini tiap kali schema.sql
+# dapat kolom baru di tabel existing.
+_COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
+    "daily_market": [
+        ("btc_oi_aggregate", "REAL"),
+        ("btc_liq_long_24h", "REAL"),
+        ("btc_liq_short_24h", "REAL"),
+    ],
+}
+
+
+def _migrate_columns(conn: sqlite3.Connection) -> None:
+    for table, columns in _COLUMN_MIGRATIONS.items():
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for col, coltype in columns:
+            if col not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {coltype}")
+
+
 def init_db(db_path: str | os.PathLike | None = None) -> Path:
     """Buat semua tabel dari schema.sql (idempotent). Return path db."""
     path = Path(db_path) if db_path is not None else get_db_path()
     ddl = SCHEMA_PATH.read_text(encoding="utf-8")
     with get_connection(path) as conn:
         conn.executescript(ddl)
+        _migrate_columns(conn)
         conn.commit()
     return path
 

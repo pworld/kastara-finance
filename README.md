@@ -109,11 +109,27 @@ menampilkan teks briefing-nya, cuma `sent: false` (tidak benar-benar terkirim).
 **Setup OpenRouter (opsional, untuk Panel 4 "4 Analisa (AI)"):**
 1. Daftar di https://openrouter.ai, generate API key.
 2. Isi `OPENROUTER_API_KEY` (dan opsional `OPENROUTER_MODEL`, default
-   `anthropic/claude-3.7-sonnet`) di `.env`.
+   `anthropic/claude-sonnet-5` — cek model id yang masih aktif di
+   https://openrouter.ai/models, model lama sering di-deprecate) di `.env`.
 3. Tulis system prompt tiap persona di `prompts/persona_<gema|leon|akela|rivan>.txt`
    (lihat `prompts/README.md`) — file ini TIDAK dibuat otomatis & TIDAK
    di-commit. Tanpa ini, tombol "Jalankan Analisa" akan kasih tahu di UI
    kalau prompt-nya belum diisi.
+
+**Setup Coinalyze (opsional, untuk Panel 1 OI agregat/liquidation/L-S ratio):**
+1. Daftar gratis di https://coinalyze.net, generate API key.
+2. Isi `COINALYZE_API_KEY` di `.env`.
+
+Tanpa ini, 4 field baru (OI Agregat, Long/Short Ratio, Liquidation Long/Short 24h)
+di kategori "Crypto (BTC)" Panel 1 tetap `n/a` (di-`skip`, bukan error) — sisanya
+tetap jalan seperti biasa.
+
+**IHSG Foreign Flow (Panel 3 Positioning) — otomatis, TANPA setup:** sumbernya
+idx.co.id (bukan API resmi publik), tidak butuh API key. Satu catatan teknis:
+scraper-nya (`scrapers/idx_foreign_flow.py`) pakai `curl_cffi` (bukan `requests`
+biasa) karena idx.co.id di belakang Cloudflare bot-management yang mendeteksi
+TLS fingerprint Python — kalau field ini kosong terus di Panel 3, cek dulu apa
+`curl_cffi` ke-install (`pip show curl_cffi`) sebelum curiga API-nya berubah.
 
 ---
 

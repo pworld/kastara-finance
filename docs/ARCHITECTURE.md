@@ -59,10 +59,13 @@ kastara-finance/
 ├── scrapers/                # 1 file = 1 sumber data, tiap file jalan sendiri
 │   ├── base.py               # http_get retry, SourceFlags, proxy, waktu WIB
 │   ├── crypto.py             # CoinGecko + Binance + Alternative.me
+│   ├── coinalyze.py          # OI agregat (3 exchange) + liquidation L/S + LS ratio
 │   ├── macro_fred.py         # FRED (DXY, US10Y, VIX, WALCL, RRP, TGA, HY)
 │   ├── macro_yf.py           # yfinance (SP500, IHSG, Gold, USD/IDR, USD/JPY)
 │   ├── news.py               # RSS + scoring rule-based (bukan AI)
-│   └── econ_calendar.py      # ForexFactory calendar (event masa depan)
+│   ├── econ_calendar.py      # ForexFactory calendar (event masa depan)
+│   ├── positioning.py        # COT (CFTC) + BTC ETF flow (farside.co.uk)
+│   └── idx_foreign_flow.py   # IHSG foreign flow (idx.co.id, curl_cffi -- Cloudflare)
 ├── pipeline/
 │   ├── run_daily.py          # orchestrator harian, UPSERT idempotent
 │   ├── backfill.py           # tarik historis, preview-before-commit

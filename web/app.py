@@ -32,6 +32,7 @@ import pipeline.backfill as backfill_mod
 import tools.review_signal as review_signal
 import web.writes as writes
 from db.connection import get_connection, get_db_path, init_db
+from indicators.calc import compare_from_series
 from notify.telegram import send_message
 from pipeline.compose_briefing import compose_daily_briefing
 from pipeline.compose_persona_context import compose_persona_context
@@ -50,6 +51,10 @@ SNAPSHOT_FIELDS = [
     {"label": "BTC Vol MA20", "column": "btc_volume_ma20", "category": "Crypto (BTC)"},
     {"label": "BTC Dominance %", "column": "btc_dominance", "category": "Crypto (BTC)"},
     {"label": "Funding Rate", "column": "btc_funding_rate", "category": "Crypto (BTC)"},
+    {"label": "OI Agregat (Coinalyze)", "column": "btc_oi_aggregate", "category": "Crypto (BTC)"},
+    {"label": "Long/Short Ratio", "column": "btc_long_short_ratio", "category": "Crypto (BTC)"},
+    {"label": "Liquidation Long 24h", "column": "btc_liq_long_24h", "category": "Crypto (BTC)"},
+    {"label": "Liquidation Short 24h", "column": "btc_liq_short_24h", "category": "Crypto (BTC)"},
     {"label": "DXY", "column": "dxy_close", "category": "Makro Global"},
     {"label": "US10Y %", "column": "us10y_yield", "category": "Makro Global"},
     {"label": "VIX", "column": "vix_close", "category": "Makro Global"},
@@ -61,13 +66,6 @@ SNAPSHOT_FIELDS = [
     {"label": "USD/JPY", "column": "usd_jpy", "category": "Ekuitas & FX"},
     {"label": "Gold", "column": "gold_close", "category": "Ekuitas & FX"},
 ]
-
-# Perbandingan snapshot Panel 1 (kartu Hari/Minggu/Bulan/Tahun) — offset
-# kalender kasar (bukan minggu/bulan/tahun ISO presisi), cukup utk "berapa
-# hari lalu" sebagai titik pembanding. Cari row daily_market TERDEKAT
-# <= tanggal target (bukan exact match) karena tidak tiap kalender hari
-# pasti ada row (run_daily jalan manual, bisa ada jeda).
-COMPARE_PERIODS = {"day": 1, "week": 7, "month": 30, "year": 365}
 
 # Kolom snapshot yang instrument-nya juga ada di asset_ohlcv (histori JAUH
 # lebih panjang di sana -- mis. BTC ~4300 baris sejak 2014 -- dibanding
@@ -168,33 +166,6 @@ def health():
     return jsonify({"status": "ok", "db": str(get_db_path())})
 
 
-def _compare_from_series(series: list[tuple[str, float]], latest_date: str, cur_val) -> dict:
-    """Bandingkan `cur_val` (hari ini) vs D-1/W-1/M-1/Y-1 dari `series`
-    ([(date, value), ...] terurut DESC baru->lama). Cari titik pertama
-    dengan date <= target (bukan exact match) -- gap kalender wajar krn
-    run_daily manual / weekend tidak ada data equity."""
-    compare: dict[str, Any] = {}
-    latest_dt = datetime.strptime(latest_date, "%Y-%m-%d")
-    for period, days_ago in COMPARE_PERIODS.items():
-        target = (latest_dt - timedelta(days=days_ago)).strftime("%Y-%m-%d")
-        past_date, past_val = None, None
-        for d, v in series:
-            if d <= target and v is not None:
-                past_date, past_val = d, v
-                break
-        if cur_val is None or past_val is None:
-            compare[period] = None
-            continue
-        delta = cur_val - past_val
-        compare[period] = {
-            "past_value": past_val,
-            "past_date": past_date,
-            "delta": delta,
-            "pct": (delta / past_val * 100) if past_val else None,
-        }
-    return compare
-
-
 @app.get("/api/latest")
 def latest():
     """Snapshot daily_market terbaru + source_flags terurai + perbandingan
@@ -236,7 +207,7 @@ def latest():
         {
             "label": field["label"], "column": field["column"], "category": field["category"],
             "value": data.get(field["column"]),
-            "compare": _compare_from_series(
+            "compare": compare_from_series(
                 series_by_col.get(field["column"], []), data["date"], data.get(field["column"])
             ),
         }
@@ -554,7 +525,7 @@ def persona_run():
         return jsonify({"error": f"lens tidak dikenal: {lens}"}), 400
     date = today_wib()
     with get_connection() as conn:
-        context_text = compose_persona_context(conn, date)
+        context_text = compose_persona_context(conn, date, lens)
     try:
         text = persona_analysis.run_persona_analysis(lens, context_text)
     except persona_analysis.PersonaPromptMissing as exc:
