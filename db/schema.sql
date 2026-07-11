@@ -93,11 +93,16 @@ CREATE TABLE IF NOT EXISTS manual_articles (
 );
 
 -- 9. Trading journal (record final)
+-- Ekstensi Phase J+ (Build Contract v1.3 §3): planned_size/actual_size (audit
+-- selisih kuantisasi lot), skip_reason (RR_BELOW_MIN/RISK_CAPACITY_EXCEEDED/dll),
+-- return_asset_ccy/return_idr (P&L ganda utk aset USD, eksposur kurs).
 CREATE TABLE IF NOT EXISTS trading_journal (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT, instrument TEXT, setup_type TEXT,
     entry_price REAL, sl_price REAL, tp1_price REAL,
-    outcome TEXT, personal_notes TEXT, lesson_learned TEXT, created_at TEXT
+    outcome TEXT, personal_notes TEXT, lesson_learned TEXT, created_at TEXT,
+    planned_size REAL, actual_size REAL, skip_reason TEXT,
+    return_asset_ccy REAL, return_idr REAL
 );
 
 -- 10. Prediction log (jantung mesin prediksi)
@@ -109,9 +114,13 @@ CREATE TABLE IF NOT EXISTS prediction_log (
 );
 
 -- 11. Asset context weight (pembobotan driver per aset, Phase D)
+-- Ekstensi Phase J+ (Build Contract v1.3 §3): level menandai di tingkat apa
+-- row ini berlaku (INDEX/SECTOR/INSTRUMENT) -- lookup cek instrument dulu,
+-- jatuh ke sector, jatuh ke index kalau tidak ketemu (pewarisan bobot).
 CREATE TABLE IF NOT EXISTS asset_context_weight (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    instrument TEXT, driver TEXT, weight TEXT, notes TEXT
+    instrument TEXT, driver TEXT, weight TEXT, notes TEXT,
+    level TEXT DEFAULT 'INSTRUMENT'   -- INDEX / SECTOR / INSTRUMENT
 );
 
 -- 12-14. Forward-looking layer (Master Plan §4.2) — struktur saja,
@@ -134,6 +143,9 @@ CREATE TABLE IF NOT EXISTS positioning (
 
 -- 14. Policy tracker (Stage 3 — retorika pembuat kebijakan, literal vs
 -- inferensi WAJIB terpisah; lihat disiplin editorial di Master Plan §4.2)
+-- Ekstensi Phase J+ (Build Contract v1.3 §3): sector_tags (JSON list, mis.
+-- '["bank"]' utk OJK, '["tambang"]' utk Minerba -- dipakai LEON slice utk
+-- filter statement yang relevan ke sektor emiten yang lagi dianalisa).
 CREATE TABLE IF NOT EXISTS policy_tracker (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT, speaker TEXT, institution TEXT, source_url TEXT,
@@ -142,6 +154,98 @@ CREATE TABLE IF NOT EXISTS policy_tracker (
     inference TEXT,           -- pembacaan arah/intent (subjektif)
     inference_flag TEXT,      -- TESTABLE / SPEKULATIF
     drift_note TEXT,
+    sector_tags TEXT,         -- JSON list, mis. '["bank"]', '["tambang"]'
+    created_at TEXT
+);
+
+-- 15. Instrument metadata (Phase J+ Build Contract v1.3 §3) -- 1 row per
+-- instrumen ekuitas/index/fx/commodity yang di-track di luar BTC/makro inti.
+-- lane menentukan apakah trade_signals di-generate (TRADE/BOTH) atau tidak
+-- (INVEST/NONE) -- lihat Section 13.1 poin 5: instrumen baru masuk
+-- INVEST/NONE dulu, naik ke TRADE cuma setelah validasi bar-replay
+-- (lane_validated_at terisi).
+CREATE TABLE IF NOT EXISTS instrument_metadata (
+    instrument TEXT PRIMARY KEY,
+    market TEXT,              -- IDX / US / CRYPTO / FX / COMMODITY
+    asset_class TEXT,         -- equity / index / crypto / fx / commodity
+    sector TEXT,              -- IDX-IC / GICS / NA
+    market_cap REAL,
+    free_float REAL,
+    avg_volume_20d REAL,
+    lot_size INTEGER,         -- IDX=100, US=1 (IBKR fractional -> 0), crypto=0
+    lane TEXT,                -- TRADE / INVEST / BOTH / NONE (Gerbang G1)
+    lane_validated_at TEXT,   -- tanggal validasi bar-replay sebelum naik ke TRADE
+    accounting_std TEXT,      -- PSAK / US_GAAP / NA
+    is_financial INTEGER DEFAULT 0,   -- true -> playbook CAR/NPL/NIM/LDR (RIVAN)
+    fx_exposure TEXT,         -- eksportir / domestik / global
+    has_daily_limit INTEGER DEFAULT 0,   -- true utk IDX (ARA/ARB) -- sizing buffer
+    has_real_volume INTEGER DEFAULT 1,   -- false utk FX/Gold spot -- proxy range/ATR
+    data_as_of_rule TEXT,
+    created_at TEXT
+);
+
+-- 16. Fundamentals quarterly (Phase J+ §2 J3/J4) -- 1 row per instrumen per
+-- kuartal. `confidence` = LOW_CONFIDENCE kalau histori yang tersedia < 8
+-- kuartal target (lihat riset G3: yfinance .JK baru kasih ~4-5 kuartal utk
+-- BBCA/BBRI/TLKM, bukan 8) -- grade tetap jalan, cuma diberi tahu tidak
+-- ditolak (kontrak §16). Field draft -- BELUM final, dokumen v1.1 asli
+-- (yang jadi rujukan "tidak berubah" di kontrak v1.3) tidak tersedia saat
+-- draft ini ditulis; koreksi kalau meleset dari spesifikasi asli Giel.
+CREATE TABLE IF NOT EXISTS fundamentals_quarterly (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    instrument TEXT, quarter_end TEXT,
+    revenue REAL, net_income REAL, eps REAL,
+    net_interest_income REAL,   -- khusus bank (is_financial), NULL utk non-bank
+    total_equity REAL, total_assets REAL,
+    operating_cash_flow REAL, free_cash_flow REAL,
+    source TEXT,                -- yfinance / manual upload / dll
+    confidence TEXT DEFAULT 'FULL',   -- FULL / LOW_CONFIDENCE
+    created_at TEXT,
+    UNIQUE(instrument, quarter_end)
+);
+
+-- 17. Earnings & corporate action calendar (Phase J+ §2 J5) -- dipakai
+-- AKELA (logika surprise forecast-vs-actual) dan rule SOP "no hold through
+-- earnings" saham AS (kontrak §18 keputusan #3, earnings_calendar =
+-- penegak aturan). Draft, sama seperti fundamentals_quarterly.
+CREATE TABLE IF NOT EXISTS earnings_calendar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    instrument TEXT, earnings_date TEXT,
+    eps_forecast REAL, eps_actual REAL,   -- actual NULL sampai rilis
+    event_type TEXT,   -- EARNINGS / CORPORATE_ACTION
+    notes TEXT, created_at TEXT
+);
+
+-- 18. Sector benchmark (Phase J+ §2 J6) -- dihitung dari fundamentals_quarterly
+-- per sektor per kuartal, dipakai RIVAN slice (playbook bank & pembanding
+-- sektor). Draft, sama seperti di atas.
+CREATE TABLE IF NOT EXISTS sector_benchmark (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sector TEXT, quarter_end TEXT,
+    avg_net_margin REAL, avg_pe REAL, median_revenue_growth REAL,
+    created_at TEXT,
+    UNIQUE(sector, quarter_end)
+);
+
+-- 19. Emiten grade (Phase J+ §16 Modul Grader) -- hasil rubrik dua sumbu
+-- (fund_score vs integrity flags) + kuadran, per emiten per tanggal grading.
+-- Draft, sama seperti di atas.
+CREATE TABLE IF NOT EXISTS emiten_grade (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    instrument TEXT, graded_at TEXT,
+    fund_score REAL,
+    integrity_flags TEXT,   -- JSON list, mis. '["UMA_ACTIVE"]'
+    quadrant TEXT,
+    notes TEXT, created_at TEXT
+);
+
+-- 20. Grader log (Phase J+ §16) -- audit trail perubahan grade dari waktu ke
+-- waktu (anti-overtuning, review berkala per kontrak §17 J-11e). Draft,
+-- sama seperti di atas.
+CREATE TABLE IF NOT EXISTS grader_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    instrument TEXT, date TEXT,
+    old_grade TEXT, new_grade TEXT, reason TEXT,
     created_at TEXT
 );
 

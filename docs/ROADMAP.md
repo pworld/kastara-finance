@@ -17,6 +17,7 @@
 | **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — `plan_d.txt` (dihapus setelah selesai) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
 | **E** | Telegram bot | ✅ **Selesai (push satu arah)** — `plan_e.txt` (dihapus setelah selesai) dieksekusi penuh, Daily Briefing manual (CLI + tombol Panel 6); bot commands dua-arah ditunda ke backlog |
 | **F+** | Multi-aset expansion | 🟡 **GOLD/SP500/IHSG/USDIDR/USDJPY aktif** (S&R+signals+context weight) — altcoin/saham/komoditas lain belum |
+| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026), kickoff jalan** — schema 6 tabel Phase J+ selesai (draft, pending v1.1), BBCA masuk `instrument_metadata` (lane INVEST) via `pipeline/seed_universe.py`; universe penuh + lane final + fundamentals/earnings/grader BLOCKED nunggu Gerbang G1/G2/G3 dari Giel |
 
 ---
 
@@ -758,6 +759,98 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       mengutip angka liquidation long/short SUNGGUHAN dan menerapkan
       aturan interpretasi "short-covering" dari prompt v4 dengan benar,
       row test dibersihkan setelah verifikasi.
+
+## 🔶 Phase J+ — Equity Expansion (kickoff, Build Contract v1.3 LOCKED 11 Jul 2026)
+
+Dokumen kontrak lengkap (13 langkah build J-0→J-13, 3 gerbang G1-G3, modul
+Emiten Grader, sizing/lot engine, execution layer manual-only) diterima
+penuh dari Giel — lihat ringkasan keputusan terkunci §18 kontrak. Beberapa
+langkah SUDAH bisa dikerjakan tanpa menunggu gerbang (schema + riset), yang
+lain BLOCKED eksplisit sampai Giel isi inputnya sendiri.
+
+**Sudah dikerjakan (tidak butuh input Giel dulu):**
+- [x] **Schema `instrument_metadata`** (kontrak §3, lengkap) — 1 row per
+      instrumen ekuitas/index/fx/commodity di luar BTC/makro inti. Field
+      kunci: `lane` (TRADE/INVEST/BOTH/NONE, Gerbang G1), `lane_validated_at`
+      (audit trail validasi bar-replay sebelum naik ke TRADE), `lot_size`,
+      `has_daily_limit` (ARA/ARB IDX), `has_real_volume` (false utk FX/Gold
+      spot — proxy range/ATR).
+- [x] **Ekstensi `trading_journal`**: `planned_size`/`actual_size` (audit
+      kuantisasi lot), `skip_reason` (RISK_CAPACITY_EXCEEDED dll),
+      `return_asset_ccy`/`return_idr` (P&L ganda aset USD).
+- [x] **Ekstensi `policy_tracker`**: `+sector_tags` (JSON, filter LEON slice
+      per sektor emiten).
+- Migrasi kolom via `db/connection.py::_migrate_columns()` (pola sama Track
+  B) — dites terhadap DB asli, 178 test tetap hijau (2 test count tabel
+  `test_db.py` disesuaikan 14→15).
+- **BELUM dibangun** (dirujuk kontrak sebagai "tidak berubah dari v1.1" —
+  dokumen v1.1 berisi DDL lengkapnya TIDAK diberikan ke saya, jadi TIDAK
+  ditebak strukturnya): `fundamentals_quarterly`, `earnings_calendar`,
+  `sector_benchmark`, `emiten_grade`, `grader_log`, dan ekstensi konkret
+  `asset_context_weight` (kontrak cuma bilang "pewarisan index → sector →
+  instrument" naratif, belum jadi kolom). Perlu dokumen v1.1 atau deskripsi
+  ulang sebelum bisa dibangun.
+- [x] **Prototipe G3 (yfinance `.JK` fundamentals)** — dites live 3 kandidat
+      (BBCA.JK, BBRI.JK, TLKM.JK, dipilih sebagai sample uji sumber data,
+      BUKAN keputusan universe). Temuan:
+      - `quarterly_financials`/`quarterly_balance_sheet`/`quarterly_cashflow`
+        tersedia via yfinance, data terlihat masuk akal (mis. BBCA Net
+        Income Q1 2026 ≈ Rp14,68 triliun, BBRI ≈ Rp15,49 triliun, TLKM ≈
+        Rp4,34 triliun) — TAPI **cuma ~4-5 kuartal ke belakang tersedia,
+        bukan 8** seperti target J4 — match PERSIS skenario yang kontrak
+        sendiri sudah antisipasi ("jika hanya 4 → grade jalan dengan flag
+        LOW_CONFIDENCE").
+      - `info["sector"]`/`info["industry"]` pakai istilah GICS/Inggris
+        (mis. "Financial Services"/"Banks - Regional"), BUKAN klasifikasi
+        IDX-IC — perlu mapping manual kalau IDX-IC jadi standar.
+      - Rasio bank CAR/NPL/NIM/LDR **TIDAK ADA** di line item yfinance
+        manapun (dicek balance sheet penuh) — mengonfirmasi J7 kontrak
+        sudah benar menandai ini butuh sumber terpisah (OJK/laporan bank),
+        bukan yfinance.
+      Giel bisa pakai temuan ini langsung utk validasi manual 3 emiten vs
+      laporan resmi (syarat Gerbang G3) — belum ada keputusan final dibuat
+      di sini, cuma riset pendukung.
+
+**BLOCKED — butuh input Giel sebelum lanjut:**
+- **Gerbang G2 (universe list)**: kontrak sebut "Giel sudah punya draft"
+  tapi daftar 15-30 ticker konkret belum diberikan — J-0/J-1 (seed
+  `instrument_metadata`) tidak bisa jalan tanpa ini.
+- **Gerbang G1 (lane + amandemen SOP v4.1)**: field `lane` sudah ada di
+  schema, tapi belum ada keputusan lane per-instrumen atau teks amandemen
+  SOP v4.1 yang menentukan aturannya.
+- **Gerbang G3 (keputusan final sumber fundamental)**: prototipe di atas
+  kasih data mentah, tapi validasi manual vs laporan resmi + keputusan
+  akhir (yfinance vs sumber lain) ada di tangan Giel.
+
+**Update — lanjutan kickoff (Giel bilang "oke lanjut", isi BBCA saja dulu):**
+- [x] **5 tabel Phase J+ dibangun sebagai DRAFT** (`fundamentals_quarterly`,
+      `earnings_calendar`, `sector_benchmark`, `emiten_grade`, `grader_log`)
+      — karena dokumen v1.1 asli tidak tersedia, kolom disusun dari gap
+      analysis §1 + data requirements §2 + riset yfinance G3, BUKAN
+      spesifikasi final Giel. Ditandai jelas di komentar `schema.sql`
+      supaya gampang dikoreksi kalau meleset dari v1.1 asli. `asset_context_
+      weight` diperluas `+level` (INDEX/SECTOR/INSTRUMENT, pewarisan bobot)
+      — row lama di-backfill otomatis jadi `INSTRUMENT` (satu-satunya level
+      yang ada sebelum konsep ini, tidak dibiarkan NULL). Total tabel
+      14→20. 3 test count di `test_db.py` disesuaikan.
+- [x] **`pipeline/seed_universe.py`** (baru, pola sama
+      `seed_context_weight.py`) — seed manual `instrument_metadata`,
+      idempotent (`INSERT OR REPLACE` by `instrument` PK). **BBCA** entry
+      pertama: `lane='INVEST'` (BUKAN `TRADE` — kontrak §13.1 poin 5,
+      instrumen baru wajib INVEST/NONE dulu sampai validasi bar-replay
+      J-3 selesai, `lane_validated_at` sengaja NULL), `is_financial=1`,
+      `lot_size=100`, `has_daily_limit=1` (ARA/ARB), data market_cap/
+      free_float dari yfinance `.JK` (dicek live, akan basi seiring waktu —
+      field metadata lambat berubah, bukan daily_market yang di-refresh
+      tiap run). `avg_volume_20d` sengaja NULL — field ini seharusnya
+      dihitung dari histori `asset_ohlcv` riil (J-2, belum jalan utk BBCA),
+      bukan pendekatan sekali-catat dari yfinance `info`.
+- 3 test baru (`test_seed_universe.py`, termasuk assert eksplisit "instrumen
+  baru tidak boleh default ke TRADE"), 181 test hijau total.
+- **Backlog dicatat (permintaan Giel eksplisit)**: sistem input manual di
+  dashboard buat `instrument_metadata` (form UI, bukan edit `seed_universe.py`
+  langsung tiap tambah emiten) — BELUM dibangun, seed script ini pengganti
+  sementara sampai UI-nya ada.
 
 **Dievaluasi, sengaja tidak dikerjakan:**
 - **NewsData.io** — dicek langsung: sentiment analysis **cuma tersedia di

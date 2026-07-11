@@ -36,6 +36,12 @@ EXPECTED_TABLES = [
     "expectations",
     "positioning",
     "policy_tracker",
+    "instrument_metadata",
+    "fundamentals_quarterly",
+    "earnings_calendar",
+    "sector_benchmark",
+    "emiten_grade",
+    "grader_log",
 ]
 
 
@@ -107,6 +113,19 @@ _COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
         ("btc_liq_long_24h", "REAL"),
         ("btc_liq_short_24h", "REAL"),
     ],
+    "trading_journal": [
+        ("planned_size", "REAL"),
+        ("actual_size", "REAL"),
+        ("skip_reason", "TEXT"),
+        ("return_asset_ccy", "REAL"),
+        ("return_idr", "REAL"),
+    ],
+    "policy_tracker": [
+        ("sector_tags", "TEXT"),
+    ],
+    "asset_context_weight": [
+        ("level", "TEXT"),
+    ],
 }
 
 
@@ -116,6 +135,15 @@ def _migrate_columns(conn: sqlite3.Connection) -> None:
         for col, coltype in columns:
             if col not in existing:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {coltype}")
+                if table == "asset_context_weight" and col == "level":
+                    # Row lama (Phase B) semuanya level instrumen (belum ada
+                    # konsep index/sector saat itu) -- backfill biar lookup
+                    # pewarisan (instrument->sector->index) tidak salah
+                    # anggap NULL sebagai "index" atau ke-skip begitu saja.
+                    conn.execute(
+                        "UPDATE asset_context_weight SET level = 'INSTRUMENT' "
+                        "WHERE level IS NULL"
+                    )
 
 
 def init_db(db_path: str | os.PathLike | None = None) -> Path:
