@@ -178,6 +178,17 @@ async function loadChart() {
   ]);
   drawCandleChart(rows, zones, signals, CHART_VISIBLE);
   renderSignalsTable(signals);
+  loadInstrumentLaneBadge(inst);
+}
+
+// Badge LANE (Phase J+ Build Contract v1.3 §19.5, J-14) — cuma tampil kalau
+// instrumen punya row instrument_metadata (saham individual). Aset makro/
+// index (BTC/GOLD/dll) tidak punya row -> badge disembunyikan, bukan bug.
+async function loadInstrumentLaneBadge(instrument) {
+  const meta = await (await fetch(`/api/instrument_meta?instrument=${encodeURIComponent(instrument)}`)).json();
+  const el = $("#instrumentLaneBadge");
+  if (!meta.lane) { el.innerHTML = ""; return; }
+  el.innerHTML = `<span class="badge ${LANE_CLASS[meta.lane] || "lane-none"}">LANE ${meta.lane}</span>`;
 }
 
 // ---------- Context mini-charts (30 hari, independen instrument) ----------

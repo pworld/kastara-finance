@@ -8,6 +8,9 @@ Mapping source:
     BTC                         -> Binance (fallback yfinance BTC-USD kalau ke-block)
     DXY/US10Y/VIX/WALCL/RRP/TGA -> FRED (butuh FRED_API_KEY)  -> daily_market
     SP500/IHSG/GOLD/USDIDR/USDJPY -> yfinance                 -> asset_ohlcv
+    Instrumen Phase J+ (mis. BBCA, harus sudah ada di          -> asset_ohlcv
+      instrument_metadata via Panel 8/pipeline.seed_universe)
+      -> yfinance dinamis (.JK utk market=IDX, apa adanya utk US)
 
 Selalu PREVIEW dulu (berapa baru, berapa duplikat di-skip), minta konfirmasi [y/N].
 Duplikat (date+instrument sudah ada) -> skip, bukan error.
@@ -24,6 +27,7 @@ import yfinance as yf
 
 from db.connection import get_connection, init_db
 from scrapers.base import created_at, http_get_json
+from scrapers.equity_universe import yf_ticker_for
 from pipeline.run_daily import upsert_asset_ohlcv, upsert_daily_market
 
 # instrument -> ticker yfinance (BTC pakai BTC-USD sbg fallback Binance)
@@ -123,7 +127,18 @@ def _fred_range(series_id: str, date_from: str, date_to: str) -> list[dict[str, 
     ]
 
 
-def _fetch_rows(instrument: str, date_from: str, date_to: str) -> tuple[str, list[dict[str, Any]]]:
+def _equity_market(instrument: str, db_path=None) -> str | None:
+    """Cek instrument_metadata (Phase J+ universe, mis. BBCA) -- return
+    `market` kalau ada, None kalau tidak dikenal (bukan asumsi asal-asal,
+    instrumen makro fixed di atas TIDAK lewat jalur ini)."""
+    with get_connection(db_path) as conn:
+        row = conn.execute(
+            "SELECT market FROM instrument_metadata WHERE instrument = ?", (instrument,)
+        ).fetchone()
+    return row["market"] if row else None
+
+
+def _fetch_rows(instrument: str, date_from: str, date_to: str, db_path=None) -> tuple[str, list[dict[str, Any]]]:
     """Return (kind, rows). kind = 'asset' atau 'fred'."""
     instrument = instrument.upper()
     if instrument == "BTC":
@@ -140,8 +155,15 @@ def _fetch_rows(instrument: str, date_from: str, date_to: str) -> tuple[str, lis
     if instrument in FRED_INSTRUMENTS:
         series_id, _ = FRED_INSTRUMENTS[instrument]
         return "fred", _fred_range(series_id, date_from, date_to)
+    # Phase J+ universe (instrument_metadata, mis. BBCA) -- ticker DINAMIS
+    # (.JK utk IDX), bukan hardcoded per emiten (lihat scrapers/equity_universe.py).
+    market = _equity_market(instrument, db_path)
+    if market:
+        ticker = yf_ticker_for(instrument, market)
+        return "asset", _yf_history_range(instrument, ticker, date_from, date_to)
     raise SystemExit(f"Instrument tidak dikenal: {instrument}. "
-                     f"Pilihan: {', '.join(list(YF_TICKERS) + list(FRED_INSTRUMENTS))}")
+                     f"Pilihan: {', '.join(list(YF_TICKERS) + list(FRED_INSTRUMENTS))}, "
+                     f"atau instrumen yang sudah ada di instrument_metadata (Panel 8 Universe).")
 
 
 def _existing_dates_asset(instrument: str, dates: list[str], db_path=None) -> set[str]:
@@ -181,7 +203,7 @@ def backfill(
     """
     instrument = instrument.upper()
     init_db(db_path)
-    kind, rows = _fetch_rows(instrument, date_from, date_to)
+    kind, rows = _fetch_rows(instrument, date_from, date_to, db_path)
 
     if not rows:
         print(f"[backfill] Tidak ada data untuk {instrument} {date_from}..{date_to}.")

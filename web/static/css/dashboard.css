@@ -121,6 +121,10 @@ td a:hover { color: var(--accent); text-decoration: underline; }
 .badge.LOW { background: rgba(110,118,129,.2); color: var(--low); }
 .badge.RETEST { background: rgba(76,154,255,.18); color: var(--accent); }
 .badge.BREAKOUT { background: rgba(63,185,80,.18); color: var(--ok); }
+.badge.lane-trade { background: rgba(63,185,80,.18); color: var(--ok); }
+.badge.lane-both { background: rgba(76,154,255,.18); color: var(--accent); }
+.badge.lane-invest { background: rgba(110,118,129,.2); color: var(--low); }
+.badge.lane-none { background: transparent; color: var(--muted); border: 1px dashed var(--border); }
 tr.news-key { background: rgba(76,154,255,.08); }
 tr.news-key td:first-child { border-left: 3px solid var(--accent); }
 .btn.key-on { background: rgba(76,154,255,.18); color: var(--accent);

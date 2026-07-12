@@ -703,6 +703,53 @@ def reading_history():
     return jsonify(rows)
 
 
+# ---------- PHASE J+: Panel 8 — Universe & Grader (Build Contract v1.3 §19,
+# J-14 Gelombang 1). Grader (fund_score/quadrant) belum jalan (J-11) --
+# list_universe() balikin None utk kolom itu sampai modulnya dibangun. ----------
+
+@app.get("/api/universe")
+def universe_list():
+    with get_connection() as conn:
+        rows = writes.list_universe(conn)
+    return jsonify(rows)
+
+
+@app.get("/api/instrument_meta")
+def instrument_meta_get():
+    """1 row instrument_metadata utk badge LANE Panel 5. {} kalau instrumen
+    (aset makro/index BTC/GOLD/dll) tidak punya row -- lane cuma berlaku
+    utk saham individual Phase J+."""
+    instrument = request.args.get("instrument", "")
+    with get_connection() as conn:
+        meta = writes.get_instrument_meta(conn, instrument)
+    return jsonify(meta or {})
+
+
+@app.post("/api/intake")
+def intake_add():
+    """Komponen C Gelombang 1: form intake kandidat baru -> instrument_metadata.
+    Guard lane (INVEST/NONE only) ada di web.writes.save_intake_metadata,
+    bukan cuma di sini -- lihat docstring fungsi itu."""
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            row = writes.save_intake_metadata(
+                conn, instrument=body["instrument"], market=body["market"],
+                sector=body.get("sector"), asset_class=body.get("asset_class") or "equity",
+                market_cap=body.get("market_cap"), free_float=body.get("free_float"),
+                lot_size=body.get("lot_size"), lane=body.get("lane") or "INVEST",
+                is_financial=bool(body.get("is_financial")),
+                has_daily_limit=bool(body.get("has_daily_limit")),
+                has_real_volume=body.get("has_real_volume", True),
+                accounting_std=body.get("accounting_std"), fx_exposure=body.get("fx_exposure"),
+                data_as_of_rule=body.get("data_as_of_rule"),
+            )
+            conn.commit()
+    except (KeyError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(row)
+
+
 def main() -> None:
     init_db()  # pastikan tabel ada (walau kosong) supaya API tidak error
     host = os.getenv("WEB_HOST", "127.0.0.1")

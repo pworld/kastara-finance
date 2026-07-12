@@ -364,3 +364,79 @@ def list_reading_history(conn: sqlite3.Connection, limit: int = 200) -> list[dic
         "ORDER BY date DESC, id ASC LIMIT ?", (limit,),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ---------- Panel 8: Universe & Grader (Phase J+ Build Contract v1.3 §19,
+# J-14 Gelombang 1) — instrument_metadata + intake kandidat. Grader
+# (emiten_grade/fund_score/quadrant) belum jalan (J-11), jadi kolom itu
+# tampil "belum digrade" sampai modulnya dibangun -- bukan bug. ----------
+
+INTAKE_ALLOWED_LANES = ("INVEST", "NONE")
+
+
+def list_universe(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """instrument_metadata + grade TERBARU per instrumen (emiten_grade, kalau
+    ada) -- Komponen A Tab 8. Correlated subquery (bukan window function)
+    dipilih karena konsisten dgn gaya SQL project ini di tempat lain."""
+    rows = conn.execute(
+        "SELECT im.*, "
+        "  (SELECT fund_score FROM emiten_grade eg WHERE eg.instrument = im.instrument "
+        "     ORDER BY graded_at DESC, id DESC LIMIT 1) AS fund_score, "
+        "  (SELECT quadrant FROM emiten_grade eg WHERE eg.instrument = im.instrument "
+        "     ORDER BY graded_at DESC, id DESC LIMIT 1) AS quadrant, "
+        "  (SELECT integrity_flags FROM emiten_grade eg WHERE eg.instrument = im.instrument "
+        "     ORDER BY graded_at DESC, id DESC LIMIT 1) AS integrity_flags, "
+        "  (SELECT graded_at FROM emiten_grade eg WHERE eg.instrument = im.instrument "
+        "     ORDER BY graded_at DESC, id DESC LIMIT 1) AS graded_at "
+        "FROM instrument_metadata im ORDER BY im.instrument"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_instrument_meta(conn: sqlite3.Connection, instrument: str) -> dict[str, Any] | None:
+    """1 row instrument_metadata (buat badge LANE Panel 5). None kalau
+    instrumen tidak ada di sana (aset makro/index BTC/GOLD/dll TIDAK punya
+    row -- lane cuma berlaku utk saham individual Phase J+, badge disembunyikan)."""
+    row = conn.execute(
+        "SELECT * FROM instrument_metadata WHERE instrument = ?", (instrument.upper(),)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def save_intake_metadata(
+    conn: sqlite3.Connection, *, instrument: str, market: str, sector: str | None = None,
+    asset_class: str = "equity", market_cap: float | None = None, free_float: float | None = None,
+    lot_size: int | None = None, lane: str = "INVEST", is_financial: bool = False,
+    has_daily_limit: bool = False, has_real_volume: bool = True,
+    accounting_std: str | None = None, fx_exposure: str | None = None,
+    data_as_of_rule: str | None = None,
+) -> dict[str, Any]:
+    """Komponen C Gelombang 1 (kontrak §19.3) -- intake kandidat baru ke
+    `instrument_metadata`. Guard di LEVEL FUNGSI (bukan cuma UI): jalur intake
+    HANYA boleh masuk lane INVEST/NONE, tidak pernah TRADE/BOTH langsung --
+    instrumen baru wajib divalidasi bar-replay dulu (kontrak §13.1 poin 5,
+    mirror assert `test_seed_universe.py::test_new_instrument_never_defaults_to_trade`).
+    `lane_validated_at` SELALU NULL dari jalur ini. INSERT OR REPLACE by PK
+    (instrument) -- idempotent, pola sama `pipeline/seed_universe.py`."""
+    lane = (lane or "INVEST").upper()
+    if lane not in INTAKE_ALLOWED_LANES:
+        raise ValueError(
+            f"lane '{lane}' tidak diizinkan dari jalur intake -- hanya "
+            f"{'/'.join(INTAKE_ALLOWED_LANES)} (instrumen baru wajib divalidasi "
+            "bar-replay dulu sebelum naik ke TRADE/BOTH, lihat kontrak §13.1 poin 5)"
+        )
+    row = {
+        "instrument": instrument.upper(), "market": market.upper(), "asset_class": asset_class,
+        "sector": sector, "market_cap": market_cap, "free_float": free_float,
+        "avg_volume_20d": None, "lot_size": lot_size, "lane": lane, "lane_validated_at": None,
+        "accounting_std": accounting_std, "is_financial": 1 if is_financial else 0,
+        "fx_exposure": fx_exposure, "has_daily_limit": 1 if has_daily_limit else 0,
+        "has_real_volume": 1 if has_real_volume else 0, "data_as_of_rule": data_as_of_rule,
+        "created_at": created_at(),
+    }
+    cols = ", ".join(row)
+    placeholders = ", ".join(f":{c}" for c in row)
+    conn.execute(
+        f"INSERT OR REPLACE INTO instrument_metadata ({cols}) VALUES ({placeholders})", row,
+    )
+    return row

@@ -20,6 +20,7 @@ from scrapers.base import SourceFlags, created_at, today_wib
 from scrapers.coinalyze import fetch_coinalyze
 from scrapers.crypto import fetch_btc
 from scrapers.econ_calendar import fetch_econ_calendar
+from scrapers.equity_universe import fetch_equity_universe
 from scrapers.idx_foreign_flow import fetch_idx_foreign_flow
 from scrapers.macro_fred import fetch_macro_fred
 from scrapers.macro_yf import fetch_macro_yf
@@ -182,9 +183,10 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
     econ = fetch_econ_calendar()
     positioning = fetch_positioning()
     idx_flow = fetch_idx_foreign_flow(date)
+    equity = fetch_equity_universe(date, db_path)
 
     flags = SourceFlags()
-    for part in (crypto, coinalyze, yf, fred, econ, positioning, idx_flow):
+    for part in (crypto, coinalyze, yf, fred, econ, positioning, idx_flow, equity):
         flags.merge(part.get("source_flags", {}))
     # health_report RSS digabung ke source_flags dgn prefix "rss_" (pola sama
     # dengan scraper lain) -- feed mati langsung kelihatan di log tiap run.
@@ -200,6 +202,7 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
             "volume": crypto.get("btc_volume"),
         })
     asset_rows.extend(yf.get("asset_rows", []))
+    asset_rows.extend(equity.get("asset_rows", []))
 
     with get_connection(db_path) as conn:
         # 1) tulis asset_ohlcv dulu (supaya volume hari ini masuk MA20)

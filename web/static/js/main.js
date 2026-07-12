@@ -23,6 +23,7 @@ async function refreshAll() {
   await loadSynthesisForDate();
   await loadDuePredictions();
   await loadHistory();
+  await loadUniverse();
 }
 $("#refresh").addEventListener("click", refreshAll);
 refreshAll();

@@ -1,0 +1,67 @@
+<!-- ===================== PANEL 8: UNIVERSE & GRADER (Phase J+) ===================== -->
+<div class="tabpanel" id="tab-p8">
+  <section>
+    <h2>Universe — Saham Individual</h2>
+    <div class="panel">
+      <div class="tbl-bar" data-tblbar="universe"></div>
+      <table data-tblkey="universe">
+        <thead><tr>
+          <th data-sort="instrument">Ticker</th>
+          <th data-sort="sector">Sektor</th>
+          <th data-sort="market">Market</th>
+          <th data-sort="lane">Lane</th>
+          <th>Divalidasi</th>
+          <th data-sort="quadrant">Kuadran</th>
+          <th data-sort="fund_score">Score</th>
+          <th>Flags</th>
+        </tr></thead>
+        <tbody id="universeBody"></tbody>
+      </table>
+      <div class="tbl-foot" data-tblfoot="universe"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>+ Intake Kandidat (metadata)</h2>
+    <div class="panel">
+      <p class="src">Gelombang 1 — cuma metadata dasar. Lane dari jalur ini
+        HANYA boleh INVEST/NONE (instrumen baru wajib divalidasi bar-replay
+        dulu, kontrak §13.1). Fundamental, cek integritas, dan grade run
+        menyusul di Gelombang 2.</p>
+      <div class="form-grid">
+        <div><label class="field">Ticker</label><input type="text" id="intakeTicker" placeholder="mis. BBRI"></div>
+        <div>
+          <label class="field">Market</label>
+          <select id="intakeMarket">
+            <option value="IDX">IDX</option>
+            <option value="US">US</option>
+          </select>
+        </div>
+        <div><label class="field">Sektor</label><input type="text" id="intakeSector" placeholder="mis. Financial Services"></div>
+      </div>
+      <div class="form-grid">
+        <div><label class="field">Market Cap</label><input type="number" id="intakeMcap"></div>
+        <div><label class="field">Free Float (%)</label><input type="number" id="intakeFreeFloat"></div>
+        <div><label class="field">Lot Size</label><input type="number" id="intakeLotSize" placeholder="IDX=100, US=1"></div>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label class="field">Lane</label>
+          <select id="intakeLane">
+            <option value="INVEST" selected>INVEST</option>
+            <option value="NONE">NONE</option>
+          </select>
+        </div>
+        <div style="align-self:end">
+          <label class="field"><input type="checkbox" id="intakeFinancial"> Emiten finansial (bank/dll)</label>
+        </div>
+        <div style="align-self:end">
+          <label class="field"><input type="checkbox" id="intakeDailyLimit"> Ada batas harian (ARA/ARB)</label>
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <button class="btn" id="intakeSaveBtn">Simpan Kandidat</button>
+      </div>
+    </div>
+  </section>
+</div>

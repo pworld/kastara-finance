@@ -3,6 +3,7 @@ from db.connection import get_connection, init_db
 from web.writes import (
     compute_disonansi,
     flag_key_trigger,
+    get_instrument_meta,
     insert_expectation,
     insert_policy_note,
     insert_positioning_manual,
@@ -19,6 +20,8 @@ from web.writes import (
     list_reading_history,
     list_synthesis_log,
     list_trading_journal,
+    list_universe,
+    save_intake_metadata,
     save_outlook,
     save_panel4,
     save_persona_analysis,
@@ -480,3 +483,97 @@ def test_list_trading_journal_returns_all(tmp_path):
         rows = list_trading_journal(conn)
         assert len(rows) == 2
         assert rows[0]["date"] == "2026-01-04"  # newest first
+
+
+# ---------- Panel 8: Universe & Grader (Phase J+ Build Contract v1.3 §19) ----------
+
+def test_save_intake_metadata_rejects_trade_lane(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        for bad_lane in ("TRADE", "BOTH"):
+            try:
+                save_intake_metadata(conn, instrument="BBRI", market="IDX", lane=bad_lane)
+                assert False, f"lane {bad_lane} seharusnya ditolak"
+            except ValueError as exc:
+                assert "tidak diizinkan" in str(exc)
+
+
+def test_save_intake_metadata_inserts_with_invest_lane(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        row = save_intake_metadata(
+            conn, instrument="bbri", market="idx", sector="Financial Services",
+            market_cap=500_000_000_000.0, free_float=40.0, lot_size=100,
+            is_financial=True, has_daily_limit=True,
+        )
+        conn.commit()
+        assert row["instrument"] == "BBRI"
+        assert row["market"] == "IDX"
+        assert row["lane"] == "INVEST"
+        assert row["lane_validated_at"] is None
+        stored = conn.execute(
+            "SELECT * FROM instrument_metadata WHERE instrument = 'BBRI'"
+        ).fetchone()
+        assert stored["is_financial"] == 1
+        assert stored["has_daily_limit"] == 1
+        assert stored["lot_size"] == 100
+
+
+def test_save_intake_metadata_idempotent_upsert(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_intake_metadata(conn, instrument="BBRI", market="IDX")
+        conn.commit()
+        save_intake_metadata(conn, instrument="BBRI", market="IDX", sector="Updated Sector")
+        conn.commit()
+        count = conn.execute(
+            "SELECT COUNT(*) c FROM instrument_metadata WHERE instrument = 'BBRI'"
+        ).fetchone()["c"]
+        assert count == 1
+
+
+def test_list_universe_joins_latest_grade(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_intake_metadata(conn, instrument="BBRI", market="IDX", sector="Banks")
+        conn.commit()
+        conn.execute(
+            "INSERT INTO emiten_grade (instrument, graded_at, fund_score, integrity_flags, "
+            "quadrant, created_at) VALUES ('BBRI', '2026-01-01', 60, '[]', 'WATCH', '')"
+        )
+        conn.execute(
+            "INSERT INTO emiten_grade (instrument, graded_at, fund_score, integrity_flags, "
+            "quadrant, created_at) VALUES ('BBRI', '2026-02-01', 75, '[\"UMA_ACTIVE\"]', "
+            "'INVESTABLE', '')"
+        )
+        conn.commit()
+        rows = list_universe(conn)
+        assert len(rows) == 1
+        assert rows[0]["instrument"] == "BBRI"
+        assert rows[0]["quadrant"] == "INVESTABLE"  # grade TERBARU, bukan yang pertama
+        assert rows[0]["fund_score"] == 75
+
+
+def test_list_universe_no_grade_yet(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_intake_metadata(conn, instrument="BBRI", market="IDX")
+        conn.commit()
+        rows = list_universe(conn)
+        assert rows[0]["quadrant"] is None
+        assert rows[0]["fund_score"] is None
+
+
+def test_get_instrument_meta_found_and_missing(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_intake_metadata(conn, instrument="BBRI", market="IDX")
+        conn.commit()
+        assert get_instrument_meta(conn, "bbri")["lane"] == "INVEST"
+        assert get_instrument_meta(conn, "BTC") is None

@@ -17,7 +17,7 @@
 | **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — `plan_d.txt` (dihapus setelah selesai) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
 | **E** | Telegram bot | ✅ **Selesai (push satu arah)** — `plan_e.txt` (dihapus setelah selesai) dieksekusi penuh, Daily Briefing manual (CLI + tombol Panel 6); bot commands dua-arah ditunda ke backlog |
 | **F+** | Multi-aset expansion | 🟡 **GOLD/SP500/IHSG/USDIDR/USDJPY aktif** (S&R+signals+context weight) — altcoin/saham/komoditas lain belum |
-| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026), kickoff jalan** — schema 6 tabel Phase J+ selesai (draft, pending v1.1), BBCA masuk `instrument_metadata` (lane INVEST) via `pipeline/seed_universe.py`; universe penuh + lane final + fundamentals/earnings/grader BLOCKED nunggu Gerbang G1/G2/G3 dari Giel |
+| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026), kickoff jalan** — schema 6 tabel Phase J+ selesai (draft, pending v1.1), BBCA masuk `instrument_metadata` (lane INVEST) via `pipeline/seed_universe.py`; **J-14 (Tab 8 Gelombang 1) SELESAI** & **J-2 (OHLCV universe) SELESAI** — BBCA sekarang punya histori asli di `asset_ohlcv` (486 hari via backfill) dan masuk chart Panel 5; J-3 (kalibrasi bar-replay) + fundamentals/earnings/grader (J-4+) BLOCKED nunggu Gerbang G1/G2/G3 dari Giel |
 
 ---
 
@@ -760,13 +760,126 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       aturan interpretasi "short-covering" dari prompt v4 dengan benar,
       row test dibersihkan setelah verifikasi.
 
-## 🔶 Phase J+ — Equity Expansion (kickoff, Build Contract v1.3 LOCKED 11 Jul 2026)
+## 🔶 Phase J+ — Equity Expansion (Build Contract v1.3 LOCKED 11 Jul 2026 + Addendum A 12 Jul 2026)
 
-Dokumen kontrak lengkap (13 langkah build J-0→J-13, 3 gerbang G1-G3, modul
-Emiten Grader, sizing/lot engine, execution layer manual-only) diterima
-penuh dari Giel — lihat ringkasan keputusan terkunci §18 kontrak. Beberapa
-langkah SUDAH bisa dikerjakan tanpa menunggu gerbang (schema + riset), yang
-lain BLOCKED eksplisit sampai Giel isi inputnya sendiri.
+> **Single source of truth spesifikasi**: [phase_j_build_contract_v1_3_LOCKED.md](phase_j_build_contract_v1_3_LOCKED.md)
+> (file kontrak lengkap, verbatim dari Giel). Ringkasan di bawah untuk konteks
+> changelog — kalau beda dengan file kontrak, KONTRAK yang benar.
+
+Dokumen kontrak lengkap (15 langkah build J-0→J-13 + J-14/J-15 dari
+Addendum A, 3 gerbang G1-G3, modul Emiten Grader, sizing/lot engine,
+execution layer manual-only, kalibrasi per-market, intake workflow, panel
+dashboard baru Tab 8) diterima penuh dari Giel — lihat ringkasan keputusan
+terkunci §18 kontrak. Beberapa langkah SUDAH bisa dikerjakan tanpa menunggu
+gerbang (schema + riset + J-14), yang lain BLOCKED eksplisit sampai Giel isi
+inputnya sendiri.
+
+### Ringkasan prinsip terkunci — Section 13-18 kontrak (BARU dicatat, belum semua dibangun)
+
+- **§13 Kalibrasi Per-Market**: engine S&R/breakout satu, tapi parameter
+  di-tune per pasar sebelum instrumen boleh naik ke lane `TRADE` — 5 poin:
+  volume proxy (ATR/range) untuk aset `has_real_volume=false`, R:R saham
+  sebagai estimasi optimis (gap risk, beda dari BTC), buffer sizing ARA/ARB
+  IDX, toleransi zona S&R diskalakan per fraksi harga (bukan angka absolut),
+  dan validasi bar-replay wajib per instrumen sebelum `lane_validated_at`
+  terisi (**"Engine teruji di BTC ≠ teruji di BBRI"**). Tabel karakter
+  IDX-vs-US (ARA/ARB vs LULD, gap kecil vs earnings gap, retest longgar vs
+  ketat, GTC limit order IBKR dipasang siang WIB tanpa begadang) — jadi
+  acuan J-3/K-2, belum dieksekusi.
+- **§14 Sizing & Lot Quantization**: budget risiko ÷ jarak entry-SL →
+  **bulatkan KE BAWAH** ke kelipatan `lot_size` (risiko aktual ≤ rencana,
+  tidak pernah sebaliknya); kapasitas tidak cukup 1 lot → sinyal **SKIP**
+  (`skip_reason=RISK_CAPACITY_EXCEEDED`), setara status skip R:R<1.5;
+  **dilarang keras geser SL supaya lot "muat"** — SL tetap struktural dari
+  zona, sizing yang menyesuaikan. Efek samping disengaja: rule ini menyaring
+  universe secara alami (emiten yang belum muat kapasitas risiko otomatis
+  cuma layak lane `INVEST`). Belum dibangun di `analysis/signals.py` —
+  masih J-3b di build order.
+- **§15 Execution Layer**: sistem berhenti di sinyal+size, eksekusi 100%
+  manual tangan Giel (Stockbit utk IDX, IBKR GTC limit order utk US,
+  exchange existing utk crypto) — **TIDAK ADA integrasi API broker untuk
+  fase J-K**, ini keputusan terkunci (§18 poin 6). Guard eksplisit ditulis
+  di kontrak untuk masa depan: kalau integrasi API broker dipertimbangkan
+  ulang suatu saat, WAJIB lewat review tertulis terpisah yang menjawab
+  "bagaimana human gate tetap hidup jika eksekusi otomatis" — dan review
+  itu HARUS dilakukan saat TIDAK sedang posisi/drawdown (keputusan saat
+  frustrasi eksekusi manual = keputusan paling patut dicurigai). Dicatat di
+  sini supaya guard ini tidak hilang kalau suatu saat idenya muncul lagi.
+- **§16 Intake Workflow**: alur uji kelayakan emiten kandidat di luar
+  universe (input metadata → input fundamental, 8 kuartal target/4 minimum
+  dgn flag `LOW_CONFIDENCE` → scraper cek UMA/papan pemantauan/suspensi →
+  grader jalan → keputusan Giel: universe/watchlist/tolak, **tercatat +
+  alasan wajib**) — pakai rubrik SAMA dengan universe existing, TIDAK ADA
+  jalur istimewa (emiten yang masuk karena hype/rekomendasi justru paling
+  butuh flag integritas — grader = rem, bukan stempel). Diimplementasi
+  sebagai Komponen C Tab 8 (lihat Addendum A di bawah), bukan modul
+  terpisah.
+- **§18 Keputusan terkunci (7 poin, review Giel 11 Jul 2026)**: hierarki
+  resmi persona→mesin→Giel; model `lane` per-instrumen; **no-hold-through-
+  earnings VERSI PENUH** untuk saham AS (tutup posisi sebelum earnings,
+  TANPA opsi size setengah — beda dari draft awal yang masih kasih opsi);
+  buffer sizing ARA/ARB = **1.5× jarak SL** sebagai default (revisi cuma
+  lewat bukti jurnal, bukan per kasus); skip rule + larangan geser SL
+  final; larangan API broker berlaku fase J-K (bukan permanen); build order
+  J-0→J-13 disetujui tanpa perubahan.
+
+### Addendum A (12 Jul 2026) — Panel Universe & Grader, Tab 8 baru
+
+Menutup backlog eksplisit "UI form input manual `instrument_metadata`"
+(dicatat sebelumnya di bagian "lanjutan kickoff" di bawah) — bukan modul
+terpisah, jadi bagian dashboard Tab 8. Posisi di spine: **kotak ⑤ BACA**
+(konteks & kelola universe), BUKAN eksekusi — tidak ada tombol approve/
+reject `trade_signals`, tidak tampilkan entry/SL/TP (itu tetap Panel 5).
+Cadence mingguan/kuartalan, sengaja terpisah dari ritual harian Panel 1-6.
+
+4 komponen (pola kode: write lewat `web/writes.py` pure function testable,
+read baru di `web/app.py`, partial `partials/panel8_*.html` + `static/js/
+panel8.js`, mengikuti pola Phase C):
+- **Komponen A — Tabel Universe**: `instrument_metadata` LEFT JOIN grade
+  terbaru (`emiten_grade` per `MAX(as_of)`). Kolom: ticker/sector/market,
+  badge `lane` (TRADE hijau/BOTH biru/INVEST abu/NONE putus-putus), badge
+  kuadran (INVESTABLE/WATCH/SPECULATIVE/AVOID, "—" kalau belum digrade),
+  `fund_score`, jumlah flag aktif. `GET /api/universe`.
+- **Komponen B — Detail Emiten** (gelombang 2, prasyarat J-4+J-11):
+  `GET /api/emiten/<ticker>` gabung metadata+8 kuartal fundamental (atau
+  kurang + `LOW_CONFIDENCE`)+benchmark sektor+grade+flag aktif. Playbook
+  bank: `is_financial=1` → tampil CAR/NPL/NIM/LDR, **SEMBUNYIKAN**
+  DER/net-debt-EBITDA (ganti, bukan tambah). Satu-satunya tulis di
+  komponen ini: `POST /api/emiten/<ticker>/override` (`{quadrant, reason}`,
+  `reason` wajib non-kosong) → `save_grade_override()` — nilai mesin asli
+  tetap terlihat, override tampil dengan penanda terpisah.
+- **Komponen C — Intake Kandidat**: **gelombang 1** (J-14, bisa sekarang) —
+  form metadata (`POST /api/intake` → `save_intake_metadata()`), **guard di
+  level write function** (bukan cuma UI): `lane` dari jalur intake HANYA
+  boleh `INVEST`/`NONE`, `TRADE`/`BOTH` ditolak eksplisit (mirror assert
+  `test_seed_universe.py`), `lane_validated_at` selalu NULL. **Gelombang 2**
+  (J-15) — fundamental manual + tombol cek integritas (scraper J-11a) +
+  tombol jalankan grade + keputusan Giel tercatat ke tabel baru
+  **`intake_log`** (`id, instrument, decided_at, decision, reason TEXT NOT
+  NULL, grade_snapshot JSON, created_at` — padanan `prediction_log` utk
+  intake, `CREATE TABLE IF NOT EXISTS`).
+- **Komponen D — Grader Log & Kalibrasi** (gelombang 2): `GET
+  /api/grader_log` (riwayat per instrumen) + widget "Nilai Outcome" (pola
+  identik widget "Skor Prediksi" Panel 6) → `POST /api/grader_log/<id>/
+  outcome` → `save_grader_outcome()`. Reminder UI: revisi bobot rubrik
+  HANYA lewat log ini, bukan per kasus.
+
+**Sengaja TIDAK masuk Tab 8**: earnings calendar (rumah Panel 3), chart/
+sinyal/approve-reject (rumah Panel 5), analisa persona per emiten (rumah
+Panel 4, slice RIVAN baca `fundamentals_quarterly` via prompt v5 nanti).
+
+**Build order 2 gelombang:**
+```
+J-14 (BISA SEKARANG, tidak nunggu gerbang/grader):
+  Tab 8 shell (partial+JS+nav) · Komponen A (GET /api/universe + tabel +
+  badge lane) · Komponen C v1 (form intake + guard lane) · Panel 5: badge
+  LANE di header chart per instrumen
+J-15 (prasyarat J-4 fundamentals + J-11 grader engine selesai):
+  Komponen B penuh (+override) · Komponen C penuh (fundamental manual+cek
+  integritas+grade run+intake_log) · Komponen D (grader_log+outcome) ·
+  Panel 5 badge KUADRAN · Panel 3 earnings_calendar di sumbu waktu + warning
+  posisi ONGOING mendekati earnings
+```
 
 **Sudah dikerjakan (tidak butuh input Giel dulu):**
 - [x] **Schema `instrument_metadata`** (kontrak §3, lengkap) — 1 row per
@@ -851,6 +964,83 @@ lain BLOCKED eksplisit sampai Giel isi inputnya sendiri.
   dashboard buat `instrument_metadata` (form UI, bukan edit `seed_universe.py`
   langsung tiap tambah emiten) — BELUM dibangun, seed script ini pengganti
   sementara sampai UI-nya ada.
+
+**Update — J-14 selesai (Tab 8 Gelombang 1, Addendum A §19.5):**
+- [x] **Panel 8 "Universe" (BARU)** — `web/templates/partials/panel8_universe.html`
+      + `web/static/js/panel8.js`, nav tab ke-8 di `index.html`.
+      **Komponen A** (tabel universe): `GET /api/universe` ->
+      `web/writes.py::list_universe()` — `instrument_metadata` + grade
+      TERBARU per instrumen dari `emiten_grade` (correlated subquery by
+      `MAX(graded_at)`, bukan window function — konsisten gaya SQL project
+      ini). Kuadran/score tampil "belum digrade"/`-` sampai modul Grader
+      (J-11) jalan — bukan bug, cuma belum ada datanya.
+      **Komponen C v1** (intake metadata): `POST /api/intake` ->
+      `save_intake_metadata()` — **guard di level fungsi** (bukan cuma UI):
+      lane HANYA boleh `INVEST`/`NONE`, `TRADE`/`BOTH` raise `ValueError`
+      (endpoint balikin 400) — mirror pola assert `test_seed_universe.py`.
+      `INSERT OR REPLACE` by `instrument` PK (idempotent, pola sama
+      `seed_universe.py`).
+- [x] **Panel 5: badge LANE** di header chart (`#instrumentLaneBadge`) —
+      `GET /api/instrument_meta?instrument=X` -> `get_instrument_meta()`.
+      Badge **disembunyikan** (bukan kosong-error) kalau instrumen tidak
+      punya row `instrument_metadata` — berlaku utk semua aset makro/index
+      existing (BTC/GOLD/IHSG/SP500/USDIDR/USDJPY, belum ada di universe
+      Phase J+), lane cuma relevan utk saham individual.
+- [x] **CSS**: 4 badge modifier baru (`lane-trade` hijau/`lane-both`
+      biru/`lane-invest` abu/`lane-none` dashed-border) di
+      `static/css/dashboard.css`, `LANE_CLASS` map bareng `LENS_LABELS` di
+      `core.js` (dipakai Panel 5 & Panel 8, tidak diduplikasi).
+- 6 test baru di `test_web_writes.py` (guard lane reject, insert+upsert
+  idempotent, join grade terbaru, no-grade-yet, get_instrument_meta
+  found/missing), 187 test hijau total. Diverifikasi live via browser:
+  BBCA muncul di tabel Universe dengan data asli, intake form nyimpen
+  instrumen baru (`ZZZTEST`, lane INVEST, dibersihkan setelah verifikasi),
+  badge Panel 5 kosong utk BTC (no row) dan render `LANE INVEST` yang
+  benar saat dipanggil manual utk BBCA (BBCA belum ada di dropdown
+  instrument Panel 5 krn J-2 OHLCV backfill belum jalan utk saham individual).
+- **Komponen B/D + badge KUADRAN Panel 5 + earnings Panel 3** tetap J-15,
+  prasyarat J-4 (fundamentals) & J-11 (grader engine) — TIDAK dikerjakan
+  di J-14 (di luar scope Gelombang 1 per kontrak §19.5).
+
+**Update — J-2 selesai (OHLCV universe -> asset_ohlcv, yfinance dinamis):**
+- [x] **`scrapers/equity_universe.py`** (BARU) — beda dari `scrapers/macro_yf.py`:
+      universe DINAMIS dibaca dari `instrument_metadata` tiap run (bukan dict
+      hardcoded), jadi nambah emiten baru lewat Panel 8 intake TIDAK perlu
+      ubah kode scraper. `yf_ticker_for(instrument, market)`: IDX -> suffix
+      `.JK`, US (dan lainnya) -> ticker apa adanya. Tulis ke `asset_ohlcv`
+      SAJA (bukan `daily_market` — saham individual bukan konteks makro
+      global, Master Plan §4). Semua instrumen di `instrument_metadata`
+      di-fetch (termasuk lane INVEST/NONE, bukan cuma TRADE) — histori
+      harga tetap dibutuhkan utk validasi bar-replay J-3 nanti.
+- [x] **Wired ke `pipeline/run_daily.py`** — `fetch_equity_universe(date,
+      db_path)` dipanggil bareng scraper lain, `asset_rows` digabung ke
+      pipeline upsert existing (tidak ada jalur tulis baru, reuse
+      `upsert_asset_ohlcv`).
+- [x] **`pipeline/backfill.py` extended** — instrumen yang tidak dikenal di
+      `YF_TICKERS`/`FRED_INSTRUMENTS` (hardcoded macro) sekarang fallback
+      cek `instrument_metadata`: kalau ada, ticker diturunkan dinamis lewat
+      `yf_ticker_for()` lalu reuse `_yf_history_range()` yang sudah ada.
+      `python -m pipeline.backfill --instrument BBCA --from .. --to ..`
+      langsung jalan tanpa perlu entry baru di kode manapun.
+- 4 test baru (`test_equity_universe.py`, live network pola sama scraper
+  lain — `yf_ticker_for()` unit test + `fetch_equity_universe()` live utk
+  BBCA), 191 test hijau total. **Diverifikasi live penuh**:
+  `pipeline.run_daily` -> `equity_BBCA = ok` di source_flags, row asli
+  masuk `asset_ohlcv` (2026-07-10, close 6175); backfill CLI 2 tahun
+  (2024-07-01..2026-07-12) -> 486 baris baru; Panel 5 browser -> BBCA
+  MUNCUL di dropdown instrument (otomatis, `/api/assets` generic sejak
+  Phase C), chart candlestick render 299 elemen SVG dengan data asli, badge
+  LANE INVEST tampil benar di header chart.
+- **Catatan cakupan**: Panel 1 "Manual Backfill" dropdown HTML masih
+  hardcoded ke instrumen makro (BTC/DXY/SP500/IHSG/Gold/USD-IDR) — backfill
+  utk instrumen Phase J+ (BBCA dst) jalan via CLI `pipeline.backfill`, BUKAN
+  lewat UI Panel 1. Menambah instrumen Phase J+ ke dropdown itu bukan
+  bagian J-2 (di luar scope kontrak), dicatat sebagai potensi UX follow-up.
+- **`volume_ma20`** tetap NULL utk row BBCA hasil backfill (`backfill.py`
+  tidak menghitung ulang kolom itu, beda dari `run_daily` yang eksplisit
+  panggil `volume_ma20_for_instrument` tiap run) — TIDAK memblokir apa pun
+  sekarang (Panel 5 chart hitung MA sendiri client-side dari OHLCV mentah;
+  `analysis/*` belum menyertakan BBCA di `INSTRUMENTS` list, itu bagian J-3).
 
 **Dievaluasi, sengaja tidak dikerjakan:**
 - **NewsData.io** — dicek langsung: sentiment analysis **cuma tersedia di

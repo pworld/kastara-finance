@@ -13,6 +13,11 @@ const LENS_LABELS = {
   CONFLICT: "Conflict Notes",
 };
 
+// Badge CSS class per lane (instrument_metadata.lane, Phase J+ Build
+// Contract v1.3 §19) -- dipakai Panel 5 (badge di header chart) & Panel 8
+// (kolom Lane tabel Universe).
+const LANE_CLASS = { TRADE: "lane-trade", BOTH: "lane-both", INVEST: "lane-invest", NONE: "lane-none" };
+
 function toast(msg) {
   const t = $("#toast");
   t.textContent = msg;
