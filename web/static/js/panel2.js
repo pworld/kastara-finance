@@ -12,11 +12,12 @@ function renderNewsTable() {
       ? `<button class="btn small ${isKey ? "key-on" : "secondary"}" data-flagid="${r.id}" data-iskey="${isKey}">${isKey ? "★ Key" : "🚩 key"}</button>`
       : "";
     return `<tr class="${isKey ? "news-key" : ""}">
+      <td class="src">${r.date}</td>
       <td><span class="badge ${r.impact_level}">${r.impact_level}</span></td>
       <td>${link}</td><td class="src">${r.source}</td>
       <td>${btn}</td>
     </tr>`;
-  }).join("") || `<tr><td colspan="4" class="src">tidak ada berita untuk tanggal/filter ini</td></tr>`;
+  }).join("") || `<tr><td colspan="5" class="src">tidak ada berita untuk tanggal/filter ini</td></tr>`;
   renderTableBar("news", total, totalPages, renderNewsTable);
 }
 tableRerender.news = renderNewsTable;

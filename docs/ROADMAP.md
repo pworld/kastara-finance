@@ -1,6 +1,6 @@
 # Kastara Finance — Roadmap
 
-> Sumber acuan: **[Master Plan.md](Master%20Plan.md)** (v1.4, dokumen strategi
+> Sumber acuan: **[Master Plan.md](Master%20Plan.md)** (v1.5, dokumen strategi
 > lengkap) → diturunkan jadi **[plan.txt](../plan.txt)** (scope eksekusi Phase
 > A yang benar-benar dikerjakan) + keputusan tambahan lewat sesi eksekusi
 > (Phase 1, dashboard). Dokumen ini dokumen hidup — update status di sini tiap
