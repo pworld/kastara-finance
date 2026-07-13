@@ -17,7 +17,7 @@
 | **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — `plan_d.txt` (dihapus setelah selesai) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
 | **E** | Telegram bot | ✅ **Selesai (push satu arah)** — `plan_e.txt` (dihapus setelah selesai) dieksekusi penuh, Daily Briefing manual (CLI + tombol Panel 6); bot commands dua-arah ditunda ke backlog |
 | **F+** | Multi-aset expansion | 🟡 **GOLD/SP500/IHSG/USDIDR/USDJPY aktif** (S&R+signals+context weight) — altcoin/saham/komoditas lain belum |
-| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026), kickoff jalan** — schema 6 tabel Phase J+ selesai (draft, pending v1.1), BBCA masuk `instrument_metadata` (lane INVEST) via `pipeline/seed_universe.py`; **J-14 (Tab 8 Gelombang 1) SELESAI** & **J-2 (OHLCV universe) SELESAI** — BBCA sekarang punya histori asli di `asset_ohlcv` (486 hari via backfill) dan masuk chart Panel 5; J-3 (kalibrasi bar-replay) + fundamentals/earnings/grader (J-4+) BLOCKED nunggu Gerbang G1/G2/G3 dari Giel |
+| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026), Gerbang G1/G2/G3 DIJAWAB (13 Jul 2026)** — universe final Gelombang 1 = **BBCA + TSLA**; **J-14/J-2/J-4 SELESAI**; **J-3 groundwork** (S&R zona+sinyal uncalibrated, siap direview Giel) & **J-3b** (sizing engine, max risk 2.5%) SELESAI; **validasi bar-replay manual (lane_validated_at)**, **kalibrasi per-market §13**, dan **J-6 (bank ratio CAR/NPL/NIM/LDR — sumber IDX BELUM ketemu, riset ekstensif tidak berhasil pin down endpoint spesifik, kemungkinan tetap perlu OJK)** menunggu Giel |
 
 ---
 
@@ -924,16 +924,148 @@ J-15 (prasyarat J-4 fundamentals + J-11 grader engine selesai):
       laporan resmi (syarat Gerbang G3) — belum ada keputusan final dibuat
       di sini, cuma riset pendukung.
 
-**BLOCKED — butuh input Giel sebelum lanjut:**
-- **Gerbang G2 (universe list)**: kontrak sebut "Giel sudah punya draft"
-  tapi daftar 15-30 ticker konkret belum diberikan — J-0/J-1 (seed
-  `instrument_metadata`) tidak bisa jalan tanpa ini.
-- **Gerbang G1 (lane + amandemen SOP v4.1)**: field `lane` sudah ada di
-  schema, tapi belum ada keputusan lane per-instrumen atau teks amandemen
-  SOP v4.1 yang menentukan aturannya.
-- **Gerbang G3 (keputusan final sumber fundamental)**: prototipe di atas
-  kasih data mentah, tapi validasi manual vs laporan resmi + keputusan
-  akhir (yfinance vs sumber lain) ada di tangan Giel.
+**Update — Gerbang G1/G2/G3 DIJAWAB Giel (13 Jul 2026):**
+- **G1 (lane + amandemen SOP v4.1)**: ✅ **disetujui** ("amandemen OK") —
+  model `lane` per-instrumen resmi menggantikan pertanyaan biner lama
+  trade-vs-invest. Belum ada teks amandemen SOP v4.1 tertulis terpisah,
+  tapi keputusan prinsipnya sudah terkunci — cukup utk lanjut J-0b secara
+  substansi (field `lane` sudah dipakai apa adanya sejak Phase J+ kickoff).
+- **G2 (universe awal)**: ✅ **BUKAN 15-30 ticker seperti draft awal
+  kontrak** — Giel putuskan universe awal CUMA **BBCA (IDX) + TSLA (US)**,
+  sisanya ditambah manual satu-per-satu lewat scrape/intake (Panel 8)
+  belakangan, bukan batch besar sekaligus. `pipeline/seed_universe.py`
+  diperbarui (TSLA ditambah, data market_cap/free_float dari yfinance
+  dicek live: mcap ≈$1,53T, free float ≈69,91%, sector "Consumer
+  Cyclical/Auto Manufacturers"). `lot_size=1` (US, bukan 100 spt IDX),
+  `has_daily_limit=0` (LULD circuit-breaker menit-an, BUKAN ARA/ARB
+  harian), `fx_exposure="global"`, `accounting_std="US_GAAP"` — beda
+  eksplisit dari BBCA di setiap field yang relevan pasar.
+- **G3 (sumber fundamental)**: ✅ **yfinance ATAU IDX langsung, keduanya
+  diterima** — tidak ada keputusan tunggal yang memaksa satu sumber;
+  Giel terima yfinance sbg default (sudah diprototipe G3 sebelumnya utk
+  BBCA/BBRI/TLKM) dgn opsi pindah ke sumber IDX langsung kalau perlu.
+  Ini membuka J-4 (fundamentals_quarterly backfill) — BELUM dikerjakan
+  di update ini, giliran berikutnya.
+
+**Dampak ke build order**: J-0/J-1 (seed universe) SEKARANG **selesai**
+untuk cakupan yang diputuskan (BBCA+TSLA, bukan "belum bisa jalan tanpa
+G2" seperti sebelumnya) — J-2 (OHLCV) otomatis ikut jalan utk TSLA juga
+tanpa ubah kode (`scrapers/equity_universe.py` baca `instrument_metadata`
+dinamis, lihat entry J-2 di atas), diverifikasi live: `equity_TSLA = ok`
+di `pipeline.run_daily`, 508 baris histori (2024-07-01..2026-07-12)
+via `pipeline.backfill`, TSLA muncul di Panel 8 Universe & (setelah dipilih)
+Panel 5 chart. **J-3 (kalibrasi per-market + validasi bar-replay)** masih
+BUKAN pekerjaan otomatis — kontrak §13.1 poin 5 tetap mensyaratkan
+validasi manual per instrumen sebelum `lane_validated_at` terisi, itu
+keputusan Giel sendiri lewat review chart historis, bukan sesuatu yang
+bisa saya putuskan sepihak.
+
+**Update — J-4 selesai (fundamentals_quarterly backfill, BBCA + TSLA):**
+- [x] **`scrapers/fundamentals_yf.py`** (BARU) — yfinance `quarterly_
+      financials`/`quarterly_balance_sheet`/`quarterly_cashflow`, field
+      real dicek live dulu (bukan ditebak) sebelum dipetakan: `Total
+      Revenue`→revenue, `Net Income`→net_income, `Diluted EPS` (fallback
+      `Basic EPS`)→eps, `Stockholders Equity`→total_equity, `Total
+      Assets`→total_assets, `Operating Cash Flow`→operating_cash_flow,
+      `Free Cash Flow`→free_cash_flow (baris langsung, tidak dihitung
+      manual dari capex). **Temuan penting**: yfinance punya baris `Net
+      Interest Income` bahkan utk TSLA (non-bank) — ini BUKAN NIM bank
+      asli, jadi kolom `net_interest_income` sengaja di-gate lewat
+      `instrument_metadata.is_financial` (cuma diisi kalau `is_financial=1`),
+      bukan diambil mentah-mentah dari yfinance apa adanya. Kuartal yang
+      revenue DAN net_income-nya NaN di-skip (bukan disimpan sbg 0).
+- [x] **`pipeline/backfill_fundamentals.py`** (BARU) — `upsert_
+      fundamentals_quarterly()` by natural key (instrument, quarter_end,
+      UNIQUE constraint sudah ada di schema), `backfill_fundamentals()`
+      proses 1 instrumen atau SEMUA di `instrument_metadata`. Dijalankan
+      manual/berkala (fundamentals berubah per-kuartal, BUKAN bagian
+      `run_daily` harian) — pola sama `seed_universe.py`.
+      `python -m pipeline.backfill_fundamentals` (semua) atau
+      `--instrument BBCA` (satu).
+- 9 test baru (`test_fundamentals_yf.py` + `test_backfill_fundamentals.py`,
+  live network pola sama scraper lain — termasuk assert eksplisit
+  `net_interest_income is None` utk TSLA semua baris, dan terisi utk
+  minimal 1 kuartal BBCA), 201 test hijau total. **Diverifikasi live
+  penuh terhadap DB asli**: `python -m pipeline.backfill_fundamentals` ->
+  BBCA 5 kuartal, TSLA 5 kuartal, KEDUANYA `LOW_CONFIDENCE` (sesuai
+  ekspektasi kontrak §16 poin 2 dan temuan prototipe G3 sebelumnya —
+  yfinance memang cuma kasih ~5 kuartal, bukan 8). Angka BBCA Net Income
+  Q1 2026 (≈Rp14,68 triliun) **cocok persis** dengan temuan prototipe G3
+  awal sebelum kickoff Phase J+ — cross-check konsistensi data.
+- **Belum dikerjakan** (di luar scope J-4 murni "backfill data"):
+  `sector_benchmark` computed dari data ini (J-5), pemakaian data ini di
+  Panel 8 Komponen B (J-15, prasyarat modul Grader J-11 belum ada), slice
+  RIVAN prompt v5 baca fundamental (J-9).
+
+**Update — J-3 groundwork (uncalibrated first pass, BUKAN validasi final):**
+Giel jawab "just do it, saya review nanti pas coba BBCA dan TSLA" — jadi
+dijalankan tanpa nunggu kalibrasi per-market (§13) selesai dulu, TAPI
+`lane_validated_at` SENGAJA TETAP NULL (validasi itu keputusan manual Giel
+sendiri lewat review chart, bukan sesuatu yang diputuskan otomatis di sini).
+- **Temuan penting**: `pipeline/run_analysis.py::run_analysis(instrument)`
+  **SUDAH generic sejak Phase B** — tidak perlu ubah kode SAMA SEKALI.
+  `INSTRUMENTS` (list default kalau tanpa `--instrument`) cuma dipakai
+  `main()`, fungsi intinya menerima instrumen APA SAJA yang ada di
+  `asset_ohlcv`. Langsung jalan: `python -m pipeline.run_analysis
+  --instrument BBCA` dan `--instrument TSLA`.
+- **Hasil live**: BBCA — 488 baris histori, 12 zona baru (10 aktif), 16
+  sinyal baru. TSLA — 508 baris histori, 13 zona baru (11 aktif), 12
+  sinyal baru. Semua `approved=0` (hardcode di `insert_signal_dedup`,
+  tidak ada jalur lain yang menulis `trade_signals` — dikonfirmasi query
+  langsung: 0 baris `approved=1` utk BBCA/TSLA). `instrument_metadata.lane`
+  tetap `INVEST`, `lane_validated_at` tetap NULL utk keduanya — dikonfirmasi
+  tidak berubah.
+- **Catatan disiplin penting**: komentar schema.sql utk `instrument_
+  metadata.lane` bilang "hanya lane TRADE/BOTH yang di-generate trade_
+  signals-nya" — itu ATURAN masa depan yang BELUM ditegakkan di kode mana
+  pun saat ini (tidak ada pengecekan `lane` sebelum generate sinyal).
+  Menjalankan engine utk instrumen lane=INVEST di sini justru SENGAJA —
+  itulah tujuan J-3 (kasih Giel bahan bar-replay review sebelum
+  `lane_validated_at` bisa terisi). Begitu J-3b/gating lane resmi
+  ditegakkan di kode nanti, aturan ini perlu direvisit supaya tidak
+  bentrok dengan alur review semacam ini.
+- Diverifikasi live di browser: Panel 5 dropdown BBCA menampilkan 16
+  baris tabel Sinyal (status "pending" semua, tombol Approve/Reject
+  berfungsi sama seperti BTC), zona S&R tergambar di chart (9/10 zona
+  relevan dgn harga saat ini).
+- **BELUM dikerjakan** (kalibrasi §13 sesungguhnya): toleransi zona S&R
+  per-fraksi-harga IDX, buffer ARA/ARB, parameter retest longgar-vs-ketat
+  per market — signal/zona di atas pakai parameter GENERIK yang sama dgn
+  BTC, BUKAN hasil kalibrasi khusus. Bar-replay review Giel di atas data
+  ini yang akan menentukan apakah parameter generik ini cukup atau perlu
+  disesuaikan sebelum lane naik ke TRADE.
+
+**Update — J-3b selesai (sizing & lot quantization engine, §14):**
+- **Keputusan Giel (13 Jul 2026)**: max risk per trade = **2.5%**.
+- [x] **`analysis/sizing.py`** (BARU) — `suggest_position_size(entry_price,
+      sl_price, capital, lot_size, max_risk_pct=2.5)`: budget risiko
+      (capital × 2.5%) ÷ jarak entry-SL = unit ideal → **bulatkan KE
+      BAWAH** ke kelipatan `lot_size` (`lot_size<=0` = fractional penuh,
+      IBKR US — tidak dibulatkan sama sekali). Kalau budget < 1 lot →
+      `skip=True, skip_reason='RISK_CAPACITY_EXCEEDED'` (kontrak §14 poin
+      2). **Tidak ada parameter/jalur apa pun utk geser SL** — modul ini
+      cuma terima `sl_price` sbg input tetap, tidak pernah mengusulkan
+      mengubahnya (kontrak §14 poin 3, "dilarang keras").
+      `MAX_RISK_PCT = 2.5` module constant (pola sama `MIN_RR = 1.5` di
+      `analysis/signals.py`) — regression-guarded lewat test eksplisit
+      supaya tidak diam-diam berubah.
+- **`capital` SENGAJA tidak disimpan/ditebak di kode** — modal riil Giel
+  privasi & bisa berubah, jadi diisi manual di `.env` (`RISK_CAPITAL_IDR`/
+  `RISK_CAPITAL_USD`, placeholder kosong ditambah ke `.env.example`,
+  segmented per kontrak §13.2 "pendanaan dari segmen USD Jago") — caller
+  (jurnal/route, belum dibangun) yang baca env itu dan teruskan sbg
+  argumen eksplisit ke fungsi.
+- 8 test baru (`test_sizing.py`) — termasuk regression guard `MAX_RISK_PCT
+  == 2.5`, pembulatan-bawah IDX (kelipatan pas & tidak pas), skip
+  `RISK_CAPACITY_EXCEEDED` saat budget < 1 lot, fractional US jarang skip
+  (kontrak §14 poin 5), dan invariant `actual_risk <= risk_budget` di
+  berbagai kombinasi angka (kontrak §14 poin 1, "tidak pernah sebaliknya").
+  209 test hijau total.
+- **Belum dikerjakan** (di luar scope "engine murni"): wiring ke UI/route
+  (mis. tombol "Approve" Panel 5 menampilkan suggested size), pengisian
+  `trading_journal.planned_size`/`actual_size`/`skip_reason` — itu J-13
+  (SOP amendment final), butuh keputusan tambahan Giel soal alur konfirmasi
+  di dashboard, bukan sekadar kalkulasi.
 
 **Update — lanjutan kickoff (Giel bilang "oke lanjut", isi BBCA saja dulu):**
 - [x] **5 tabel Phase J+ dibangun sebagai DRAFT** (`fundamentals_quarterly`,
@@ -1043,6 +1175,27 @@ J-15 (prasyarat J-4 fundamentals + J-11 grader engine selesai):
   `analysis/*` belum menyertakan BBCA di `INSTRUMENTS` list, itu bagian J-3).
 
 **Dievaluasi, sengaja tidak dikerjakan:**
+- **J-6: Bank ratio CAR/NPL/NIM/LDR via IDX** — Giel tanya "how about IDX"
+  sbg alternatif OJK. Riset dilakukan (bukan asumsi): (1) WebSearch
+  konfirmasi IDX punya laman "Financial Report and Ratio of Listed
+  Companies" di sistem Digital Statistic yang sama dgn foreign-flow API
+  yang sudah dipakai (Track C); (2) riset source code proyek open-source
+  NeaByteLab/IDX-API menemukan modul `syncFinancialRatio()` — TAPI field
+  yang disebut cuma **PER/PBV/ROE/DER** (rasio valuasi pasar umum), BUKAN
+  rasio prudential bank (CAR/NPL/NIM/LDR); (3) percobaan langsung nembak
+  beberapa nama `urlName` API (`LINK_TABLE_FINANCIAL_RATIO` dkk, pola sama
+  endpoint foreign-flow) — semua balik 503 (bukan 404, endpoint yang benar
+  memang belum ketemu); (4) percobaan lewat browser sungguhan (isi filter
+  bulan/tahun + klik "Terapkan" di laman resminya) juga tidak berhasil
+  memicu network request API-nya (kemungkinan resolusi server-side Nuxt,
+  bukan client-side fetch yang bisa diintip). **Kesimpulan**: rasio
+  prudential bank spesifik KEMUNGKINAN BESAR memang bukan data yang
+  dipublikasi di level "ratio umum" milik bursa (IDX) — biasanya itu
+  disclosure regulasi milik OJK (`ojk.go.id`, Laporan Surveillance
+  Perbankan Indonesia, ditemukan di riset yang sama). **Tetap Backlog** —
+  OJK jadi kandidat sumber paling mungkin, belum diriset lebih lanjut
+  (di luar scope turn ini). Dicatat di sini supaya riset "urlName IDX
+  utk financial ratio" tidak diulang dari nol lagi tanpa alasan baru.
 - **NewsData.io** — dicek langsung: sentiment analysis **cuma tersedia di
   tier Professional/Corporate (berbayar)**, bukan tier gratis seperti yang
   awalnya dikira. Historical archive (10 tahun) juga fitur berbayar. Tier

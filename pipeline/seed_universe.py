@@ -1,9 +1,17 @@
 """Seed instrument_metadata — universe Phase J+ (Build Contract v1.3).
 
 Manual seed sementara (satu-per-satu, ditambah Giel by request) sampai ada
-sistem input manual di dashboard (backlog, lihat docs/ROADMAP.md). BUKAN
-scraper otomatis -- metadata seperti market_cap/free_float berubah lambat,
-tidak perlu di-refresh tiap run_daily seperti daily_market.
+sistem input manual di dashboard (backlog, lihat docs/ROADMAP.md — Panel 8
+"Universe" Tab 8/J-14 SUDAH menutup backlog ini utk kandidat ad-hoc lewat
+`/api/intake`; file ini tetap dipertahankan sbg jalur seed utk instrumen
+yang memang sudah DIPUTUSKAN Giel masuk universe, bukan kandidat baru).
+BUKAN scraper otomatis -- metadata seperti market_cap/free_float berubah
+lambat, tidak perlu di-refresh tiap run_daily seperti daily_market.
+
+Keputusan Gerbang G2 (11 Jul 2026, jawaban Giel): universe awal CUMA BBCA +
+TSLA (bukan daftar 15-30 emiten penuh seperti draft awal kontrak) -- emiten
+lain ditambah manual belakangan lewat scrape/intake satu-per-satu (Panel 8),
+bukan batch besar sekaligus.
 
 Lane semua entry baru = INVEST (BUKAN TRADE), sesuai aturan kontrak §13.1
 poin 5: "instrumen baru masuk lane INVEST/NONE dulu -> naik ke TRADE hanya
@@ -50,6 +58,27 @@ UNIVERSE: list[dict[str, Any]] = [
         "fx_exposure": "domestik",
         "has_daily_limit": 1,   # ARA/ARB berlaku (saham IDX)
         "has_real_volume": 1,   # volume riil tersedia (bukan FX/Gold spot)
+        "data_as_of_rule": None,
+    },
+    {
+        "instrument": "TSLA",
+        "market": "US",
+        "asset_class": "equity",
+        # yfinance: sector="Consumer Cyclical", industry="Auto Manufacturers"
+        # (GICS) -- belum ada standar mapping lain utk saham AS, dipakai apa adanya.
+        "sector": "Consumer Cyclical (GICS) -- Auto Manufacturers",
+        "market_cap": 1_531_433_975_808.0,
+        "free_float": 69.91,  # % -- floatShares/sharesOutstanding * 100 (yfinance)
+        "avg_volume_20d": None,
+        "lot_size": 1,          # US -- lihat kontrak §3 (IBKR fractional -> 0, tapi
+                                # 1 dipakai dulu sbg minimum unit non-fractional standar)
+        "lane": "INVEST",       # BUKAN TRADE -- lihat docstring modul
+        "lane_validated_at": None,
+        "accounting_std": "US_GAAP",
+        "is_financial": 0,
+        "fx_exposure": "global",  # saham AS, eksposur USD penuh dari sisi Giel (IDR)
+        "has_daily_limit": 0,   # US pakai LULD (circuit breaker menit-an), bukan ARA/ARB harian
+        "has_real_volume": 1,
         "data_as_of_rule": None,
     },
 ]

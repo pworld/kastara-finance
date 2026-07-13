@@ -21,10 +21,11 @@ def test_fetch_equity_universe_empty_when_no_instruments(tmp_path):
     assert out == {"asset_rows": [], "source_flags": {}}
 
 
-def test_fetch_equity_universe_returns_real_data_for_bbca(tmp_path):
+def test_fetch_equity_universe_returns_real_data_for_universe(tmp_path):
     """Live network -- pola sama scraper lain di project ini (test_crypto.py,
-    test_macro.py). Kalau yfinance/BBCA.JK down, source_flags akan tandai
-    fail dan asset_rows kosong, bukan crash."""
+    test_macro.py). Kalau yfinance down utk 1 ticker, source_flags akan
+    tandai fail dan ticker itu di-skip dari asset_rows, bukan crash. Tidak
+    assert urutan (SELECT tanpa ORDER BY) -- cari row per instrumen."""
     db = tmp_path / "t.db"
     init_db(db)
     with get_connection(db) as conn:
@@ -32,9 +33,11 @@ def test_fetch_equity_universe_returns_real_data_for_bbca(tmp_path):
         conn.commit()
     out = fetch_equity_universe(db_path=db)
     assert "source_flags" in out
-    if out["asset_rows"]:
-        row = out["asset_rows"][0]
-        assert row["instrument"] == "BBCA"
+    by_instrument = {r["instrument"]: r for r in out["asset_rows"]}
+    for instrument in ("BBCA", "TSLA"):
+        row = by_instrument.get(instrument)
+        if row is None:
+            continue  # source down saat test jalan -- bukan kegagalan test ini
         for col in ("date", "open", "high", "low", "close"):
             assert col in row
         assert row["low"] <= row["high"]

@@ -21,6 +21,23 @@ def test_seed_inserts_bbca(tmp_path):
         assert row["lot_size"] == 100
 
 
+def test_seed_inserts_tsla(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        seed_instrument_metadata(conn, UNIVERSE)
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM instrument_metadata WHERE instrument = 'TSLA'"
+        ).fetchone()
+        assert row is not None
+        assert row["market"] == "US"
+        assert row["lane"] == "INVEST"
+        assert row["lane_validated_at"] is None
+        assert row["has_daily_limit"] == 0  # LULD, bukan ARA/ARB
+        assert row["lot_size"] == 1
+
+
 def test_seed_idempotent_no_duplicates(tmp_path):
     db = tmp_path / "t.db"
     init_db(db)
