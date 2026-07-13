@@ -43,6 +43,7 @@ EXPECTED_TABLES = [
     "emiten_grade",
     "grader_log",
     "intake_log",
+    "lane_validation_log",
 ]
 
 

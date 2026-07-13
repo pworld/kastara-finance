@@ -66,3 +66,31 @@ def test_rejects_zero_risk_distance():
 def test_rejects_non_positive_capital():
     with pytest.raises(ValueError):
         suggest_position_size(entry_price=100, sl_price=90, capital=0, lot_size=100)
+
+
+# ---------- ARA/ARB buffer (kontrak §18 poin 4, TERKUNCI 1.5x) ----------
+
+def test_ara_arb_buffer_multiplies_risk_per_unit():
+    no_buffer = suggest_position_size(entry_price=6100, sl_price=6000, capital=100_000_000, lot_size=100)
+    with_buffer = suggest_position_size(
+        entry_price=6100, sl_price=6000, capital=100_000_000, lot_size=100, has_daily_limit=True,
+    )
+    assert with_buffer["risk_per_unit"] == pytest.approx(no_buffer["risk_per_unit"] * 1.5)
+    assert with_buffer["nominal_risk_per_unit"] == no_buffer["nominal_risk_per_unit"] == 100
+
+
+def test_ara_arb_buffer_reduces_suggested_units_vs_no_buffer():
+    """Buffer bikin risiko per unit lebih besar -> unit yang disarankan
+    LEBIH KECIL dari tanpa buffer (lebih konservatif, bukan lebih agresif)."""
+    no_buffer = suggest_position_size(entry_price=6100, sl_price=6000, capital=100_000_000, lot_size=100)
+    with_buffer = suggest_position_size(
+        entry_price=6100, sl_price=6000, capital=100_000_000, lot_size=100, has_daily_limit=True,
+    )
+    assert with_buffer["suggested_units"] < no_buffer["suggested_units"]
+
+
+def test_ara_arb_buffer_default_false_preserves_old_behavior():
+    """Regression: caller lama yang tidak kasih has_daily_limit sama sekali
+    HARUS tetap dapat hasil identik dgn sebelum buffer ditambahkan."""
+    result = suggest_position_size(entry_price=6100, sl_price=6000, capital=100_000_000, lot_size=100)
+    assert result["risk_per_unit"] == result["nominal_risk_per_unit"] == 100

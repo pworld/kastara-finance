@@ -184,6 +184,40 @@ $("#overrideSaveBtn").addEventListener("click", async () => {
   loadUniverse();
 });
 
+// ---------- Validasi Lane (Bar-Replay Sign-off, kontrak §13.1 poin 5) ----------
+$("#laneValidateBtn").addEventListener("click", async () => {
+  const ticker = $("#laneTicker").value.trim();
+  const evidence = $("#laneEvidence").value.trim();
+  if (!ticker) { toast("Ticker wajib diisi"); return; }
+  if (!evidence) { toast("Evidence wajib diisi"); return; }
+  const result = await postJSON(`/api/emiten/${encodeURIComponent(ticker)}/validate_lane`, {
+    new_lane: $("#laneNew").value, evidence,
+  });
+  if (result.error) { toast(result.error); return; }
+  toast(`${ticker}: lane ${result.old_lane || "-"} → ${result.new_lane}`);
+  $("#laneEvidence").value = "";
+  loadUniverse();
+  loadLaneValidationLog();
+});
+
+function renderLaneValidationLogTable() {
+  const { pageRows, total, totalPages } = applyTableControls("lanelog", tableCache.lanelog || [], {
+    searchFields: ["instrument", "evidence"],
+  });
+  $("#laneLogBody").innerHTML = pageRows.map(r => `<tr>
+    <td class="src">${r.validated_at}</td><td>${r.instrument}</td>
+    <td class="src">${r.old_lane || "-"} → <span class="badge ${LANE_CLASS[r.new_lane] || "lane-none"}">${r.new_lane}</span></td>
+    <td>${r.evidence}</td>
+  </tr>`).join("") || `<tr><td colspan="4" class="src">belum ada validasi lane</td></tr>`;
+  renderTableBar("lanelog", total, totalPages, renderLaneValidationLogTable);
+}
+tableRerender.lanelog = renderLaneValidationLogTable;
+
+async function loadLaneValidationLog() {
+  tableCache.lanelog = await (await fetch("/api/lane_validation_log")).json();
+  renderLaneValidationLogTable();
+}
+
 // ---------- Grader Log & Kalibrasi (Komponen D, Addendum A §19.4) ----------
 function outcomeCell(row, field) {
   if (row[field]) return row[field];

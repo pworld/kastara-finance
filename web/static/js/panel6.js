@@ -51,7 +51,10 @@ $("#jSizingBtn").addEventListener("click", async () => {
     $("#jSkipReason").value = result.skip_reason;
     $("#jPlannedSize").value = "";
   } else {
-    $("#jSizingResult").textContent = `Suggested: ${result.suggested_units} unit (risiko aktual ${fmt(result.actual_risk)} / budget ${fmt(result.risk_budget)})`;
+    const bufferNote = result.risk_per_unit !== result.nominal_risk_per_unit
+      ? ` [buffer ARA/ARB 1.5x diterapkan: jarak nominal ${fmt(result.nominal_risk_per_unit)} → ${fmt(result.risk_per_unit)}]`
+      : "";
+    $("#jSizingResult").textContent = `Suggested: ${result.suggested_units} unit (risiko aktual ${fmt(result.actual_risk)} / budget ${fmt(result.risk_budget)})${bufferNote}`;
     $("#jPlannedSize").value = result.suggested_units;
     $("#jSkipReason").value = "";
   }

@@ -16,9 +16,10 @@ import argparse
 import sqlite3
 from typing import Any
 
+from analysis.calibration import idx_zone_tolerance_pct
 from analysis.indicators import ma_stack_order, moving_average, rolling_ma
 from analysis.signals import detect_signals
-from analysis.sr_zones import detect_zones, zone_bucket_key
+from analysis.sr_zones import CLUSTER_TOLERANCE, detect_zones, zone_bucket_key
 from db.connection import get_connection, init_db
 from scrapers.base import created_at
 
@@ -50,20 +51,28 @@ def _load_history(conn: sqlite3.Connection, instrument: str) -> dict[str, list]:
     }
 
 
-def upsert_sr_zone(conn: sqlite3.Connection, instrument: str, zone: dict[str, Any]) -> str:
+def upsert_sr_zone(
+    conn: sqlite3.Connection, instrument: str, zone: dict[str, Any],
+    tolerance: float = CLUSTER_TOLERANCE,
+) -> str:
     """UPSERT 1 zona by natural key (bucket relatif, plan_b.txt §7.4).
+
+    `tolerance` HARUS SAMA dgn yang dipakai `detect_zones()` waktu zona ini
+    dihasilkan (kontrak §13.1 poin 4, J-3 — IDX pakai toleransi lebih
+    lebar dari default 0.5% BTC, lihat analysis/calibration.py) supaya
+    bucket key konsisten, tidak nge-drift antar re-run.
 
     Return 'inserted' | 'updated'. TIDAK PERNAH menimpa `validated`
     atau `notes` — itu field manual review, bukan hasil deteksi otomatis.
     """
-    target_key = zone_bucket_key(zone["zone_type"], zone["zone_lower"], zone["zone_upper"])
+    target_key = zone_bucket_key(zone["zone_type"], zone["zone_lower"], zone["zone_upper"], tolerance)
     existing = conn.execute(
         "SELECT id, zone_lower, zone_upper FROM sr_zones WHERE instrument = ? AND zone_type = ?",
         (instrument, zone["zone_type"]),
     ).fetchall()
     match_id = None
     for r in existing:
-        if zone_bucket_key(zone["zone_type"], r["zone_lower"], r["zone_upper"]) == target_key:
+        if zone_bucket_key(zone["zone_type"], r["zone_lower"], r["zone_upper"], tolerance) == target_key:
             match_id = r["id"]
             break
 
@@ -137,11 +146,24 @@ def run_analysis(instrument: str = INSTRUMENT, db_path=None) -> dict[str, Any]:
         # histori volume penuh (lihat penemuan saat eksekusi Phase B).
         volume_mas = rolling_ma(hist["volumes"], VOLUME_MA_PERIOD)
 
+        # Kalibrasi §13.1 poin 4 (J-3): instrumen IDX pakai toleransi zona
+        # diskalakan dari fraksi harga resmi (analysis/calibration.py),
+        # BUKAN 0.5% flat spt BTC/GOLD/dst -- instrumen lain TIDAK
+        # terpengaruh (row instrument_metadata cuma ada utk Phase J+
+        # equities, bukan aset makro/index existing).
+        market_row = conn.execute(
+            "SELECT market FROM instrument_metadata WHERE instrument = ?", (instrument,)
+        ).fetchone()
+        if market_row and market_row["market"] == "IDX" and hist["closes"]:
+            tolerance = idx_zone_tolerance_pct(hist["closes"][-1])
+        else:
+            tolerance = CLUSTER_TOLERANCE
+
         # 1) S&R zone detection -> UPSERT
-        zones = detect_zones(hist["dates"], hist["highs"], hist["lows"], hist["closes"])
+        zones = detect_zones(hist["dates"], hist["highs"], hist["lows"], hist["closes"], tolerance=tolerance)
         n_inserted = n_updated = 0
         for z in zones:
-            if upsert_sr_zone(conn, instrument, z) == "inserted":
+            if upsert_sr_zone(conn, instrument, z, tolerance=tolerance) == "inserted":
                 n_inserted += 1
             else:
                 n_updated += 1
@@ -182,6 +204,7 @@ def run_analysis(instrument: str = INSTRUMENT, db_path=None) -> dict[str, Any]:
         "signals_new": n_new_signals,
         "ma20": ma20, "ma50": ma50, "ma100": ma100, "ma200": ma200,
         "ma_stack": stack,
+        "zone_tolerance": tolerance,
     }
     _print_summary(summary)
     return summary
@@ -198,6 +221,8 @@ def _print_summary(s: dict[str, Any]) -> None:
     print(f"  MA20/50/100/200 : {_format_price(s['ma20'])} / {_format_price(s['ma50'])} / "
           f"{_format_price(s['ma100'])} / {_format_price(s['ma200'])}")
     print(f"  MA stack order  : {s['ma_stack']}")
+    print(f"  zone tolerance  : {s['zone_tolerance']*100:.3f}%"
+          f"{' (kalibrasi IDX, DRAFT — lihat analysis/calibration.py)' if s['zone_tolerance'] != CLUSTER_TOLERANCE else ' (default)'}")
     print("=========================================\n")
 
 

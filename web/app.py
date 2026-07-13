@@ -843,7 +843,10 @@ def sizing_suggest():
         }), 400
     try:
         capital = float(capital_raw)
-        result = suggest_position_size(entry, sl, capital, meta["lot_size"] or 0)
+        result = suggest_position_size(
+            entry, sl, capital, meta["lot_size"] or 0,
+            has_daily_limit=bool(meta.get("has_daily_limit")),
+        )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify(result)
@@ -920,6 +923,37 @@ def grader_log_outcome(log_id):
         )
         conn.commit()
     return jsonify({"ok": ok})
+
+
+# ---------- PHASE J+: Lane validation (bar-replay sign-off, §13.1 poin 5).
+# Satu-satunya jalur yang boleh mengubah lane / mengisi lane_validated_at --
+# lihat guard di web.writes.validate_lane, TIDAK PERNAH otomatis. ----------
+
+@app.post("/api/emiten/<ticker>/validate_lane")
+def emiten_validate_lane(ticker):
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            result = writes.validate_lane(
+                conn, instrument=ticker, new_lane=body.get("new_lane", ""),
+                evidence=body.get("evidence", ""),
+            )
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if result is None:
+        return jsonify({"error": f"{ticker} tidak ada di instrument_metadata -- jalankan intake dulu"}), 404
+    return jsonify(result)
+
+
+@app.get("/api/lane_validation_log")
+def lane_validation_log_list():
+    with get_connection() as conn:
+        rows = writes.list_lane_validation_log(
+            conn, instrument=request.args.get("instrument"),
+            limit=request.args.get("limit", 200, type=int),
+        )
+    return jsonify(rows)
 
 
 def main() -> None:

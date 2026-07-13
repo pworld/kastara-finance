@@ -26,6 +26,7 @@ async function refreshAll() {
   await loadUniverse();
   await loadIntakeLog();
   await loadGraderLog();
+  await loadLaneValidationLog();
 }
 $("#refresh").addEventListener("click", refreshAll);
 refreshAll();

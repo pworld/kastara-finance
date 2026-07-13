@@ -24,13 +24,28 @@ SLICE (beda per lens):
 - AKELA (Dinamika Pasar & Waktu): econ_calendar penuh, Fear&Greed + delta, VIX,
   BTC Vol MA20, funding rate, delta H/M/B/T semua instrumen utama.
 - RIVAN (Fundamental & Realist): funding rate, OI agregat + delta, liquidation
-  long/short 24h, L/S ratio, ETF flow, BTC Dominance, volume vs Vol MA20.
+  long/short 24h, L/S ratio, ETF flow, BTC Dominance, volume vs Vol MA20,
+  fundamental saham individual (revenue/net income/FCF atau rasio bank,
+  grade emiten, foreign flow per-saham -- J-9 data plumbing, lihat catatan
+  di bawah).
 
 IHSG foreign flow TIDAK diberikan ke AKELA/RIVAN (disiplin slice, lihat
 prompts/persona_akela.txt & persona_rivan.txt §BATASAN).
+
+**J-9 (13 Jul 2026) -- data plumbing equity slice, PROMPT BELUM DIUBAH:**
+`_equity_fundamentals_lines()` (RIVAN) dan `_earnings_calendar_lines()`
+(AKELA) menambah data fundamentals_quarterly/emiten_grade/earnings_calendar/
+foreign-flow-per-saham ke slice masing-masing -- infrastruktur murni,
+TIDAK butuh judgment (data sudah dibangun J-4/J-6/J-7/J-8/J-11). Prompt
+`persona_rivan.txt`/`persona_akela.txt` BELUM diupdate mengklaim field ini
+tersedia -- itu draft terpisah yang perlu ditulis ulang dgn suara Giel
+sendiri (lihat docs/j9_equity_slice_prompt_draft.md), pola sama Track D:
+jangan pasang klaim prompt sebelum datanya beneran ada DAN prompt-nya
+sendiri disetujui.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from typing import Any
 
@@ -229,6 +244,81 @@ def _fear_greed_history_line(history: list[dict[str, Any]], date: str) -> str:
     return f"Fear & Greed: {_fmt_num(cur, 0)} ({label or 'n/a'}){trend}"
 
 
+def _equity_fundamentals_lines(conn: sqlite3.Connection, date: str) -> list[str]:
+    """Ringkasan per-emiten (fundamentals terbaru + grade + foreign flow
+    per-saham) utk semua instrumen Phase J+ di instrument_metadata -- SELALU
+    disertakan (pola sama BTC di shared core), tidak kondisional per topik
+    berita hari itu. J-9 belum menulis kapan/di slice mana ini dipakai --
+    fungsi ini murni data plumbing, dipanggil dari _slice_rivan (lihat
+    catatan J-9 draft di prompts/README.md)."""
+    instruments = conn.execute(
+        "SELECT instrument, sector, is_financial FROM instrument_metadata ORDER BY instrument"
+    ).fetchall()
+    if not instruments:
+        return ["(belum ada emiten individual di universe)"]
+    lines = []
+    for row in instruments:
+        inst = row["instrument"]
+        fund = conn.execute(
+            "SELECT * FROM fundamentals_quarterly WHERE instrument = ? "
+            "ORDER BY quarter_end DESC LIMIT 1", (inst,),
+        ).fetchone()
+        grade = conn.execute(
+            "SELECT * FROM emiten_grade WHERE instrument = ? ORDER BY graded_at DESC, id DESC LIMIT 1",
+            (inst,),
+        ).fetchone()
+        ff_net = _positioning_value(conn, date, inst, "stock_ff_foreign_net_vol")
+
+        parts = [f"- {inst} ({row['sector'] or 'sektor n/a'}):"]
+        if fund:
+            if row["is_financial"]:
+                parts.append(
+                    f" NII={_fmt_num(fund['net_interest_income'], 0)} CAR={_fmt_num(fund['car'], 1)}% "
+                    f"NPL={_fmt_num(fund['npl_gross'], 1)}% NIM={_fmt_num(fund['nim'], 1)}% "
+                    f"LDR={_fmt_num(fund['ldr'], 1)}% (Q {fund['quarter_end']})"
+                )
+            else:
+                parts.append(
+                    f" Revenue={_fmt_num(fund['revenue'], 0)} NetIncome={_fmt_num(fund['net_income'], 0)} "
+                    f"FCF={_fmt_num(fund['free_cash_flow'], 0)} (Q {fund['quarter_end']}, "
+                    f"confidence={fund['confidence']})"
+                )
+        else:
+            parts.append(" fundamentals belum tersedia")
+        if grade:
+            override = ""
+            if grade["giel_override"]:
+                ov = json.loads(grade["giel_override"])
+                override = f" (override Giel: {ov['quadrant']})"
+            parts.append(f" | Grade: {grade['quadrant']} score={_fmt_num(grade['fund_score'], 0)}{override}")
+        else:
+            parts.append(" | belum digrade")
+        if ff_net is not None:
+            parts.append(f" | Foreign flow saham (net volume lembar): {_fmt_num(ff_net, 0)}")
+        lines.append("".join(parts))
+    return lines
+
+
+def _earnings_calendar_lines(conn: sqlite3.Connection, date: str, limit: int = 5) -> list[str]:
+    """Earnings/corporate action terjadwal (earnings_calendar, J-7) -- dipakai
+    AKELA sbg dimensi timing tambahan (event risk terjadwal, padanan FOMC/
+    rilis data ekonomi, BUKAN cuma berita tak terduga). Skema sudah eksplisit
+    mencatat peruntukan ini sejak J-7 dibangun (lihat db/schema.sql)."""
+    rows = conn.execute(
+        "SELECT instrument, earnings_date, eps_forecast, eps_actual, event_type "
+        "FROM earnings_calendar WHERE earnings_date >= ? ORDER BY earnings_date LIMIT ?",
+        (date, limit),
+    ).fetchall()
+    if not rows:
+        return ["(belum ada earnings/corporate action terjadwal)"]
+    return [
+        f"- {r['instrument']} {r['earnings_date']} [{r['event_type'] or 'EARNINGS'}] "
+        f"forecast_eps={r['eps_forecast'] if r['eps_forecast'] is not None else 'n/a'} "
+        f"actual_eps={r['eps_actual'] if r['eps_actual'] is not None else 'n/a'}"
+        for r in rows
+    ]
+
+
 # ---------- SHARED CORE ----------
 
 def _shared_core(conn: sqlite3.Connection, date: str, history: list[dict[str, Any]]) -> str:
@@ -307,6 +397,9 @@ def _slice_akela(conn: sqlite3.Connection, date: str, history: list[dict[str, An
     lines.append("  " + _delta_line(history, date, "btc_volume_ma20", "BTC Vol MA20", 0))
     lines.append("  " + _delta_line(history, date, "btc_funding_rate", "Funding Rate", 5))
     lines.append("")
+    lines.append("Jadwal earnings/corporate action terjadwal (event risk saham individual, J-7):")
+    lines.extend("  " + ln for ln in _earnings_calendar_lines(conn, date))
+    lines.append("")
     lines.append("Delta harga instrumen utama (H/M/B/T):")
     for col, label in [
         ("btc_close", "BTC"), ("dxy_close", "DXY"), ("sp500_close", "S&P 500"),
@@ -331,6 +424,9 @@ def _slice_rivan(conn: sqlite3.Connection, date: str, history: list[dict[str, An
     lines.append("  " + _value_line(history, "btc_dominance", "BTC Dominance"))
     lines.append("  " + _delta_line(history, date, "btc_volume", "BTC Volume", 0))
     lines.append("  " + _delta_line(history, date, "btc_volume_ma20", "BTC Vol MA20", 0))
+    lines.append("")
+    lines.append("Fundamental saham individual (universe Phase J+, J-4/J-6/J-8/J-11):")
+    lines.extend("  " + ln for ln in _equity_fundamentals_lines(conn, date))
     return "\n".join(lines)
 
 

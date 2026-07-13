@@ -3,6 +3,8 @@
 DB (load histori, UPSERT zona, INSERT sinyal dedup, idempotent) dan
 regression guard approved SELALU 0.
 """
+from analysis.calibration import idx_zone_tolerance_pct
+from analysis.sr_zones import CLUSTER_TOLERANCE
 from db.connection import get_connection, init_db
 from pipeline.run_analysis import run_analysis
 
@@ -141,3 +143,35 @@ def test_run_analysis_no_data_returns_empty_summary(tmp_path):
     init_db(db)
     summary = run_analysis(instrument="NOPE", db_path=db)
     assert summary["rows"] == 0
+
+
+def test_run_analysis_uses_default_tolerance_for_non_idx(tmp_path):
+    """Regression (kontrak §13.1 poin 4, J-3): instrumen TANPA row
+    instrument_metadata (semua aset makro/index existing: BTC/GOLD/dst)
+    HARUS tetap pakai toleransi default 0.5%, TIDAK terpengaruh kalibrasi
+    IDX sama sekali."""
+    db = tmp_path / "analysis_test.db"
+    _seed_synthetic_history(db)
+    summary = run_analysis(instrument=INSTRUMENT, db_path=db)
+    assert summary["zone_tolerance"] == CLUSTER_TOLERANCE
+
+
+def test_run_analysis_uses_idx_calibrated_tolerance(tmp_path):
+    """Instrumen dgn instrument_metadata.market='IDX' pakai toleransi dari
+    analysis/calibration.py (fraksi harga), BUKAN 0.5% default."""
+    db = tmp_path / "analysis_test.db"
+    idx_instrument = "TESTIDX"
+    _seed_synthetic_history(db)  # pola sama, ganti instrument di bawah
+    with get_connection(db) as conn:
+        conn.execute(
+            "INSERT INTO asset_ohlcv (date, instrument, open, high, low, close, volume, created_at) "
+            "VALUES ('2024-01-01', ?, 6175, 6175, 6175, 6175, 100, '')", (idx_instrument,),
+        )
+        conn.execute(
+            "INSERT INTO instrument_metadata (instrument, market, created_at) VALUES (?, 'IDX', '')",
+            (idx_instrument,),
+        )
+        conn.commit()
+    summary = run_analysis(instrument=idx_instrument, db_path=db)
+    assert summary["zone_tolerance"] == idx_zone_tolerance_pct(6175)
+    assert summary["zone_tolerance"] != CLUSTER_TOLERANCE

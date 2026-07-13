@@ -416,6 +416,72 @@ def get_instrument_meta(conn: sqlite3.Connection, instrument: str) -> dict[str, 
     return dict(row) if row else None
 
 
+# ---------- Lane validation (bar-replay sign-off) -- Phase J+ Build Contract
+# v1.3 §13.1 poin 5 ("Engine teruji di BTC != teruji di BBRI, validasi per
+# instrumen wajib sebelum lane naik ke TRADE"). Ini SATU-SATUNYA jalur yang
+# boleh mengisi `lane_validated_at` / mengubah lane -- TIDAK PERNAH dipanggil
+# otomatis oleh run_analysis/seed_universe/backfill manapun. Murni tindakan
+# manual Giel lewat form Panel 8, setelah dia benar-benar mereview chart
+# historis instrumen ybs sendiri (bukan diklaim/diasumsikan oleh kode). ----------
+
+ALLOWED_LANES = ("TRADE", "INVEST", "BOTH", "NONE")
+
+
+def validate_lane(
+    conn: sqlite3.Connection, *, instrument: str, new_lane: str, evidence: str,
+) -> dict[str, Any] | None:
+    """Rekam hasil review bar-replay manual Giel. `evidence` WAJIB non-kosong
+    (padanan `reason` di intake_log/save_grade_override) -- keputusan lane
+    harus terdokumentasi kenapa, bukan sekadar toggle kosong. Return None
+    kalau instrumen belum ada di instrument_metadata (harus lewat intake
+    dulu, lihat save_intake_metadata)."""
+    instrument = instrument.upper()
+    new_lane = (new_lane or "").upper()
+    if new_lane not in ALLOWED_LANES:
+        raise ValueError(f"lane '{new_lane}' tidak dikenal -- pilihan: {'/'.join(ALLOWED_LANES)}")
+    if not evidence or not evidence.strip():
+        raise ValueError(
+            "evidence wajib diisi (kontrak §13.1 poin 5 -- perubahan lane harus "
+            "terdokumentasi kenapa, bukan toggle kosong)"
+        )
+    meta = get_instrument_meta(conn, instrument)
+    if not meta:
+        return None
+    old_lane = meta["lane"]
+    validated_at = today_wib()
+    conn.execute(
+        "UPDATE instrument_metadata SET lane = ?, lane_validated_at = ? WHERE instrument = ?",
+        (new_lane, validated_at, instrument),
+    )
+    conn.execute(
+        "INSERT INTO lane_validation_log (instrument, validated_at, old_lane, new_lane, evidence, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (instrument, validated_at, old_lane, new_lane, evidence.strip(), created_at()),
+    )
+    return {
+        "instrument": instrument, "old_lane": old_lane, "new_lane": new_lane,
+        "lane_validated_at": validated_at,
+    }
+
+
+def list_lane_validation_log(
+    conn: sqlite3.Connection, instrument: str | None = None, limit: int = 200,
+) -> list[dict[str, Any]]:
+    """Riwayat validasi lane, terbaru dulu. Filter opsional per instrumen."""
+    if instrument:
+        rows = conn.execute(
+            "SELECT * FROM lane_validation_log WHERE instrument = ? "
+            "ORDER BY validated_at DESC, id DESC LIMIT ?",
+            (instrument.upper(), limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM lane_validation_log ORDER BY validated_at DESC, id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def save_intake_metadata(
     conn: sqlite3.Connection, *, instrument: str, market: str, sector: str | None = None,
     asset_class: str = "equity", market_cap: float | None = None, free_float: float | None = None,

@@ -160,3 +160,100 @@ def test_unknown_lens_raises(tmp_path):
     conn = _seed_db(tmp_path)
     with pytest.raises(ValueError):
         compose_persona_context(conn, "2026-07-08", "UNKNOWN")
+
+
+def test_rivan_slice_shows_equity_fundamentals_and_grade(tmp_path):
+    """J-9 data plumbing: RIVAN slice mendapat ringkasan fundamental saham
+    individual (revenue/net income/FCF, grade, foreign flow per-saham)."""
+    conn = _seed_db(tmp_path)
+    conn.execute(
+        "INSERT INTO instrument_metadata (instrument, market, sector, lane, is_financial, created_at) "
+        "VALUES ('BBCA', 'IDX', 'Financial Services', 'INVEST', 1, '')"
+    )
+    conn.execute(
+        "INSERT INTO fundamentals_quarterly (instrument, quarter_end, net_interest_income, car, "
+        "npl_gross, nim, ldr, confidence, created_at) VALUES "
+        "('BBCA', '2026-03-31', 15_000_000_000, 25.5, 1.2, 5.8, 80.0, 'FULL', '')"
+    )
+    conn.execute(
+        "INSERT INTO emiten_grade (instrument, graded_at, fund_score, integrity_flags, quadrant, created_at) "
+        "VALUES ('BBCA', '2026-07-01', 88, '[]', 'INVESTABLE', '')"
+    )
+    conn.execute(
+        "INSERT INTO positioning (date, instrument, metric, value, source, created_at) "
+        "VALUES ('2026-07-08', 'BBCA', 'stock_ff_foreign_net_vol', -15_000_000, 'test', '')"
+    )
+    conn.commit()
+
+    text = compose_persona_context(conn, "2026-07-08", "RIVAN")
+    assert "Fundamental saham individual" in text
+    assert "BBCA (Financial Services)" in text
+    assert "CAR=25.5%" in text
+    assert "Grade: INVESTABLE score=88" in text
+    assert "Foreign flow saham (net volume lembar): -15,000,000" in text
+
+
+def test_rivan_slice_equity_line_shows_giel_override(tmp_path):
+    conn = _seed_db(tmp_path)
+    conn.execute(
+        "INSERT INTO instrument_metadata (instrument, market, sector, lane, is_financial, created_at) "
+        "VALUES ('TSLA', 'US', 'Consumer Cyclical', 'INVEST', 0, '')"
+    )
+    conn.execute(
+        "INSERT INTO emiten_grade (instrument, graded_at, fund_score, integrity_flags, quadrant, "
+        "giel_override, created_at) VALUES ('TSLA', '2026-07-01', 60, '[]', 'WATCH', "
+        "'{\"quadrant\": \"INVESTABLE\", \"reason\": \"test\", \"overridden_at\": \"2026-07-08\"}', '')"
+    )
+    conn.commit()
+
+    text = compose_persona_context(conn, "2026-07-08", "RIVAN")
+    assert "Grade: WATCH score=60 (override Giel: INVESTABLE)" in text
+
+
+def test_rivan_slice_no_universe_shows_placeholder(tmp_path):
+    conn = _seed_db(tmp_path)
+    text = compose_persona_context(conn, "2026-07-08", "RIVAN")
+    assert "belum ada emiten individual di universe" in text
+
+
+def test_akela_slice_shows_earnings_calendar(tmp_path):
+    """J-9 data plumbing: AKELA slice mendapat jadwal earnings sbg dimensi
+    timing tambahan (event risk terjadwal, kontrak J-7)."""
+    conn = _seed_db(tmp_path)
+    conn.execute(
+        "INSERT INTO earnings_calendar (instrument, earnings_date, eps_forecast, event_type, created_at) "
+        "VALUES ('BBCA', '2026-07-20', 150.0, 'EARNINGS', '')"
+    )
+    conn.commit()
+
+    text = compose_persona_context(conn, "2026-07-08", "AKELA")
+    assert "Jadwal earnings/corporate action terjadwal" in text
+    assert "BBCA 2026-07-20 [EARNINGS] forecast_eps=150.0" in text
+
+
+def test_akela_slice_no_earnings_shows_placeholder(tmp_path):
+    conn = _seed_db(tmp_path)
+    text = compose_persona_context(conn, "2026-07-08", "AKELA")
+    assert "belum ada earnings/corporate action terjadwal" in text
+
+
+def test_equity_fundamentals_not_leaked_to_gema_leon(tmp_path):
+    """Disiplin slice (pola sama IHSG foreign flow): fundamental saham
+    individual HANYA di RIVAN, jadwal earnings HANYA di AKELA."""
+    conn = _seed_db(tmp_path)
+    conn.execute(
+        "INSERT INTO instrument_metadata (instrument, market, sector, lane, is_financial, created_at) "
+        "VALUES ('BBCA', 'IDX', 'Financial Services', 'INVEST', 1, '')"
+    )
+    conn.execute(
+        "INSERT INTO earnings_calendar (instrument, earnings_date, eps_forecast, event_type, created_at) "
+        "VALUES ('BBCA', '2026-07-20', 150.0, 'EARNINGS', '')"
+    )
+    conn.commit()
+
+    gema_text = compose_persona_context(conn, "2026-07-08", "GEMA")
+    leon_text = compose_persona_context(conn, "2026-07-08", "LEON")
+    assert "Fundamental saham individual" not in gema_text
+    assert "Fundamental saham individual" not in leon_text
+    assert "Jadwal earnings" not in gema_text
+    assert "Jadwal earnings" not in leon_text

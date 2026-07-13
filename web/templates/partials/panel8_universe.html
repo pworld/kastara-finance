@@ -126,6 +126,53 @@
   </section>
 
   <section>
+    <h2>Validasi Lane (Bar-Replay Sign-off)</h2>
+    <div class="panel">
+      <p class="src">Kontrak §13.1 poin 5: "Engine teruji di BTC ≠ teruji di
+        BBRI" — lane instrumen HANYA naik ke TRADE/BOTH setelah kamu
+        benar-benar mereview chart historisnya sendiri (bar-replay manual, di
+        luar dashboard ini, mis. Panel 5). Form ini CUMA MEREKAM keputusan
+        itu — tidak ada validasi otomatis apa pun di baliknya.</p>
+      <div class="form-grid">
+        <div><label class="field">Ticker</label><input type="text" id="laneTicker" placeholder="mis. BBCA"></div>
+        <div>
+          <label class="field">Lane Baru</label>
+          <select id="laneNew">
+            <option value="TRADE">TRADE</option>
+            <option value="BOTH">BOTH</option>
+            <option value="INVEST">INVEST</option>
+            <option value="NONE">NONE</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="field">Evidence (wajib) — apa yang dicek di bar-replay & kesimpulannya</label>
+        <textarea id="laneEvidence" placeholder="mis. Cek 2 tahun candle historis BBCA di Panel 5, zona S&R konsisten dgn kalibrasi fraksi harga, pola breakout/retest valid, tidak ada gap tak wajar di luar ARA/ARB normal..."></textarea>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <button class="btn" id="laneValidateBtn">Rekam Validasi Lane</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Riwayat Validasi Lane</h2>
+    <div class="panel">
+      <div class="tbl-bar" data-tblbar="lanelog"></div>
+      <table data-tblkey="lanelog">
+        <thead><tr>
+          <th data-sort="validated_at">Tanggal</th>
+          <th data-sort="instrument">Ticker</th>
+          <th>Lane Lama → Baru</th>
+          <th>Evidence</th>
+        </tr></thead>
+        <tbody id="laneLogBody"></tbody>
+      </table>
+      <div class="tbl-foot" data-tblfoot="lanelog"></div>
+    </div>
+  </section>
+
+  <section>
     <h2>Rasio Bank (Manual — Khusus Emiten Finansial)</h2>
     <div class="panel">
       <p class="src">CAR/NPL/NIM/LDR TIDAK tersedia di yfinance (dikonfirmasi

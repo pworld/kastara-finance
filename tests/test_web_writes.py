@@ -23,6 +23,7 @@ from web.writes import (
     list_bank_ratios,
     list_grader_log,
     list_intake_log,
+    list_lane_validation_log,
     list_reading_history,
     list_synthesis_log,
     list_trading_journal,
@@ -38,6 +39,7 @@ from web.writes import (
     save_reading_entry,
     save_synthesis,
     score_prediction,
+    validate_lane,
     set_econ_actual,
 )
 
@@ -807,6 +809,84 @@ def test_save_grade_override_updates_latest_grade_preserving_original(tmp_path):
         override = json.loads(row["giel_override"])
         assert override["quadrant"] == "INVESTABLE"
         assert "reason" in override
+
+
+def test_validate_lane_rejects_unknown_lane(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_intake_metadata(conn, instrument="BBRI", market="IDX")
+        try:
+            validate_lane(conn, instrument="BBRI", new_lane="MAYBE", evidence="cek chart")
+            assert False, "lane tidak dikenal seharusnya ditolak"
+        except ValueError as exc:
+            assert "tidak dikenal" in str(exc)
+
+
+def test_validate_lane_requires_evidence(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_intake_metadata(conn, instrument="BBRI", market="IDX")
+        try:
+            validate_lane(conn, instrument="BBRI", new_lane="TRADE", evidence="  ")
+            assert False, "evidence kosong seharusnya ditolak"
+        except ValueError as exc:
+            assert "evidence" in str(exc)
+
+
+def test_validate_lane_returns_none_when_instrument_not_in_universe(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        assert validate_lane(conn, instrument="NOPE", new_lane="TRADE", evidence="cek chart") is None
+
+
+def test_validate_lane_updates_metadata_and_logs_evidence(tmp_path):
+    """Kontrak §13.1 poin 5: naik ke TRADE harus terekam dgn evidence, dan
+    `lane_validated_at` terisi tanggal validasi -- BUKAN NULL lagi."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_intake_metadata(conn, instrument="BBCA", market="IDX", lane="INVEST")
+        conn.commit()
+        meta_before = get_instrument_meta(conn, "BBCA")
+        assert meta_before["lane"] == "INVEST"
+        assert meta_before["lane_validated_at"] is None
+
+        result = validate_lane(
+            conn, instrument="bbca", new_lane="TRADE",
+            evidence="Cek 2 tahun candle historis, zona S&R konsisten, pola breakout/retest valid",
+        )
+        conn.commit()
+        assert result["instrument"] == "BBCA"
+        assert result["old_lane"] == "INVEST"
+        assert result["new_lane"] == "TRADE"
+        assert result["lane_validated_at"] is not None
+
+        meta_after = get_instrument_meta(conn, "BBCA")
+        assert meta_after["lane"] == "TRADE"
+        assert meta_after["lane_validated_at"] == result["lane_validated_at"]
+
+        log = list_lane_validation_log(conn, instrument="BBCA")
+        assert len(log) == 1
+        assert log[0]["old_lane"] == "INVEST"
+        assert log[0]["new_lane"] == "TRADE"
+        assert "breakout" in log[0]["evidence"]
+
+
+def test_list_lane_validation_log_filters_by_instrument(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_intake_metadata(conn, instrument="BBCA", market="IDX")
+        save_intake_metadata(conn, instrument="TSLA", market="US")
+        conn.commit()
+        validate_lane(conn, instrument="BBCA", new_lane="TRADE", evidence="cek chart BBCA")
+        validate_lane(conn, instrument="TSLA", new_lane="TRADE", evidence="cek chart TSLA")
+        conn.commit()
+        assert len(list_lane_validation_log(conn)) == 2
+        assert len(list_lane_validation_log(conn, instrument="BBCA")) == 1
 
 
 def test_list_grader_log_filters_by_instrument(tmp_path):

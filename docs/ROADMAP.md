@@ -21,6 +21,35 @@
 
 ---
 
+<a id="anchor-gap-tersisa"></a>
+## 📍 Gap Tersisa (13 Jul 2026) — ringkasan cepat, TIDAK perlu scroll ke bawah
+
+Semua build/kode dari kontrak sudah selesai. Yang tersisa cuma butuh
+tindakan/keputusan Giel sendiri, bukan development lagi:
+
+1. **Track A — Deploy infra** (auth, Docker/Railway, Telegram bot 2-arah) —
+   sengaja ditunda ("save for release time"), belum dikerjakan sama sekali.
+2. **Bar-replay validation** — mekanismenya SUDAH ADA (Panel 8 "Validasi
+   Lane", lihat §"Update — Mekanisme validasi lane" di bagian Phase J+ di
+   bawah), tapi belum ada satu instrumen pun yang divalidasi. BBCA & TSLA
+   masih `lane=INVEST`, belum `TRADE`.
+3. **Kalibrasi §13 final** — `IDX_ZONE_TOLERANCE_TICKS = 2` di
+   `analysis/calibration.py` masih DRAFT, nunggu Giel konfirmasi/revisi
+   setelah lihat bar-replay beneran (lihat §"Update — J-3: ARA/ARB..." di
+   bawah).
+4. **J-9 prompt persona** — draft teks sudah ada di
+   [`docs/j9_equity_slice_prompt_draft.md`](j9_equity_slice_prompt_draft.md),
+   belum digabung ke `prompts/persona_rivan.txt`/`persona_akela.txt`
+   (suara Giel sendiri, bukan final version dari saya).
+5. **J-5 — sector benchmark** — ditunda, belum worth effort-nya dengan
+   cuma 1 ticker per sektor di universe saat ini.
+
+Detail penuh tiap item ada di section "🔶 Phase J+" di bawah (cari heading
+"**Update —**" terbaru per topik) — poin di atas cuma ringkasan biar tidak
+perlu scroll baca histori lengkapnya.
+
+---
+
 <a id="anchor-cross-check"></a>
 ## 🔍 Cross-check vs Master Plan v1.4
 
@@ -1546,6 +1575,115 @@ sektor — lebih detail dari yang diminta kontrak):**
     403 sama seperti `exchange-flows` di atas, tidak termasuk plan yang
     dipunya. **Giel putuskan drop** bareng item di atas — tidak worth
     dikejar lebih jauh. Tetap Backlog.
+
+**Update — J-3: ARA/ARB sizing buffer (§18 keputusan #4, LOCKED) + fraksi harga
+zone tolerance (§13.1 poin 4, DRAFT) selesai (13 Jul 2026):**
+- **ARA/ARB buffer 1.5×** (`analysis/sizing.py`) — `suggest_position_size()`
+  terima parameter baru `has_daily_limit: bool`. Kalau `True` (dibaca otomatis
+  dari `instrument_metadata.has_daily_limit`, bukan input manual user), jarak
+  SL dikalikan `ARA_ARB_BUFFER_MULT = 1.5` sebelum dipakai hitung ukuran posisi
+  — mengecilkan `suggested_units` supaya risiko riil tidak melebihi budget
+  kalau harga gap lewat SL saat kena ARA/ARB (auto-rejection order IDX, beda
+  dari LULD circuit-breaker US yang masih bisa closed-out). Ini keputusan
+  **terkunci §18**, bukan draft — tidak perlu revisi Giel lagi. Respons API
+  `/api/sizing/suggest` sekarang sertakan `nominal_risk_per_unit` (jarak SL
+  asli, tanpa buffer) berdampingan dengan `risk_per_unit` (sudah dibuffer) —
+  Panel 6 (`panel6.js`) tampilkan keduanya eksplisit kalau buffer dipakai
+  ("buffer ARA/ARB 1.5x diterapkan: jarak nominal X → Y") supaya Giel bisa
+  lihat transparansi hitungannya, bukan cuma angka akhir. 3 test baru
+  (`test_sizing.py`), diverifikasi live: BBCA (`has_daily_limit=1`) tampilkan
+  nominal 100 → buffered 150 dengan benar di Panel 6 browser.
+- **Fraksi harga (tick size) zone tolerance** (`analysis/calibration.py`,
+  file baru) — tabel resmi Peraturan No. II-A BEI (dikonfirmasi WebSearch,
+  bukan tebakan): harga <Rp200 → fraksi Rp1; Rp200-500 → Rp2; Rp500-2rb →
+  Rp5; Rp2rb-5rb → Rp10; ≥Rp5rb → Rp25. `idx_zone_tolerance_pct()` hitung
+  toleransi clustering S&R sbg persentase relatif (`fraksi × 2 ticks ÷ harga
+  acuan`) — **DRAFT**, `IDX_ZONE_TOLERANCE_TICKS = 2` masih perlu dikonfirmasi/
+  direvisi Giel setelah bar-replay validation per §13.1 poin 5 ("engine teruji
+  di BTC ≠ teruji di BBRI"), BEDA dari buffer ARA/ARB di atas yang sudah final.
+  `pipeline/run_analysis.py::run_analysis()` cek `instrument_metadata.market`
+  — kalau `'IDX'`, toleransi dihitung dari close TERBARU via fungsi ini;
+  instrumen lain (semua makro/index existing: BTC/GOLD/IHSG/SP500/USDIDR/
+  USDJPY, tidak punya row `instrument_metadata`) tetap pakai `CLUSTER_TOLERANCE`
+  default 0.5% persis seperti sebelumnya — **dijamin nol regresi** (diverifikasi
+  baik lewat code inspection maupun re-run test suite existing sebelum nambah
+  test baru). `upsert_sr_zone()` terima `tolerance` yang SAMA dgn dipakai
+  `detect_zones()` supaya `zone_bucket_key()` konsisten antar re-run (tidak
+  drift). Summary dict + `_print_summary()` tampilkan persentase toleransi
+  aktual dgn catatan "(kalibrasi IDX, DRAFT)" vs "(default)". 4 test baru
+  (`test_calibration.py`) + 2 test baru (`test_run_analysis.py`, regression
+  guard non-IDX + assert toleransi IDX terpakai benar), 276 test total hijau.
+  **Diverifikasi live**: `python -m pipeline.run_analysis --instrument BBCA`
+  -> toleransi 0.816% (25×2÷6175, sesuai harga BBCA riil ~Rp6175), 0 zona baru
+  (bucket existing tetap match, tidak drift); `--instrument TSLA` -> tetap
+  0.500% default (bukan IDX, tidak terpengaruh sama sekali).
+
+**Update — Mekanisme validasi lane / bar-replay sign-off selesai (13 Jul
+2026, kontrak §13.1 poin 5):** Giel review "Tidak usah, saya review langsung
+dari Panel 5" utk materi persiapan bar-replay (tidak butuh dibangunkan alat
+bantu khusus) — TAPI dia tetap butuh **jalur untuk merekam hasil** review itu
+begitu selesai, karena `instrument_metadata.lane`/`lane_validated_at`
+sebelumnya tidak ada UI/API sama sekali buat menulisnya (cuma terisi manual
+lewat `sqlite3` langsung, tidak scalable & tidak ada jejak audit). Dibangun:
+- **Tabel baru `lane_validation_log`** (`db/schema.sql`, append-only, pola
+  sama `intake_log`/`grader_log`) — `evidence TEXT NOT NULL`, jejak
+  instrument/old_lane/new_lane/validated_at per keputusan. `db/connection.py`
+  `EXPECTED_TABLES` + `tests/test_db.py` diupdate (21 → 22 tabel).
+- **`web/writes.py::validate_lane()`** — SATU-SATUNYA jalur yang boleh
+  mengubah `instrument_metadata.lane` / mengisi `lane_validated_at`. Guard di
+  level fungsi (bukan cuma UI, pola sama `save_intake_metadata`/
+  `save_grade_override`): `evidence` wajib non-kosong, `new_lane` harus salah
+  satu TRADE/INVEST/BOTH/NONE, return `None` kalau instrumen belum ada di
+  `instrument_metadata` (harus intake dulu). TIDAK PERNAH dipanggil otomatis
+  oleh `run_analysis`/`seed_universe`/backfill manapun — murni tindakan
+  manual lewat form. `list_lane_validation_log()` utk riwayat, filter
+  opsional per instrumen.
+- **Routes baru** `POST /api/emiten/<ticker>/validate_lane` +
+  `GET /api/lane_validation_log` (`web/app.py`).
+- **Panel 8 UI baru** (`panel8_universe.html`/`panel8.js`): section "Validasi
+  Lane (Bar-Replay Sign-off)" (ticker + dropdown lane baru + textarea
+  evidence wajib) + tabel "Riwayat Validasi Lane" (kolom lane lama→baru +
+  evidence), wired ke `refreshAll()` di `main.js`.
+- 7 test baru (`test_web_writes.py`: reject lane tidak dikenal, reject
+  evidence kosong, return None kalau belum intake, update metadata + log
+  evidence dgn benar, filter log per instrumen), 281 test total hijau.
+  **Diverifikasi live** via browser (fetch langsung, bukan klik form, supaya
+  tidak menyentuh judgment BBCA/TSLA yang sebenarnya): intake ticker
+  disposable `ZZTEST` → validasi TRADE dgn evidence → cek log tercatat benar
+  → **dibersihkan lagi dari DB produksi** (0 row tersisa, dikonfirmasi
+  query). BBCA & TSLA TETAP `lane=INVEST`, `lane_validated_at=NULL` seperti
+  semula — mekanisme sudah siap, tapi keputusan bar-replay yang sebenarnya
+  tetap milik Giel sepenuhnya, tidak difabrikasi di sini.
+
+**Update — J-9 data plumbing + draft prompt equity slice (13 Jul 2026):**
+Giel minta "lanjutkan" 3 hal sekaligus (bar-replay validation, kalibrasi
+§13, prompt J-9) — utk J-9, split lagi jadi "mekanisme" (bisa dibangun) vs
+"suara/kata-kata prompt" (harus Giel sendiri, sama seperti keputusan
+sebelumnya di Track D bahwa prompt persona adalah cara berpikir Giel).
+- **Data plumbing** (`pipeline/compose_persona_context.py`) —
+  `_equity_fundamentals_lines()` (fundamentals_quarterly + emiten_grade +
+  foreign-flow-per-saham J-8, per instrumen di `instrument_metadata`) dan
+  `_earnings_calendar_lines()` (earnings_calendar J-7, peruntukannya utk
+  AKELA sudah ditulis eksplisit di komentar schema sejak J-7 dibangun) —
+  ditambahkan ke `_slice_rivan()` dan `_slice_akela()`. Instrumen bank
+  (`is_financial=1`) tampil NII/CAR/NPL/NIM/LDR, non-bank tampil
+  Revenue/NetIncome/FCF + flag `confidence` (FULL/LOW_CONFIDENCE). Grade
+  tampil kuadran+score+override Giel (kalau ada, ASLI tetap terlihat
+  bareng). GEMA/LEON TIDAK disentuh (disiplin slice, konsisten dgn pola
+  IHSG foreign flow yg sudah ada). 9 test baru
+  (`test_compose_persona_context.py`), 287 test total hijau. **Diverifikasi
+  live** thd DB produksi: RIVAN slice tampil BBCA (bank, CAR/NPL/NIM/LDR
+  masih `n/a` krn belum diisi manual Giel, NII terisi dari yfinance,
+  grade WATCH score=100, foreign flow -14.912.000 lembar) + TSLA (Revenue/
+  NetIncome/FCF terisi, confidence=LOW_CONFIDENCE, grade WATCH score=100);
+  AKELA slice tampil earnings BBCA & TSLA 2026-07-22 dgn forecast EPS.
+- **Prompt teks itu sendiri BELUM diubah** — didraft terpisah di
+  `docs/j9_equity_slice_prompt_draft.md` (proposal, BUKAN ditulis ke
+  `prompts/persona_rivan.txt`/`persona_akela.txt` yang gitignored/personal
+  IP Giel). Draft mengusulkan RIVAN dapat penjelasan data equity + panduan
+  "grade bukan vonis final", AKELA dapat penjelasan earnings-date sbg event
+  risk terjadwal. GEMA/LEON sengaja tidak diusulkan berubah sama sekali.
+  Giel yang putuskan apakah dipakai, diedit, atau dibuang.
 
 ## Prinsip Perubahan Roadmap
 

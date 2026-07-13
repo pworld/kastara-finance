@@ -282,6 +282,24 @@ CREATE TABLE IF NOT EXISTS intake_log (
     created_at TEXT
 );
 
+-- 22. Lane validation log (Phase J+ Build Contract v1.3 §13.1 poin 5, J-9/
+-- "lanjutan") -- jejak audit setiap kali Giel merekam hasil review bar-replay
+-- manual per instrumen ("Engine teruji di BTC != teruji di BBRI, validasi per
+-- instrumen wajib sebelum lane naik ke TRADE"). Append-only (pola sama
+-- intake_log/grader_log) -- TIDAK PERNAH ditulis otomatis oleh kode manapun,
+-- cuma lewat form Panel 8 yang Giel isi sendiri setelah dia benar-benar
+-- melihat chart historis. `evidence` WAJIB non-kosong (padanan `reason` di
+-- intake_log) -- keputusan "lane naik ke TRADE" harus terdokumentasi kenapa,
+-- bukan sekadar toggle kosong.
+CREATE TABLE IF NOT EXISTS lane_validation_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    instrument TEXT,
+    validated_at TEXT,
+    old_lane TEXT, new_lane TEXT,
+    evidence TEXT NOT NULL,   -- catatan Giel: apa yang dicek di bar-replay, kesimpulannya
+    created_at TEXT
+);
+
 -- Index untuk performa query range-tanggal saat histori membesar (5 tahun+).
 
 -- asset_ohlcv: query utama selalu "WHERE instrument = ? ORDER BY date" (chart,
