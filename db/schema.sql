@@ -249,6 +249,21 @@ CREATE TABLE IF NOT EXISTS grader_log (
     created_at TEXT
 );
 
+-- 21. Intake log (Phase J+ Build Contract v1.3 §19.3 Komponen C Gelombang 2,
+-- J-12) -- padanan prediction_log utk keputusan intake kandidat: kandidat di
+-- luar universe diuji pakai rubrik SAMA (tidak ada jalur istimewa, kontrak
+-- §16), keputusan Giel (universe/watchlist/tolak) TERCATAT + alasan WAJIB
+-- (reason NOT NULL) -- bisa diaudit nanti, bukan hilang begitu saja.
+CREATE TABLE IF NOT EXISTS intake_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    instrument TEXT,
+    decided_at TEXT,
+    decision TEXT,          -- UNIVERSE / WATCHLIST / TOLAK
+    reason TEXT NOT NULL,
+    grade_snapshot TEXT,     -- JSON: {fund_score, integrity_flags, quadrant} saat keputusan diambil
+    created_at TEXT
+);
+
 -- Index untuk performa query range-tanggal saat histori membesar (5 tahun+).
 
 -- asset_ohlcv: query utama selalu "WHERE instrument = ? ORDER BY date" (chart,

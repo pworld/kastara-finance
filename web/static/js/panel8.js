@@ -45,3 +45,63 @@ $("#intakeSaveBtn").addEventListener("click", async () => {
   $("#intakeDailyLimit").checked = false;
   loadUniverse();
 });
+
+// ---------- Uji Kelayakan Kandidat (Gelombang 2, kontrak §19.3/§16) ----------
+let lastGradeSnapshot = null;
+
+$("#ujiIntegritasBtn").addEventListener("click", async () => {
+  const instrument = $("#ujiTicker").value.trim();
+  if (!instrument) { toast("Ticker wajib diisi"); return; }
+  const result = await (await fetch(`/api/intake/integrity_check?instrument=${encodeURIComponent(instrument)}`)).json();
+  const flagText = result.uma_active
+    ? `<span class="badge lane-none" style="border-color:var(--high);color:var(--high)">UMA_ACTIVE</span>`
+    : `<span class="badge LOW">bersih (tidak ada UMA baru-baru ini)</span>`;
+  $("#ujiResult").innerHTML = `Cek Integritas ${instrument}: ${flagText} `
+    + `(${result.uma_history.length} riwayat UMA ditemukan di laman)`;
+});
+
+$("#ujiGradeBtn").addEventListener("click", async () => {
+  const instrument = $("#ujiTicker").value.trim();
+  if (!instrument) { toast("Ticker wajib diisi"); return; }
+  const result = await postJSON("/api/intake/grade", { instrument });
+  if (result.error) { toast(result.error); return; }
+  lastGradeSnapshot = result;
+  $("#ujiResult").innerHTML = `Grade ${instrument}: score=${result.fund_score}, `
+    + `kuadran=<b>${result.quadrant}</b>, flags=${JSON.stringify(result.integrity_flags)}`;
+  toast(`Grade ${instrument}: ${result.quadrant}`);
+  loadUniverse();
+});
+
+$("#ujiDecisionBtn").addEventListener("click", async () => {
+  const instrument = $("#ujiTicker").value.trim();
+  const reason = $("#ujiReason").value.trim();
+  if (!instrument) { toast("Ticker wajib diisi"); return; }
+  if (!reason) { toast("Alasan wajib diisi"); return; }
+  const result = await postJSON("/api/intake/decision", {
+    instrument, decision: $("#ujiDecision").value, reason,
+    grade_snapshot: lastGradeSnapshot,
+  });
+  if (result.error) { toast(result.error); return; }
+  toast(`Keputusan ${instrument} tercatat`);
+  $("#ujiReason").value = "";
+  loadIntakeLog();
+});
+
+function renderIntakeLogTable() {
+  const { pageRows, total, totalPages } = applyTableControls("intakelog", tableCache.intakelog || [], {
+    searchFields: ["instrument", "decision", "reason"],
+  });
+  $("#intakeLogBody").innerHTML = pageRows.map(r => `<tr>
+    <td class="src">${r.decided_at}</td>
+    <td>${r.instrument}</td>
+    <td><span class="badge ${r.decision === "TOLAK" ? "HIGH" : r.decision === "WATCHLIST" ? "MED" : "LOW"}">${r.decision}</span></td>
+    <td>${r.reason}</td>
+  </tr>`).join("") || `<tr><td colspan="4" class="src">belum ada keputusan intake</td></tr>`;
+  renderTableBar("intakelog", total, totalPages, renderIntakeLogTable);
+}
+tableRerender.intakelog = renderIntakeLogTable;
+
+async function loadIntakeLog() {
+  tableCache.intakelog = await (await fetch("/api/intake/log")).json();
+  renderIntakeLogTable();
+}

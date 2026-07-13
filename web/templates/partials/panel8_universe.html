@@ -64,4 +64,52 @@
       </div>
     </div>
   </section>
+
+  <section>
+    <h2>Uji Kelayakan Kandidat (Gelombang 2)</h2>
+    <div class="panel">
+      <p class="src">Rubrik SAMA dengan universe existing — tidak ada jalur
+        istimewa. Ticker harus sudah tersimpan (Gelombang 1 di atas, atau
+        sudah ada di Universe) sebelum diuji di sini.</p>
+      <div class="form-grid">
+        <div><label class="field">Ticker</label><input type="text" id="ujiTicker" placeholder="mis. BBRI"></div>
+        <div style="align-self:end"><button class="btn secondary" id="ujiIntegritasBtn">1. Cek Integritas (UMA)</button></div>
+        <div style="align-self:end"><button class="btn secondary" id="ujiGradeBtn">2. Jalankan Grade</button></div>
+      </div>
+      <div id="ujiResult" class="src" style="margin-top:8px"></div>
+
+      <div class="form-row" style="margin-top:16px">
+        <label class="field">3. Keputusan</label>
+        <select id="ujiDecision">
+          <option value="UNIVERSE">Masuk Universe</option>
+          <option value="WATCHLIST">Watchlist</option>
+          <option value="TOLAK">Tolak</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="field">Alasan (wajib)</label>
+        <textarea id="ujiReason" placeholder="Kenapa keputusan ini diambil?"></textarea>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <button class="btn" id="ujiDecisionBtn">Catat Keputusan</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Riwayat Keputusan Intake</h2>
+    <div class="panel">
+      <div class="tbl-bar" data-tblbar="intakelog"></div>
+      <table data-tblkey="intakelog">
+        <thead><tr>
+          <th data-sort="decided_at">Tanggal</th>
+          <th data-sort="instrument">Ticker</th>
+          <th data-sort="decision">Keputusan</th>
+          <th>Alasan</th>
+        </tr></thead>
+        <tbody id="intakeLogBody"></tbody>
+      </table>
+      <div class="tbl-foot" data-tblfoot="intakelog"></div>
+    </div>
+  </section>
 </div>

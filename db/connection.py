@@ -42,6 +42,7 @@ EXPECTED_TABLES = [
     "sector_benchmark",
     "emiten_grade",
     "grader_log",
+    "intake_log",
 ]
 
 

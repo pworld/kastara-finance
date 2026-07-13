@@ -17,7 +17,7 @@
 | **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — `plan_d.txt` (dihapus setelah selesai) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
 | **E** | Telegram bot | ✅ **Selesai (push satu arah)** — `plan_e.txt` (dihapus setelah selesai) dieksekusi penuh, Daily Briefing manual (CLI + tombol Panel 6); bot commands dua-arah ditunda ke backlog |
 | **F+** | Multi-aset expansion | 🟡 **GOLD/SP500/IHSG/USDIDR/USDJPY aktif** (S&R+signals+context weight) — altcoin/saham/komoditas lain belum |
-| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026), Gerbang G1/G2/G3 DIJAWAB (13 Jul 2026)** — universe = **BBCA + TSLA**; **J-14/J-2/J-4/J-3(groundwork)/J-3b/J-10/J-7 SELESAI**; sisa: **J-5** (sector benchmark, ditunda — belum worth dgn 1 ticker/sektor), **J-6** (bank ratio CAR/NPL/NIM/LDR — kemungkinan manual dari laporan, Giel masih pikirkan), **J-8/J-9/J-11/J-12/J-13/J-15**, + validasi bar-replay manual & kalibrasi §13 (keputusan Giel, bukan otomatis) |
+| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026), Gerbang G1/G2/G3 DIJAWAB (13 Jul 2026)** — universe = **BBCA + TSLA**; **J-14/J-2/J-4/J-3(groundwork)/J-3b/J-10/J-7/J-11(Grader DRAFT v1)/J-12+J-15-KomponenC(intake workflow penuh) SELESAI**; sisa: **J-5** (ditunda), **J-6** (Giel masih pikirkan), **J-8/J-9/J-13/J-15-KomponenB&D**, + validasi bar-replay manual & kalibrasi §13 (keputusan Giel, bukan otomatis) |
 
 ---
 
@@ -1111,6 +1111,106 @@ sendiri lewat review chart, bukan sesuatu yang diputuskan otomatis di sini).
   Panel 3 sumbu waktu (gabung visual dgn `econ_calendar`), WARNING utk
   posisi `trading_journal.outcome='ONGOING'` yang mendekati earnings — itu
   J-15 (prasyarat J-4 sudah selesai, tinggal J-11 grader + UI-nya).
+
+**Update — J-11 selesai (Modul Emiten Grader, DRAFT v1):**
+> ⚠️ **Rubrik DRAFT, bukan spesifikasi final Giel** — dokumen sumber "v1.1"
+> yang berisi rubrik resmi (bobot fund_score, daftar lengkap flag) TIDAK
+> tersedia saat modul ini dibangun. Disusun dari konsep umum kontrak (dua
+> sumbu: fund_score × integrity flags → kuadran), pola sama dgn 5 tabel
+> Phase J+ yang sebelumnya juga ditandai draft. **Koreksi kapan pun kalau
+> meleset dari rubrik asli Giel.**
+- [x] **`analysis/grader.py`** (BARU, pure function) —
+      **Axis 1 fund_score (0-100)**: 4 komponen @25 poin dari
+      `fundamentals_quarterly` kuartal TERBARU, kriteria beda bank
+      (`is_financial=1`: net_income>0, net_interest_income>0, net_margin>0,
+      equity>0) vs non-bank (revenue>0, net_margin>0, operating_cash_flow>0,
+      free_cash_flow>0). **Bug ditemukan & diperbaiki saat nulis test**:
+      net_margin = net_income/revenue bisa keliru "positif" kalau KEDUANYA
+      negatif (mis. -500jt/-1 = angka besar positif) — di-guard jadi cuma
+      valid kalau `revenue > 0` (bukan cuma `!= 0`).
+      **Axis 2 integrity_flags**: `UMA_ACTIVE` (RED, dari scraper baru),
+      `NEGATIVE_NET_INCOME`/`NEGATIVE_EQUITY` (RED, dari fundamentals
+      langsung), `LOW_CONFIDENCE_FUNDAMENTALS` (ORANGE, kuartal <8).
+      **Kuadran**: RED flag mana pun → **AVOID** (veto mutlak, "grader =
+      REM bukan stempel" — kontrak §16), lalu INVESTABLE (score≥70, tanpa
+      flag) / WATCH (40-69, atau ≥70 dgn ORANGE) / SPECULATIVE (<40).
+      Data fundamental kosong (belum digrade) → SPECULATIVE, BUKAN AVOID
+      (kosong ≠ red flag aktif, tidak boleh disamakan).
+- [x] **`scrapers/idx_uma.py`** (BARU, J-11a) — sumber laman berita UMA
+      idx.co.id: **SSR (server-rendered)**, BEDA dari laman "Financial
+      Data and Ratio" yang gagal diriset sesi sebelumnya (client-side) —
+      1x GET langsung dapat payload `__NUXT__` penuh berisi 1115+ referensi
+      PDF pengumuman, TANPA perlu interaksi filter/JS. Pola nama file
+      dikonfirmasi live: `YYYYMMDD-UMA_<TICKER>.pdf` / `YYYYMMDD-WAS_UMA_
+      <TICKER>.pdf`. `is_recently_flagged()` — heuristik KONSERVATIF
+      (window 90 hari, entri WAS_ TETAP dihitung krn semantik resminya
+      "UMA selesai" tidak dikonfirmasi) — asumsi eksplisit, revisit kalau
+      Giel punya kejelasan semantik resmi.
+- [x] **`pipeline/run_grader.py`** (BARU, J-11b/c/d/e orchestrator) —
+      baca fundamentals TERBARU + UMA live per instrumen → `grade_emiten()`
+      → **APPEND** ke `emiten_grade` (histori grade, bukan overwrite) +
+      **`grader_log` HANYA ditambah kalau kuadran BERUBAH** dari grade
+      sebelumnya (anti-overtuning, dites eksplisit: run 2x data sama →
+      `grader_log` tidak nambah baris, `emiten_grade` tetap append).
+- 26 test baru (`test_idx_uma.py`, `test_grader.py`, `test_run_grader.py`)
+  — termasuk regression test utk bug net_margin di atas, veto RED-flag
+  vs skor tinggi, dan anti-overtuning grader_log. 245 test hijau total.
+  **Diverifikasi live penuh terhadap DB asli**: BBCA & TSLA sama-sama
+  `fund_score=100, quadrant=WATCH` (ditahan dari INVESTABLE oleh flag
+  `LOW_CONFIDENCE_FUNDAMENTALS` — 5 kuartal data, bukan 8), tidak ada
+  `UMA_ACTIVE` utk keduanya (masuk akal, blue-chip). Panel 8 browser:
+  kolom Kuadran/Score/Flags SEKARANG terisi data asli (sebelumnya "belum
+  digrade"/`-`), tanpa console error.
+- **BELUM otomatis (J-11a lanjutan, riset lebih jauh diperlukan)**: papan
+  pemantauan khusus (laman `daftar-efek-pemantauan-khusus` ternyata JS-
+  client-side spt financial-ratio, bukan SSR spt UMA — gagal diriset
+  dgn cara yang sama) dan riwayat suspensi 12 bulan (J8-J10 kontrak) —
+  scraper BELUM dibangun, flag utk ini kalau ada bisa dimasukkan manual
+  lewat parameter `extra_flags` di `grade_emiten()`.
+- **Belum dikerjakan** (di luar scope J-11 "engine murni"): kolom
+  `emiten_grade.giel_override` (disebut di Addendum A §19.2 Komponen B
+  tapi belum ada di schema.sql — gap ditemukan saat riset, perlu
+  ditambahkan saat J-15 dibangun), UI Panel 8 Komponen B/D (detail emiten +
+  grader log view, J-15), widget "Nilai Outcome" grader_log 3/6 bulan.
+
+**Update — J-12/J-15 Komponen C Gelombang 2 selesai (intake workflow penuh):**
+- [x] **Tabel `intake_log`** (schema.sql, BARU) — padanan `prediction_log`
+      utk keputusan intake: `instrument, decided_at, decision
+      (UNIVERSE/WATCHLIST/TOLAK), reason TEXT NOT NULL, grade_snapshot
+      JSON, created_at`. Total tabel 20→21, `EXPECTED_TABLES` +
+      `test_db.py` disesuaikan.
+- [x] **`web/writes.py::save_intake_decision()`** — guard di level fungsi
+      (bukan cuma UI): `decision` harus salah satu UNIVERSE/WATCHLIST/TOLAK,
+      **`reason` WAJIB non-kosong** (raise `ValueError` kalau tidak) —
+      kontrak §16: "emiten yang masuk karena hype/rekomendasi justru
+      paling butuh flag integritas, grader adalah REM bukan stempel."
+      `list_intake_log()` utk riwayat.
+- [x] **3 route baru `web/app.py`** — `GET /api/intake/integrity_check`
+      (reuse `scrapers.idx_uma`, READ-ONLY, tidak menulis apa pun),
+      `POST /api/intake/grade` (reuse `run_grader()` PERSIS dari J-11,
+      bukan logic terpisah — menulis ke `emiten_grade`/`grader_log` sama
+      seperti run_grader biasa), `POST /api/intake/decision` +
+      `GET /api/intake/log`.
+- [x] **Panel 8 UI**: section baru "Uji Kelayakan Kandidat (Gelombang 2)"
+      — input ticker + 3 tombol berurutan (Cek Integritas → Jalankan Grade
+      → catat Keputusan dgn dropdown + textarea alasan wajib), + tabel
+      "Riwayat Keputusan Intake".
+- 3 test baru (`test_web_writes.py`: reason kosong ditolak, decision tidak
+  dikenal ditolak, insert+list normal), 248 test hijau total.
+  **Diverifikasi live penuh via browser**: alur 3 langkah dicoba end-to-end
+  utk BBCA — Cek Integritas → "bersih (tidak ada UMA baru-baru ini)",
+  Jalankan Grade → "score=100, kuadran=WATCH, flags=
+  [LOW_CONFIDENCE_FUNDAMENTALS]" (match hasil J-11), Catat Keputusan →
+  muncul di tabel Riwayat Keputusan Intake dengan snapshot grade
+  ter-lampir. Data uji dibersihkan dari `intake_log` setelah verifikasi
+  (baris `emiten_grade` hasil re-grade dibiarkan — itu histori asli,
+  bukan sampah uji, `grader_log` dikonfirmasi TIDAK nambah baris karena
+  kuadran tidak berubah).
+- **Belum dikerjakan**: form fundamental manual (n kuartal, `source=
+  'manual'`) yang disebut kontrak §19.3 gelombang 2 — saat ini fundamental
+  kandidat harus sudah ada lewat `backfill_fundamentals` (yfinance) dulu
+  sebelum "Jalankan Grade" berguna; kalau kandidat tidak listed/tidak ada
+  di yfinance, perlu jalur input manual terpisah (belum dibangun).
 
 **Update — lanjutan kickoff (Giel bilang "oke lanjut", isi BBCA saja dulu):**
 - [x] **5 tabel Phase J+ dibangun sebagai DRAFT** (`fundamentals_quarterly`,

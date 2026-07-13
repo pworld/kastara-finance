@@ -17,10 +17,12 @@ from web.writes import (
     list_positioning,
     list_predictions,
     list_reading_entries,
+    list_intake_log,
     list_reading_history,
     list_synthesis_log,
     list_trading_journal,
     list_universe,
+    save_intake_decision,
     save_intake_metadata,
     save_outlook,
     save_panel4,
@@ -577,3 +579,45 @@ def test_get_instrument_meta_found_and_missing(tmp_path):
         conn.commit()
         assert get_instrument_meta(conn, "bbri")["lane"] == "INVEST"
         assert get_instrument_meta(conn, "BTC") is None
+
+
+# ---------- Panel 8 Komponen C Gelombang 2: Intake decision (Phase J+ §19.3/§16) ----------
+
+def test_save_intake_decision_requires_reason(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        try:
+            save_intake_decision(conn, instrument="BBRI", decision="UNIVERSE", reason="")
+            assert False, "reason kosong seharusnya ditolak"
+        except ValueError as exc:
+            assert "reason" in str(exc)
+
+
+def test_save_intake_decision_rejects_unknown_decision(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        try:
+            save_intake_decision(conn, instrument="BBRI", decision="MAYBE", reason="alasan valid")
+            assert False, "decision tidak dikenal seharusnya ditolak"
+        except ValueError as exc:
+            assert "tidak dikenal" in str(exc)
+
+
+def test_save_intake_decision_inserts_and_lists(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        new_id = save_intake_decision(
+            conn, instrument="bbri", decision="watchlist", reason="Fundamental oke, tunggu bar-replay",
+            grade_snapshot={"fund_score": 75.0, "quadrant": "WATCH"},
+        )
+        conn.commit()
+        assert new_id is not None
+        rows = list_intake_log(conn)
+        assert len(rows) == 1
+        assert rows[0]["instrument"] == "BBRI"
+        assert rows[0]["decision"] == "WATCHLIST"
+        assert rows[0]["reason"] == "Fundamental oke, tunggu bar-replay"
+        assert "fund_score" in rows[0]["grade_snapshot"]

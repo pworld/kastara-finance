@@ -24,6 +24,7 @@ async function refreshAll() {
   await loadDuePredictions();
   await loadHistory();
   await loadUniverse();
+  await loadIntakeLog();
 }
 $("#refresh").addEventListener("click", refreshAll);
 refreshAll();

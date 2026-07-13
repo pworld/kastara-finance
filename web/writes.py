@@ -21,10 +21,11 @@ Konvensi `reading_workspace.lens` (Panel 4 & 6, bukan enum ketat di DB):
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from typing import Any
 
-from scrapers.base import created_at
+from scrapers.base import created_at, today_wib
 
 READING_LENSES = ("GEMA", "LEON", "AKELA", "RIVAN")
 
@@ -440,3 +441,45 @@ def save_intake_metadata(
         f"INSERT OR REPLACE INTO instrument_metadata ({cols}) VALUES ({placeholders})", row,
     )
     return row
+
+
+# ---------- Panel 8 Komponen C Gelombang 2: Intake Kandidat penuh (Phase
+# J+ Build Contract v1.3 §19.3/§16, J-12) — keputusan Giel atas kandidat
+# (universe/watchlist/tolak) TERCATAT + alasan WAJIB, padanan
+# prediction_log utk keputusan intake. Rubrik SAMA dgn universe existing
+# (tidak ada jalur istimewa, §16) -- fungsi ini cuma CATAT keputusan,
+# grade-nya sendiri dihitung run_grader() (J-11) yang sudah ada. ----------
+
+INTAKE_DECISIONS = ("UNIVERSE", "WATCHLIST", "TOLAK")
+
+
+def save_intake_decision(
+    conn: sqlite3.Connection, *, instrument: str, decision: str, reason: str,
+    grade_snapshot: dict[str, Any] | None = None,
+) -> int:
+    """Catat keputusan Giel atas kandidat intake. `reason` WAJIB non-kosong
+    -- kandidat yang masuk karena hype/rekomendasi justru paling butuh
+    alasan tertulis (kontrak §16: "grader adalah REM di momen tertarik,
+    bukan stempel"), ditegakkan di level fungsi bukan cuma UI."""
+    decision = (decision or "").upper()
+    if decision not in INTAKE_DECISIONS:
+        raise ValueError(
+            f"decision '{decision}' tidak dikenal -- pilihan: {'/'.join(INTAKE_DECISIONS)}"
+        )
+    if not reason or not reason.strip():
+        raise ValueError("reason wajib diisi (kontrak §16 -- tidak ada jalur istimewa tanpa alasan)")
+    cur = conn.execute(
+        "INSERT INTO intake_log (instrument, decided_at, decision, reason, grade_snapshot, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (instrument.upper(), today_wib(), decision, reason.strip(),
+         json.dumps(grade_snapshot) if grade_snapshot else None, created_at()),
+    )
+    return cur.lastrowid
+
+
+def list_intake_log(conn: sqlite3.Connection, limit: int = 100) -> list[dict[str, Any]]:
+    """Riwayat keputusan intake, terbaru dulu."""
+    rows = conn.execute(
+        "SELECT * FROM intake_log ORDER BY decided_at DESC, id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    return [dict(r) for r in rows]

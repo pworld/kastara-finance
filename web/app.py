@@ -36,7 +36,9 @@ from indicators.calc import compare_from_series
 from notify.telegram import send_message
 from pipeline.compose_briefing import compose_daily_briefing
 from pipeline.compose_persona_context import compose_persona_context
+from pipeline.run_grader import run_grader
 from scrapers.base import today_wib
+from scrapers.idx_uma import fetch_uma_announcements, is_recently_flagged, uma_history_for
 
 app = Flask(__name__)
 
@@ -748,6 +750,65 @@ def intake_add():
     except (KeyError, ValueError) as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify(row)
+
+
+# ---------- PHASE J+: Panel 8 Komponen C Gelombang 2 — intake workflow
+# penuh (Build Contract v1.3 §19.3/§16, J-12). Rubrik SAMA dgn universe
+# existing (reuse run_grader/idx_uma, tidak ada logic terpisah). ----------
+
+@app.get("/api/intake/integrity_check")
+def intake_integrity_check():
+    """Cek UMA utk 1 ticker -- tombol 'Jalankan Cek Integritas'. Read-only,
+    TIDAK menulis apa pun (beda dari /api/intake/grade)."""
+    instrument = request.args.get("instrument", "").upper()
+    uma_result = fetch_uma_announcements()
+    history = uma_history_for(uma_result["items"], instrument)
+    return jsonify({
+        "instrument": instrument,
+        "uma_active": is_recently_flagged(uma_result["items"], instrument),
+        "uma_history": history[:5],
+        "source_flags": uma_result["source_flags"],
+    })
+
+
+@app.post("/api/intake/grade")
+def intake_grade_run():
+    """Jalankan grade utk 1 instrumen -- tombol 'Jalankan Grade'. Reuse
+    run_grader() (J-11 orchestrator persis, bukan logic terpisah) --
+    MENULIS ke emiten_grade/grader_log, sama seperti run_grader biasa."""
+    body = request.get_json(force=True)
+    instrument = (body.get("instrument") or "").upper()
+    if not instrument:
+        return jsonify({"error": "instrument wajib diisi"}), 400
+    summary = run_grader(instrument=instrument)
+    if instrument not in summary:
+        return jsonify({"error": f"instrumen {instrument} tidak ditemukan di instrument_metadata"}), 404
+    return jsonify({"instrument": instrument, **summary[instrument]})
+
+
+@app.post("/api/intake/decision")
+def intake_decision_save():
+    """Catat keputusan Giel (universe/watchlist/tolak) + alasan wajib.
+    Guard `reason` non-kosong & `decision` valid ada di web.writes,
+    bukan cuma di sini."""
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            new_id = writes.save_intake_decision(
+                conn, instrument=body["instrument"], decision=body["decision"],
+                reason=body.get("reason", ""), grade_snapshot=body.get("grade_snapshot"),
+            )
+            conn.commit()
+    except (KeyError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"id": new_id})
+
+
+@app.get("/api/intake/log")
+def intake_log_list():
+    with get_connection() as conn:
+        rows = writes.list_intake_log(conn, limit=request.args.get("limit", 100, type=int))
+    return jsonify(rows)
 
 
 def main() -> None:
