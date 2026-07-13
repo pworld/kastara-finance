@@ -1,4 +1,6 @@
 """Test web/writes.py — pure functions tulis-DB untuk Phase C (tanpa Flask)."""
+import json
+
 from db.connection import get_connection, init_db
 from web.writes import (
     compute_disonansi,
@@ -17,11 +19,17 @@ from web.writes import (
     list_positioning,
     list_predictions,
     list_reading_entries,
+    get_emiten_detail,
+    list_bank_ratios,
+    list_grader_log,
     list_intake_log,
     list_reading_history,
     list_synthesis_log,
     list_trading_journal,
     list_universe,
+    save_bank_ratios_manual,
+    save_grade_override,
+    save_grader_outcome,
     save_intake_decision,
     save_intake_metadata,
     save_outlook,
@@ -659,3 +667,188 @@ def test_save_intake_decision_inserts_and_lists(tmp_path):
         assert rows[0]["decision"] == "WATCHLIST"
         assert rows[0]["reason"] == "Fundamental oke, tunggu bar-replay"
         assert "fund_score" in rows[0]["grade_snapshot"]
+
+
+# ---------- Rasio prudential bank manual (CAR/NPL/NIM/LDR, Phase J+ §2 J7/J-6) ----------
+
+def test_save_bank_ratios_manual_inserts_new_row(tmp_path):
+    """Kuartal belum ada di fundamentals_quarterly sama sekali -- INSERT
+    baris baru source='manual'."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_bank_ratios_manual(
+            conn, instrument="bbca", quarter_end="2026-03-31",
+            car=25.5, npl_gross=1.2, nim=5.8, ldr=78.3,
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM fundamentals_quarterly WHERE instrument='BBCA' AND quarter_end='2026-03-31'"
+        ).fetchone()
+        assert row["car"] == 25.5
+        assert row["npl_gross"] == 1.2
+        assert row["source"] == "manual"
+
+
+def test_save_bank_ratios_manual_does_not_clobber_yfinance_row(tmp_path):
+    """Kuartal SUDAH ada dari yfinance (revenue/net_income terisi) -- input
+    manual rasio bank cuma update 4 kolom rasio, TIDAK menimpa data lain."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        conn.execute(
+            "INSERT INTO fundamentals_quarterly (instrument, quarter_end, revenue, "
+            "net_income, source, confidence, created_at) VALUES "
+            "('BBCA', '2026-03-31', 28000000000000, 14000000000000, 'yfinance', 'LOW_CONFIDENCE', '')"
+        )
+        conn.commit()
+        save_bank_ratios_manual(conn, instrument="BBCA", quarter_end="2026-03-31", car=25.5)
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM fundamentals_quarterly WHERE instrument='BBCA' AND quarter_end='2026-03-31'"
+        ).fetchone()
+        assert row["car"] == 25.5
+        assert row["revenue"] == 28000000000000  # TIDAK ter-clobber
+        assert row["source"] == "yfinance"  # source asli tetap, bukan ketimpa 'manual'
+
+
+def test_list_bank_ratios_only_rows_with_ratio_filled(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        conn.execute(
+            "INSERT INTO fundamentals_quarterly (instrument, quarter_end, revenue, created_at) "
+            "VALUES ('BBCA', '2025-12-31', 27000000000000, '')"
+        )  # kuartal lain, TANPA rasio bank -- tidak boleh muncul
+        save_bank_ratios_manual(conn, instrument="BBCA", quarter_end="2026-03-31", car=25.5, ldr=78.3)
+        conn.commit()
+        rows = list_bank_ratios(conn, "BBCA")
+        assert len(rows) == 1
+        assert rows[0]["quarter_end"] == "2026-03-31"
+
+
+# ---------- Panel 8 Komponen B/D: detail emiten, override, grader log (Addendum A §19.2/§19.4) ----------
+
+def test_get_emiten_detail_unknown_instrument_returns_none(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        assert get_emiten_detail(conn, "ZZZZ") is None
+
+
+def test_get_emiten_detail_combines_metadata_fundamentals_grade(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        save_intake_metadata(conn, instrument="BBRI", market="IDX", is_financial=True)
+        conn.execute(
+            "INSERT INTO fundamentals_quarterly (instrument, quarter_end, revenue, "
+            "net_income, confidence, created_at) VALUES "
+            "('BBRI', '2026-03-31', 100, 20, 'LOW_CONFIDENCE', '')"
+        )
+        conn.execute(
+            "INSERT INTO emiten_grade (instrument, graded_at, fund_score, integrity_flags, "
+            "quadrant, created_at) VALUES ('BBRI', '2026-07-13', 75, '[\"UMA_ACTIVE\"]', 'AVOID', '')"
+        )
+        conn.commit()
+        detail = get_emiten_detail(conn, "bbri")
+        assert detail["metadata"]["instrument"] == "BBRI"
+        assert len(detail["fundamentals"]) == 1
+        assert detail["grade"]["quadrant"] == "AVOID"
+        assert detail["grade"]["integrity_flags"] == ["UMA_ACTIVE"]
+        assert detail["grade"]["giel_override"] is None
+
+
+def test_save_grade_override_requires_reason(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        try:
+            save_grade_override(conn, "BBRI", "WATCH", "")
+            assert False, "reason kosong seharusnya ditolak"
+        except ValueError as exc:
+            assert "reason" in str(exc)
+
+
+def test_save_grade_override_rejects_unknown_quadrant(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        try:
+            save_grade_override(conn, "BBRI", "MAYBE", "alasan valid")
+            assert False, "quadrant tidak dikenal seharusnya ditolak"
+        except ValueError as exc:
+            assert "tidak dikenal" in str(exc)
+
+
+def test_save_grade_override_returns_false_when_never_graded(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        assert save_grade_override(conn, "BBRI", "WATCH", "alasan valid") is False
+
+
+def test_save_grade_override_updates_latest_grade_preserving_original(tmp_path):
+    """Override TIDAK menimpa kolom `quadrant` asli (nilai mesin) --
+    disimpan terpisah di `giel_override` (kontrak §19.2)."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        conn.execute(
+            "INSERT INTO emiten_grade (instrument, graded_at, fund_score, integrity_flags, "
+            "quadrant, created_at) VALUES ('BBRI', '2026-07-13', 75, '[]', 'WATCH', '')"
+        )
+        conn.commit()
+        ok = save_grade_override(conn, "bbri", "investable", "Giel yakin fundamental lebih kuat dari skor mesin")
+        conn.commit()
+        assert ok is True
+        row = conn.execute("SELECT * FROM emiten_grade WHERE instrument='BBRI'").fetchone()
+        assert row["quadrant"] == "WATCH"  # nilai mesin asli TIDAK berubah
+        override = json.loads(row["giel_override"])
+        assert override["quadrant"] == "INVESTABLE"
+        assert "reason" in override
+
+
+def test_list_grader_log_filters_by_instrument(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        conn.execute(
+            "INSERT INTO grader_log (instrument, date, old_grade, new_grade, reason, created_at) "
+            "VALUES ('BBCA', '2026-07-01', NULL, 'WATCH', 'initial', '')"
+        )
+        conn.execute(
+            "INSERT INTO grader_log (instrument, date, old_grade, new_grade, reason, created_at) "
+            "VALUES ('TSLA', '2026-07-01', NULL, 'WATCH', 'initial', '')"
+        )
+        conn.commit()
+        assert len(list_grader_log(conn)) == 2
+        assert len(list_grader_log(conn, instrument="BBCA")) == 1
+
+
+def test_save_grader_outcome_independent_3m_6m(tmp_path):
+    """Isi outcome_3m TIDAK menghapus outcome_6m yang sudah ada (2 widget
+    independen, diisi di waktu berbeda)."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        cur = conn.execute(
+            "INSERT INTO grader_log (instrument, date, old_grade, new_grade, reason, created_at) "
+            "VALUES ('BBCA', '2026-01-01', NULL, 'WATCH', 'initial', '')"
+        )
+        log_id = cur.lastrowid
+        conn.commit()
+        save_grader_outcome(conn, log_id, outcome_6m="BENAR")
+        conn.commit()
+        save_grader_outcome(conn, log_id, outcome_3m="PARTIAL")
+        conn.commit()
+        row = conn.execute("SELECT * FROM grader_log WHERE id=?", (log_id,)).fetchone()
+        assert row["outcome_3m"] == "PARTIAL"
+        assert row["outcome_6m"] == "BENAR"  # tidak ter-hapus
+
+
+def test_save_grader_outcome_unknown_id_returns_false(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        assert save_grader_outcome(conn, 9999, outcome_3m="BENAR") is False

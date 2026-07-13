@@ -17,7 +17,7 @@
 | **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — `plan_d.txt` (dihapus setelah selesai) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
 | **E** | Telegram bot | ✅ **Selesai (push satu arah)** — `plan_e.txt` (dihapus setelah selesai) dieksekusi penuh, Daily Briefing manual (CLI + tombol Panel 6); bot commands dua-arah ditunda ke backlog |
 | **F+** | Multi-aset expansion | 🟡 **GOLD/SP500/IHSG/USDIDR/USDJPY aktif** (S&R+signals+context weight) — altcoin/saham/komoditas lain belum |
-| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026), Gerbang G1/G2/G3 DIJAWAB (13 Jul 2026)** — universe = **BBCA + TSLA**; **J-14/J-2/J-4/J-3(groundwork)/J-3b/J-10/J-7/J-11(Grader DRAFT v1)/J-12+J-15-KomponenC/J-13 SELESAI**; sisa: **J-5** (ditunda), **J-6** (Giel masih pikirkan), **J-8/J-9/J-15-KomponenB&D**, + validasi bar-replay manual & kalibrasi §13 (keputusan Giel, bukan otomatis) |
+| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026, SELESAI SELURUHNYA 13 Jul 2026), Gerbang G1/G2/G3 DIJAWAB (13 Jul 2026)** — universe = **BBCA + TSLA**; **J-2/J-3(groundwork)/J-3b/J-4/J-6/J-7/J-8/J-10/J-11/J-12/J-13/J-14/J-15 SELESAI**; sisa: **J-5** (ditunda, belum worth dgn 1 ticker/sektor), **J-9** (prompt persona v5, butuh tulisan Giel), + validasi bar-replay manual & kalibrasi §13 (keputusan Giel, bukan otomatis) |
 
 ---
 
@@ -1249,6 +1249,120 @@ sendiri lewat review chart, bukan sesuatu yang diputuskan otomatis di sini).
   bukan cuma manual di Panel 6) juga belum dibangun — saat ini alurnya
   masih 2 langkah terpisah (approve di Panel 5, hitung+catat size manual
   di Panel 6).
+
+**Update — RISK_CAPITAL_IDR/USD default placeholder (keputusan Giel: "buat
+field aja tapi kamu siapkan nilai default"):** `.env`/`.env.example` diisi
+`RISK_CAPITAL_IDR=100000000` (Rp100 juta) & `RISK_CAPITAL_USD=10000`
+($10rb) — **NILAI PLACEHOLDER, BUKAN modal riil siapa pun**, ditandai jelas
+di komentar supaya Giel ganti begitu tahu angka pastinya. Sizing engine
+sekarang jalan out-of-the-box (dicek live: `suggest_position_size` dgn
+modal placeholder BBCA menghasilkan angka masuk akal), tanpa perlu Giel
+buka .env dulu.
+
+**Update — J-6 selesai (rasio prudential bank CAR/NPL/NIM/LDR, MANUAL):**
+- [x] **4 kolom baru di `fundamentals_quarterly`** (`car`, `npl_gross`,
+      `nim`, `ldr`) — BUKAN tabel terpisah, tetap "1 row per instrumen per
+      kuartal" (konsisten dgn tabel yang sudah ada), migrasi via
+      `_COLUMN_MIGRATIONS`.
+- [x] **`web/writes.py::save_bank_ratios_manual()`** — UPSERT by
+      (instrument, quarter_end) yang **HANYA menyentuh 4 kolom rasio**,
+      TIDAK PERNAH menimpa revenue/net_income/dll ATAU kolom `source` baris
+      yang sudah ada dari yfinance backfill — dites eksplisit (test +
+      verifikasi live: baris BBCA 2026-03-31 dari yfinance, isi manual
+      CAR/NPL/NIM/LDR, `source` tetap "yfinance" bukan ketimpa "manual").
+      Fungsi ini TERPISAH dari `upsert_fundamentals_quarterly` (J-4) by
+      design — scraper otomatis tidak pernah menyentuh 4 kolom ini sama
+      sekali.
+- [x] **2 route baru** `POST`/`GET /api/fundamentals/bank_ratios`.
+- [x] **Panel 8 UI**: form input (ticker+kuartal+4 rasio) + tabel riwayat
+      per-ticker.
+- 3 test baru (`test_web_writes.py`: insert baru, tidak clobber baris
+  yfinance, list cuma kuartal yang punya rasio terisi), 253 test hijau
+  total. Diverifikasi live: simpan rasio dummy utk BBCA 2026-03-31 (baris
+  sudah ada dari yfinance) -> `source` tetap "yfinance", 4 kolom rasio
+  terisi benar di tabel. Data uji (angka dummy, BUKAN rasio BBCA asli)
+  dibersihkan (di-NULL-kan lagi) setelah verifikasi — baris asli (revenue
+  dll) tidak disentuh.
+- **Catatan**: form TIDAK validasi `is_financial=1` di level backend (bisa
+  saja diisi utk instrumen non-bank kalau Giel salah ketik ticker) — kalau
+  ini jadi masalah nyata, tambahkan guard serupa `save_intake_metadata()`
+  di sesi mendatang.
+
+**Update — J-15 Komponen B/D selesai (detail emiten, override, grader log):**
+- [x] **Schema**: `emiten_grade.giel_override` (TEXT JSON, kolom yang
+      sempat ditandai "gap" di update J-11 — sekarang ditambahkan),
+      `grader_log.outcome_3m`/`outcome_6m`/`outcome_notes` (BARU, utk
+      widget Nilai Outcome). Migrasi via `_COLUMN_MIGRATIONS`.
+- [x] **`web/writes.py::get_emiten_detail()`** — gabungan
+      instrument_metadata + 8 kuartal fundamentals terakhir + grade
+      terbaru (integrity_flags & giel_override diurai dari JSON).
+- [x] **`save_grade_override()`** — guard: `quadrant` harus salah satu
+      4 kuadran resmi, `reason` WAJIB non-kosong. **Kuadran mesin ASLI
+      (`quadrant`) TIDAK PERNAH ditimpa** — override disimpan terpisah di
+      `giel_override`, keduanya tampil bareng di UI (dites eksplisit +
+      diverifikasi live: override BBCA jadi INVESTABLE, kolom `quadrant`
+      di DB tetap WATCH).
+- [x] **`list_grader_log()` + `save_grader_outcome()`** — outcome 3bln/6bln
+      independen (COALESCE, isi salah satu tidak menghapus yang lain —
+      dites eksplisit).
+- [x] **4 route baru**: `GET /api/emiten/<ticker>`, `POST /api/emiten/
+      <ticker>/override`, `GET /api/grader_log`, `POST /api/grader_log/
+      <id>/outcome`.
+- [x] **Panel 8 UI**: section "Detail Emiten" (metadata+grade+override
+      form, **playbook bank kontrak §12.1 diterapkan** — `is_financial=1`
+      tampilkan CAR/NPL/NIM/LDR, SEMBUNYIKAN revenue/OCF/FCF generik yang
+      kurang relevan utk bank) + section "Grader Log & Kalibrasi" (tabel
+      dgn dropdown outcome inline per baris).
+- 9 test baru (`test_web_writes.py`), 262 test hijau total. **Diverifikasi
+  live penuh via browser**: detail BBCA tampil benar dgn kolom bank
+  (bukan revenue generik), override ke INVESTABLE tersimpan dgn kuadran
+  mesin (WATCH) tetap terlihat berdampingan, widget outcome dropdown
+  berfungsi (pilih PARTIAL -> tersimpan, muncul di tabel). Data uji
+  (override + outcome dummy) dibersihkan setelah verifikasi.
+- **Dengan ini, J-15 (Addendum A §19) SELESAI SELURUHNYA** — Komponen
+  A (J-14), C Gelombang 1 (J-14) & 2 (J-12), B & D (giliran ini) semua
+  sudah ada.
+
+**Update — J-8 selesai (foreign flow, ternyata PER-SAHAM bukan cuma per-
+sektor — lebih detail dari yang diminta kontrak):**
+- **Riset**: percobaan pertama (tebak nama urlName API "Digital Statistic"
+  spt yang berhasil utk Track C) GAGAL — konsisten dgn dead-end
+  "papan pemantauan khusus"/"financial ratio" sebelumnya. **Endpoint yang
+  benar ditemukan lewat observasi network request BROWSER SUNGGUHAN**
+  (navigate ke laman resmi "Stock Summary" IDX, baca network request yang
+  benar-benar terpanggil) — bukan tebak nama lagi. Endpoint:
+  `https://www.idx.co.id/primary/TradingSummary/GetStockSummary?length=9999&start=0`
+  — BEDA family dari "Digital Statistic" (`primary/DigitalStatistic/...`)
+  yang dipakai Track C. **Tidak butuh session-cookie warmup** (beda dari
+  `idx_foreign_flow.py`) — 1x GET langsung 200. Dikonfirmasi live: 965
+  saham, termasuk BBCA (`ForeignBuy`=105.752.900, `ForeignSell`=120.664.900
+  lembar, 2026-07-10) — field VOLUME (lembar), BUKAN value Rupiah spt
+  Track C.
+- [x] **`scrapers/idx_stock_foreign_flow.py`** (BARU) —
+      `fetch_idx_stock_foreign_flow(tickers)`, generic (terima list ticker,
+      tidak baca DB sendiri — beda dari `equity_universe.py`, konsisten dgn
+      pola scraper lain yang lebih umum di project ini). Output 3 metric
+      per ticker: `stock_ff_foreign_buy_vol`/`sell_vol`/`net_vol`.
+- [x] **Wired ke `pipeline/run_daily.py`** — baca ticker `market='IDX'`
+      dari `instrument_metadata` (dinamis, otomatis ikut kalau universe
+      nambah saham IDX baru), panggil scraper, gabung ke `upsert_
+      positioning` yang sudah ada (natural key dedupe otomatis, TIDAK ada
+      jalur tulis baru).
+- **TIDAK ada kode UI baru** — `positioning` table SUDAH generik, Panel 3
+  otomatis menampilkan baris baru ini begitu ada (pola persis Track C).
+- 5 test baru (`test_idx_stock_foreign_flow.py`, live network + guard
+  ticker kosong = skip network call), 267 test hijau total. **Diverifikasi
+  live penuh**: `pipeline.run_daily` -> `idx_stock_summary = ok`, 3 row
+  BBCA masuk `positioning` dgn angka PERSIS sama dgn temuan riset manual
+  (net = -14.912.000, net = buy - sell tervalidasi), muncul otomatis di
+  `/api/positioning` tanpa ubah endpoint atau Panel 3 sama sekali.
+- **Catatan cakupan**: ini PER-INSTRUMEN, bukan agregat per-sektor spt
+  yang diminta literal kontrak J-8 — dianggap LEBIH baik (bisa diagregasi
+  ke sektor kapan pun kalau perlu, granularitas turun tidak bisa
+  sebaliknya). Endpoint tidak punya parameter tanggal (selalu hari bursa
+  TERAKHIR) — histori/backfill utk tanggal lampau BELUM dibangun (di luar
+  scope turn ini, kalau perlu J-2-style backfill perlu riset ulang apakah
+  endpoint ini punya cara narik histori).
 
 **Update — lanjutan kickoff (Giel bilang "oke lanjut", isi BBCA saja dulu):**
 - [x] **5 tabel Phase J+ dibangun sebagai DRAFT** (`fundamentals_quarterly`,

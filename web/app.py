@@ -849,6 +849,79 @@ def sizing_suggest():
     return jsonify(result)
 
 
+# ---------- PHASE J+: Rasio prudential bank (CAR/NPL/NIM/LDR), MANUAL,
+# kontrak §2 J7/J-6 (Giel baca dari laporan resmi bank, yfinance tidak
+# punya field ini). ----------
+
+@app.post("/api/fundamentals/bank_ratios")
+def bank_ratios_save():
+    body = request.get_json(force=True)
+    with get_connection() as conn:
+        writes.save_bank_ratios_manual(
+            conn, instrument=body["instrument"], quarter_end=body["quarter_end"],
+            car=body.get("car"), npl_gross=body.get("npl_gross"),
+            nim=body.get("nim"), ldr=body.get("ldr"),
+        )
+        conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/fundamentals/bank_ratios")
+def bank_ratios_list():
+    instrument = request.args.get("instrument", "").upper()
+    with get_connection() as conn:
+        rows = writes.list_bank_ratios(conn, instrument)
+    return jsonify(rows)
+
+
+# ---------- PHASE J+: Panel 8 Komponen B/D — detail emiten, override,
+# grader log (Addendum A §19.2/§19.4, J-15). ----------
+
+@app.get("/api/emiten/<ticker>")
+def emiten_detail(ticker):
+    with get_connection() as conn:
+        detail = writes.get_emiten_detail(conn, ticker)
+    if detail is None:
+        return jsonify({"error": f"{ticker} tidak ada di instrument_metadata"}), 404
+    return jsonify(detail)
+
+
+@app.post("/api/emiten/<ticker>/override")
+def emiten_override(ticker):
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            ok = writes.save_grade_override(conn, ticker, body.get("quadrant"), body.get("reason", ""))
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if not ok:
+        return jsonify({"error": f"{ticker} belum pernah digrade -- jalankan grade dulu"}), 404
+    return jsonify({"ok": True})
+
+
+@app.get("/api/grader_log")
+def grader_log_list():
+    with get_connection() as conn:
+        rows = writes.list_grader_log(
+            conn, instrument=request.args.get("instrument"),
+            limit=request.args.get("limit", 200, type=int),
+        )
+    return jsonify(rows)
+
+
+@app.post("/api/grader_log/<int:log_id>/outcome")
+def grader_log_outcome(log_id):
+    body = request.get_json(force=True)
+    with get_connection() as conn:
+        ok = writes.save_grader_outcome(
+            conn, log_id, outcome_3m=body.get("outcome_3m"), outcome_6m=body.get("outcome_6m"),
+            notes=body.get("notes"),
+        )
+        conn.commit()
+    return jsonify({"ok": ok})
+
+
 def main() -> None:
     init_db()  # pastikan tabel ada (walau kosong) supaya API tidak error
     host = os.getenv("WEB_HOST", "127.0.0.1")

@@ -22,6 +22,7 @@ from scrapers.crypto import fetch_btc
 from scrapers.econ_calendar import fetch_econ_calendar
 from scrapers.equity_universe import fetch_equity_universe
 from scrapers.idx_foreign_flow import fetch_idx_foreign_flow
+from scrapers.idx_stock_foreign_flow import fetch_idx_stock_foreign_flow
 from scrapers.macro_fred import fetch_macro_fred
 from scrapers.macro_yf import fetch_macro_yf
 from scrapers.news import fetch_all_news
@@ -185,8 +186,17 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
     idx_flow = fetch_idx_foreign_flow(date)
     equity = fetch_equity_universe(date, db_path)
 
+    # J-8: foreign flow per-saham -- HANYA utk instrumen market=IDX di
+    # instrument_metadata (TSLA/US tidak relevan, endpoint ini murni IDX).
+    with get_connection(db_path) as conn:
+        idx_tickers = [
+            r["instrument"] for r in
+            conn.execute("SELECT instrument FROM instrument_metadata WHERE market = 'IDX'").fetchall()
+        ]
+    stock_flow = fetch_idx_stock_foreign_flow(idx_tickers)
+
     flags = SourceFlags()
-    for part in (crypto, coinalyze, yf, fred, econ, positioning, idx_flow, equity):
+    for part in (crypto, coinalyze, yf, fred, econ, positioning, idx_flow, equity, stock_flow):
         flags.merge(part.get("source_flags", {}))
     # health_report RSS digabung ke source_flags dgn prefix "rss_" (pola sama
     # dengan scraper lain) -- feed mati langsung kelihatan di log tiap run.
@@ -244,10 +254,11 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
         n_econ = upsert_econ_calendar(conn, econ.get("items", []))
 
         # 6) positioning (Phase D — COT + BTC ETF flow, upsert by natural key)
-        #    + IHSG foreign flow (Track C, IDX) -- item list yang sama, natural
-        #    key (date,instrument,metric) dedupe otomatis.
+        #    + IHSG foreign flow (Track C, IDX) + foreign flow per-saham
+        #    (J-8) -- item list yang sama, natural key (date,instrument,
+        #    metric) dedupe otomatis.
         n_positioning = upsert_positioning(
-            conn, positioning.get("items", []) + idx_flow.get("items", [])
+            conn, positioning.get("items", []) + idx_flow.get("items", []) + stock_flow.get("items", [])
         )
 
         conn.commit()

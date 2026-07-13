@@ -97,6 +97,63 @@
   </section>
 
   <section>
+    <h2>Detail Emiten (Komponen B)</h2>
+    <div class="panel">
+      <div class="form-grid">
+        <div><label class="field">Ticker</label><input type="text" id="detailTicker" placeholder="mis. BBCA"></div>
+        <div style="align-self:end"><button class="btn secondary" id="detailLoadBtn">Lihat Detail</button></div>
+      </div>
+      <div id="detailResult" style="margin-top:12px"></div>
+      <div class="form-grid" style="margin-top:16px">
+        <div>
+          <label class="field">Override Kuadran</label>
+          <select id="overrideQuadrant">
+            <option value="INVESTABLE">INVESTABLE</option>
+            <option value="WATCH">WATCH</option>
+            <option value="SPECULATIVE">SPECULATIVE</option>
+            <option value="AVOID">AVOID</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="field">Alasan Override (wajib)</label>
+        <textarea id="overrideReason" placeholder="Kenapa kamu tidak setuju dgn kuadran mesin?"></textarea>
+      </div>
+      <div class="form-row" style="margin-top:8px">
+        <button class="btn small secondary" id="overrideSaveBtn">Simpan Override</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Rasio Bank (Manual — Khusus Emiten Finansial)</h2>
+    <div class="panel">
+      <p class="src">CAR/NPL/NIM/LDR TIDAK tersedia di yfinance (dikonfirmasi
+        saat riset G3) — isi manual dari laporan resmi bank (OJK/laporan
+        tahunan). Tidak akan pernah tertimpa oleh backfill fundamental
+        otomatis.</p>
+      <div class="form-grid">
+        <div><label class="field">Ticker</label><input type="text" id="bankTicker" placeholder="mis. BBCA"></div>
+        <div><label class="field">Kuartal (akhir periode)</label><input type="date" id="bankQuarterEnd"></div>
+      </div>
+      <div class="form-grid" style="margin-top:12px">
+        <div><label class="field">CAR (%)</label><input type="number" step="any" id="bankCar"></div>
+        <div><label class="field">NPL Gross (%)</label><input type="number" step="any" id="bankNpl"></div>
+        <div><label class="field">NIM (%)</label><input type="number" step="any" id="bankNim"></div>
+        <div><label class="field">LDR (%)</label><input type="number" step="any" id="bankLdr"></div>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <button class="btn" id="bankSaveBtn">Simpan Rasio Bank</button>
+        <button class="btn small secondary" id="bankLoadBtn">Lihat Riwayat Ticker Ini</button>
+      </div>
+      <table style="margin-top:12px">
+        <thead><tr><th>Kuartal</th><th>CAR</th><th>NPL</th><th>NIM</th><th>LDR</th><th>Sumber</th></tr></thead>
+        <tbody id="bankRatiosBody"><tr><td colspan="6" class="src">klik "Lihat Riwayat" utk tampilkan</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
     <h2>Riwayat Keputusan Intake</h2>
     <div class="panel">
       <div class="tbl-bar" data-tblbar="intakelog"></div>
@@ -110,6 +167,28 @@
         <tbody id="intakeLogBody"></tbody>
       </table>
       <div class="tbl-foot" data-tblfoot="intakelog"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Grader Log & Kalibrasi (Komponen D)</h2>
+    <div class="panel">
+      <p class="src">Revisi bobot rubrik grader HANYA lewat log ini (bukan
+        per kasus) — widget "Nilai Outcome" utk grade yang sudah berumur
+        3/6 bulan, pola sama Skor Prediksi Panel 6.</p>
+      <div class="tbl-bar" data-tblbar="graderlog"></div>
+      <table data-tblkey="graderlog">
+        <thead><tr>
+          <th data-sort="date">Tanggal</th>
+          <th data-sort="instrument">Ticker</th>
+          <th>Grade Lama → Baru</th>
+          <th>Alasan</th>
+          <th>Outcome 3bln</th>
+          <th>Outcome 6bln</th>
+        </tr></thead>
+        <tbody id="graderLogBody"></tbody>
+      </table>
+      <div class="tbl-foot" data-tblfoot="graderlog"></div>
     </div>
   </section>
 </div>

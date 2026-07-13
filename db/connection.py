@@ -127,6 +127,20 @@ _COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
     "asset_context_weight": [
         ("level", "TEXT"),
     ],
+    "fundamentals_quarterly": [
+        ("car", "REAL"),
+        ("npl_gross", "REAL"),
+        ("nim", "REAL"),
+        ("ldr", "REAL"),
+    ],
+    "emiten_grade": [
+        ("giel_override", "TEXT"),
+    ],
+    "grader_log": [
+        ("outcome_3m", "TEXT"),
+        ("outcome_6m", "TEXT"),
+        ("outcome_notes", "TEXT"),
+    ],
 }
 
 

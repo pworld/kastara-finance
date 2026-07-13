@@ -198,6 +198,16 @@ CREATE TABLE IF NOT EXISTS fundamentals_quarterly (
     net_interest_income REAL,   -- khusus bank (is_financial), NULL utk non-bank
     total_equity REAL, total_assets REAL,
     operating_cash_flow REAL, free_cash_flow REAL,
+    -- Rasio prudential bank (Phase J+ §2 J7/J-6) -- khusus is_financial=1,
+    -- NULL utk non-bank. yfinance TIDAK PUNYA field ini (dikonfirmasi saat
+    -- prototipe G3) -- MANUAL SAJA, dibaca Giel dari laporan resmi bank
+    -- (OJK/laporan tahunan), tidak pernah disentuh upsert otomatis
+    -- backfill_fundamentals.py (lihat guard di web/writes.py::save_bank_
+    -- ratios_manual -- fungsi TERPISAH dari upsert_fundamentals_quarterly).
+    car REAL,          -- Capital Adequacy Ratio (%)
+    npl_gross REAL,    -- Non-Performing Loan gross (%)
+    nim REAL,          -- Net Interest Margin (%)
+    ldr REAL,          -- Loan to Deposit Ratio (%)
     source TEXT,                -- yfinance / manual upload / dll
     confidence TEXT DEFAULT 'FULL',   -- FULL / LOW_CONFIDENCE
     created_at TEXT,
@@ -236,6 +246,11 @@ CREATE TABLE IF NOT EXISTS emiten_grade (
     fund_score REAL,
     integrity_flags TEXT,   -- JSON list, mis. '["UMA_ACTIVE"]'
     quadrant TEXT,
+    -- Addendum A §19.2 Komponen B -- override manual Giel atas kuadran
+    -- mesin. JSON: {"quadrant","reason","overridden_at"}. Kuadran mesin
+    -- ASLI di kolom `quadrant` TIDAK ditimpa -- keduanya tampil bareng
+    -- di UI ("(override Giel)"), bukan salah satu hilang.
+    giel_override TEXT,
     notes TEXT, created_at TEXT
 );
 
@@ -246,6 +261,9 @@ CREATE TABLE IF NOT EXISTS grader_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     instrument TEXT, date TEXT,
     old_grade TEXT, new_grade TEXT, reason TEXT,
+    -- Addendum A §19.4 Komponen D -- widget "Nilai Outcome" 3/6 bulan
+    -- setelah grade (pola sama prediction_log skor BENAR/SALAH/PARTIAL).
+    outcome_3m TEXT, outcome_6m TEXT, outcome_notes TEXT,
     created_at TEXT
 );
 

@@ -495,3 +495,131 @@ def list_intake_log(conn: sqlite3.Connection, limit: int = 100) -> list[dict[str
         "SELECT * FROM intake_log ORDER BY decided_at DESC, id DESC LIMIT ?", (limit,)
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ---------- Rasio prudential bank — CAR/NPL/NIM/LDR (Phase J+ §2 J7/J-6)
+# MANUAL SAJA -- yfinance tidak punya field ini (dikonfirmasi saat
+# prototipe G3), jadi Giel input sendiri dari laporan resmi bank (OJK/
+# laporan tahunan). Kolom di `fundamentals_quarterly` yang sama (bukan
+# tabel terpisah -- tetap "1 row per instrumen per kuartal"), TAPI lewat
+# fungsi TERPISAH dari `upsert_fundamentals_quarterly` (backfill_
+# fundamentals.py) supaya re-run scraper yfinance TIDAK PERNAH menimpa
+# angka manual ini (upsert yfinance cuma SET kolom-kolom miliknya sendiri,
+# tidak menyentuh car/npl_gross/nim/ldr sama sekali). ----------
+
+def save_bank_ratios_manual(
+    conn: sqlite3.Connection, *, instrument: str, quarter_end: str,
+    car: float | None = None, npl_gross: float | None = None,
+    nim: float | None = None, ldr: float | None = None,
+) -> None:
+    """UPSERT by (instrument, quarter_end). Kalau baris kuartal itu SUDAH
+    ada (dari yfinance backfill_fundamentals), cuma 4 kolom ini yang
+    ter-update -- revenue/net_income/dll TIDAK disentuh. Kalau belum ada,
+    INSERT baris baru `source='manual'` (kuartal ini mungkin belum
+    ke-backfill yfinance sama sekali)."""
+    conn.execute(
+        "INSERT INTO fundamentals_quarterly (instrument, quarter_end, car, npl_gross, "
+        "nim, ldr, source, created_at) VALUES (?, ?, ?, ?, ?, ?, 'manual', ?) "
+        "ON CONFLICT(instrument, quarter_end) DO UPDATE SET "
+        "car=excluded.car, npl_gross=excluded.npl_gross, nim=excluded.nim, ldr=excluded.ldr",
+        (instrument.upper(), quarter_end, car, npl_gross, nim, ldr, created_at()),
+    )
+
+
+def list_bank_ratios(conn: sqlite3.Connection, instrument: str, limit: int = 12) -> list[dict[str, Any]]:
+    """Kuartal yang punya MINIMAL 1 rasio bank terisi, terbaru dulu."""
+    rows = conn.execute(
+        "SELECT quarter_end, car, npl_gross, nim, ldr, source FROM fundamentals_quarterly "
+        "WHERE instrument = ? AND (car IS NOT NULL OR npl_gross IS NOT NULL "
+        "OR nim IS NOT NULL OR ldr IS NOT NULL) ORDER BY quarter_end DESC LIMIT ?",
+        (instrument.upper(), limit),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ---------- Panel 8 Komponen B — Detail Emiten (Addendum A §19.2, J-15) ----------
+
+QUADRANTS = ("INVESTABLE", "WATCH", "SPECULATIVE", "AVOID")
+
+
+def get_emiten_detail(conn: sqlite3.Connection, instrument: str) -> dict[str, Any] | None:
+    """Gabungan instrument_metadata + histori fundamentals (8 kuartal
+    terakhir) + grade TERBARU (integrity_flags & giel_override diurai dari
+    JSON). None kalau instrumen tidak ada di instrument_metadata."""
+    instrument = instrument.upper()
+    meta = get_instrument_meta(conn, instrument)
+    if not meta:
+        return None
+    fundamentals = [
+        dict(r) for r in conn.execute(
+            "SELECT * FROM fundamentals_quarterly WHERE instrument = ? "
+            "ORDER BY quarter_end DESC LIMIT 8", (instrument,),
+        ).fetchall()
+    ]
+    grade_row = conn.execute(
+        "SELECT * FROM emiten_grade WHERE instrument = ? ORDER BY graded_at DESC, id DESC LIMIT 1",
+        (instrument,),
+    ).fetchone()
+    grade = dict(grade_row) if grade_row else None
+    if grade:
+        grade["integrity_flags"] = json.loads(grade["integrity_flags"]) if grade["integrity_flags"] else []
+        grade["giel_override"] = json.loads(grade["giel_override"]) if grade["giel_override"] else None
+    return {"metadata": meta, "fundamentals": fundamentals, "grade": grade}
+
+
+def save_grade_override(conn: sqlite3.Connection, instrument: str, quadrant: str, reason: str) -> bool:
+    """Override kuadran MANUAL Giel atas grade terbaru. `reason` WAJIB
+    non-kosong (kontrak §19.2: nilai mesin asli tetap terlihat, override
+    ditandai terpisah, bukan menimpa). Return False kalau instrumen belum
+    pernah digrade sama sekali (tidak ada baris utk di-override)."""
+    quadrant = (quadrant or "").upper()
+    if quadrant not in QUADRANTS:
+        raise ValueError(f"quadrant '{quadrant}' tidak dikenal -- pilihan: {'/'.join(QUADRANTS)}")
+    if not reason or not reason.strip():
+        raise ValueError("reason wajib diisi utk override kuadran")
+    instrument = instrument.upper()
+    latest = conn.execute(
+        "SELECT id FROM emiten_grade WHERE instrument = ? ORDER BY graded_at DESC, id DESC LIMIT 1",
+        (instrument,),
+    ).fetchone()
+    if not latest:
+        return False
+    override = json.dumps({"quadrant": quadrant, "reason": reason.strip(), "overridden_at": today_wib()})
+    conn.execute("UPDATE emiten_grade SET giel_override = ? WHERE id = ?", (override, latest["id"]))
+    return True
+
+
+# ---------- Panel 8 Komponen D — Grader Log & Kalibrasi (Addendum A §19.4, J-15) ----------
+
+def list_grader_log(conn: sqlite3.Connection, instrument: str | None = None, limit: int = 200) -> list[dict[str, Any]]:
+    """Riwayat perubahan kuadran, terbaru dulu. Filter opsional per instrumen."""
+    if instrument:
+        rows = conn.execute(
+            "SELECT * FROM grader_log WHERE instrument = ? ORDER BY date DESC, id DESC LIMIT ?",
+            (instrument.upper(), limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM grader_log ORDER BY date DESC, id DESC LIMIT ?", (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def save_grader_outcome(
+    conn: sqlite3.Connection, log_id: int, *, outcome_3m: str | None = None,
+    outcome_6m: str | None = None, notes: str | None = None,
+) -> bool:
+    """Widget 'Nilai Outcome' 3/6 bulan (pola sama score_prediction() Panel
+    6). COALESCE supaya isi outcome_3m tidak menghapus outcome_6m yang
+    sudah ada (dua widget independen, diisi di waktu berbeda). Return
+    False kalau id tidak ada."""
+    exists = conn.execute("SELECT 1 FROM grader_log WHERE id = ?", (log_id,)).fetchone()
+    if not exists:
+        return False
+    conn.execute(
+        "UPDATE grader_log SET outcome_3m = COALESCE(?, outcome_3m), "
+        "outcome_6m = COALESCE(?, outcome_6m), outcome_notes = COALESCE(?, outcome_notes) "
+        "WHERE id = ?",
+        (outcome_3m, outcome_6m, notes, log_id),
+    )
+    return True
