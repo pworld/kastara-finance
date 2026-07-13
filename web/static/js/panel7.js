@@ -40,10 +40,13 @@ function renderJournalHistoryTable() {
   });
   $("#histJournalBody").innerHTML = pageRows.map(r => {
     const px = [r.entry_price, r.sl_price, r.tp1_price].map(v => v ?? "-").join(" / ");
+    const size = r.skip_reason
+      ? `<span class="badge HIGH">SKIP: ${r.skip_reason}</span>`
+      : `${r.planned_size ?? "-"} / ${r.actual_size ?? "-"}`;
     return `<tr><td class="src">${r.date}</td><td>${r.instrument}</td><td class="src">${r.setup_type || "-"}</td>
-      <td class="src">${px}</td><td>${r.outcome || "-"}</td>
+      <td class="src">${px}</td><td class="src">${size}</td><td>${r.outcome || "-"}</td>
       <td>${r.personal_notes || "-"}</td><td class="src">${r.lesson_learned || "-"}</td></tr>`;
-  }).join("") || `<tr><td colspan="7" class="src">belum ada entri trading journal</td></tr>`;
+  }).join("") || `<tr><td colspan="8" class="src">belum ada entri trading journal</td></tr>`;
   renderTableBar("histjournal", total, totalPages, renderJournalHistoryTable);
 }
 tableRerender.histjournal = renderJournalHistoryTable;

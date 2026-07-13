@@ -31,6 +31,7 @@ import pipeline.add_article as add_article
 import pipeline.backfill as backfill_mod
 import tools.review_signal as review_signal
 import web.writes as writes
+from analysis.sizing import suggest_position_size
 from db.connection import get_connection, get_db_path, init_db
 from indicators.calc import compare_from_series
 from notify.telegram import send_message
@@ -627,6 +628,9 @@ def journal_add():
             sl_price=body.get("sl_price"), tp1_price=body.get("tp1_price"),
             outcome=body.get("outcome"), personal_notes=body.get("personal_notes"),
             lesson_learned=body.get("lesson_learned"),
+            planned_size=body.get("planned_size"), actual_size=body.get("actual_size"),
+            skip_reason=body.get("skip_reason"), return_asset_ccy=body.get("return_asset_ccy"),
+            return_idr=body.get("return_idr"),
         )
         conn.commit()
     return jsonify({"id": new_id})
@@ -809,6 +813,40 @@ def intake_log_list():
     with get_connection() as conn:
         rows = writes.list_intake_log(conn, limit=request.args.get("limit", 100, type=int))
     return jsonify(rows)
+
+
+# ---------- PHASE J+: Sizing engine wiring (Build Contract v1.3 §14, J-13)
+# ke Trading Journal Panel 6. HANYA utk instrumen di instrument_metadata
+# (lot_size diketahui) -- capital dibaca dari .env, TIDAK ditebak/di-
+# hardcode. Kalau env kosong, balikin error eksplisit, bukan angka fiktif. ----------
+
+@app.get("/api/sizing/suggest")
+def sizing_suggest():
+    instrument = request.args.get("instrument", "").upper()
+    entry = request.args.get("entry", type=float)
+    sl = request.args.get("sl", type=float)
+    if not instrument or entry is None or sl is None:
+        return jsonify({"error": "instrument, entry, sl wajib diisi"}), 400
+    with get_connection() as conn:
+        meta = writes.get_instrument_meta(conn, instrument)
+    if not meta:
+        return jsonify({
+            "error": f"{instrument} tidak ada di instrument_metadata -- sizing engine "
+                     "(lot quantization) cuma berlaku utk universe Phase J+ (saham individual)",
+        }), 404
+    env_var = "RISK_CAPITAL_IDR" if meta["market"] == "IDX" else "RISK_CAPITAL_USD"
+    capital_raw = os.getenv(env_var, "").strip()
+    if not capital_raw:
+        return jsonify({
+            "error": f"{env_var} belum diisi di .env -- isi modal riil dulu (lihat "
+                     ".env.example) sebelum sizing engine bisa hitung apa pun",
+        }), 400
+    try:
+        capital = float(capital_raw)
+        result = suggest_position_size(entry, sl, capital, meta["lot_size"] or 0)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(result)
 
 
 def main() -> None:

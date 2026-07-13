@@ -337,6 +337,44 @@ def test_insert_trading_journal(tmp_path):
         assert row["outcome"] == "ONGOING"
 
 
+def test_insert_trading_journal_with_sizing_fields(tmp_path):
+    """Ekstensi Phase J+ §14/J-13 -- planned_size/actual_size/skip_reason/
+    return ganda ccy, semua opsional (backward-compat dgn caller lama)."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        jid = insert_trading_journal(
+            conn, date="2026-07-13", instrument="BBCA", setup_type="retest",
+            entry_price=6100.0, sl_price=6000.0, tp1_price=6300.0,
+            outcome="ONGOING", personal_notes=None, lesson_learned=None,
+            planned_size=2500.0, actual_size=2500.0, skip_reason=None,
+            return_asset_ccy=None, return_idr=None,
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM trading_journal WHERE id=?", (jid,)).fetchone()
+        assert row["planned_size"] == 2500.0
+        assert row["actual_size"] == 2500.0
+        assert row["skip_reason"] is None
+
+
+def test_insert_trading_journal_skip_reason_without_size(tmp_path):
+    """Sinyal SKIP (kapasitas risiko tidak cukup) -- dicatat dgn skip_reason,
+    size tetap None (bukan 0, kosong ≠ nol)."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        jid = insert_trading_journal(
+            conn, date="2026-07-13", instrument="BBCA", setup_type="retest",
+            entry_price=6100.0, sl_price=6000.0, tp1_price=6300.0,
+            outcome="ONGOING", personal_notes=None, lesson_learned=None,
+            skip_reason="RISK_CAPACITY_EXCEEDED",
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM trading_journal WHERE id=?", (jid,)).fetchone()
+        assert row["skip_reason"] == "RISK_CAPACITY_EXCEEDED"
+        assert row["planned_size"] is None
+
+
 # ---------- Prediction Log ----------
 
 def test_insert_prediction_and_list_due(tmp_path):

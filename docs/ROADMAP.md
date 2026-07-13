@@ -17,7 +17,7 @@
 | **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — `plan_d.txt` (dihapus setelah selesai) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
 | **E** | Telegram bot | ✅ **Selesai (push satu arah)** — `plan_e.txt` (dihapus setelah selesai) dieksekusi penuh, Daily Briefing manual (CLI + tombol Panel 6); bot commands dua-arah ditunda ke backlog |
 | **F+** | Multi-aset expansion | 🟡 **GOLD/SP500/IHSG/USDIDR/USDJPY aktif** (S&R+signals+context weight) — altcoin/saham/komoditas lain belum |
-| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026), Gerbang G1/G2/G3 DIJAWAB (13 Jul 2026)** — universe = **BBCA + TSLA**; **J-14/J-2/J-4/J-3(groundwork)/J-3b/J-10/J-7/J-11(Grader DRAFT v1)/J-12+J-15-KomponenC(intake workflow penuh) SELESAI**; sisa: **J-5** (ditunda), **J-6** (Giel masih pikirkan), **J-8/J-9/J-13/J-15-KomponenB&D**, + validasi bar-replay manual & kalibrasi §13 (keputusan Giel, bukan otomatis) |
+| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026), Gerbang G1/G2/G3 DIJAWAB (13 Jul 2026)** — universe = **BBCA + TSLA**; **J-14/J-2/J-4/J-3(groundwork)/J-3b/J-10/J-7/J-11(Grader DRAFT v1)/J-12+J-15-KomponenC/J-13 SELESAI**; sisa: **J-5** (ditunda), **J-6** (Giel masih pikirkan), **J-8/J-9/J-15-KomponenB&D**, + validasi bar-replay manual & kalibrasi §13 (keputusan Giel, bukan otomatis) |
 
 ---
 
@@ -1211,6 +1211,44 @@ sendiri lewat review chart, bukan sesuatu yang diputuskan otomatis di sini).
   kandidat harus sudah ada lewat `backfill_fundamentals` (yfinance) dulu
   sebelum "Jalankan Grade" berguna; kalau kandidat tidak listed/tidak ada
   di yfinance, perlu jalur input manual terpisah (belum dibangun).
+
+**Update — J-13 selesai (sizing engine wired ke Trading Journal, §14):**
+- [x] **`web/writes.py::insert_trading_journal()` extended** — 5 parameter
+      baru OPSIONAL (backward-compat): `planned_size`, `actual_size`,
+      `skip_reason`, `return_asset_ccy`, `return_idr` (kolom sudah ada di
+      schema sejak kontrak §3, tinggal disambungkan).
+- [x] **`GET /api/sizing/suggest?instrument=X&entry=&sl=`** (BARU) — reuse
+      `analysis.sizing.suggest_position_size()` (J-3b) PERSIS, tidak ada
+      logic terpisah. **Guard 2 lapis** (bukan cuma hitung asal jalan):
+      (1) instrumen HARUS ada di `instrument_metadata` (lot_size diketahui)
+      — kalau tidak, 404 dgn pesan jelas ("sizing engine cuma berlaku utk
+      universe Phase J+"); (2) capital dibaca dari `.env` (`RISK_CAPITAL_
+      IDR`/`RISK_CAPITAL_USD`, dipilih otomatis dari `instrument_metadata.
+      market`) — kalau kosong, 400 dgn pesan jelas, **TIDAK fabrikasi
+      angka**.
+- [x] **Panel 6 Trading Journal form**: tombol "Hitung Ukuran" (panggil
+      endpoint di atas, isi `planned_size` otomatis atau tampilkan alasan
+      SKIP) + 3 field baru (Planned Size/Actual Size/Skip Reason, semua
+      bisa diisi manual juga kalau mau override saran engine).
+- [x] **Panel 7 Riwayat > Jurnal Trading**: kolom baru "Size (Plan/Actual)"
+      — tampil badge SKIP kalau ada `skip_reason`, bukan cuma dua angka
+      kosong.
+- 2 test baru (`test_web_writes.py`: sizing fields tersimpan benar, skip
+  tanpa size), 250 test hijau total. **Diverifikasi live end-to-end
+  browser**: (1) `/api/sizing/suggest` utk BBCA (ada di universe) TAPI
+  `RISK_CAPITAL_IDR` belum diisi -> pesan error jelas, tidak ada angka
+  ngasal; (2) `/api/sizing/suggest` utk BTC (bukan Phase J+) -> 404 pesan
+  jelas; (3) isi `planned_size`/`actual_size` manual -> simpan ke
+  `trading_journal` -> muncul benar di Panel 7 sbg "2500 / 2500". Data uji
+  dibersihkan setelah verifikasi.
+- **Belum dikerjakan**: `return_asset_ccy`/`return_idr` (P&L ganda aset
+  USD, kontrak §13.2) belum ada UI input-nya — field sudah ada di
+  DB/fungsi tulis, tinggal ditambah ke form kalau/waktu Giel mulai
+  trading TSLA beneran dan butuh catat P&L; auto-compute dari sizing
+  engine (isi `planned_size` otomatis saat approve signal di Panel 5,
+  bukan cuma manual di Panel 6) juga belum dibangun — saat ini alurnya
+  masih 2 langkah terpisah (approve di Panel 5, hitung+catat size manual
+  di Panel 6).
 
 **Update — lanjutan kickoff (Giel bilang "oke lanjut", isi BBCA saja dulu):**
 - [x] **5 tabel Phase J+ dibangun sebagai DRAFT** (`fundamentals_quarterly`,

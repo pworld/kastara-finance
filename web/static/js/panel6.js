@@ -38,15 +38,37 @@ $("#synthSaveBtn").addEventListener("click", async () => {
   toast("Synthesis tersimpan");
   loadSynthesisLog();  // segarkan riwayat di Panel 7
 });
+$("#jSizingBtn").addEventListener("click", async () => {
+  const instrument = $("#jInstrument").value.trim();
+  const entry = $("#jEntry").value, sl = $("#jSl").value;
+  if (!instrument || !entry || !sl) { toast("Instrument, Entry, SL wajib diisi dulu"); return; }
+  const result = await (await fetch(
+    `/api/sizing/suggest?instrument=${encodeURIComponent(instrument)}&entry=${entry}&sl=${sl}`
+  )).json();
+  if (result.error) { $("#jSizingResult").textContent = result.error; return; }
+  if (result.skip) {
+    $("#jSizingResult").textContent = `SKIP — ${result.skip_reason} (budget ${fmt(result.risk_budget)} tidak cukup utk 1 lot)`;
+    $("#jSkipReason").value = result.skip_reason;
+    $("#jPlannedSize").value = "";
+  } else {
+    $("#jSizingResult").textContent = `Suggested: ${result.suggested_units} unit (risiko aktual ${fmt(result.actual_risk)} / budget ${fmt(result.risk_budget)})`;
+    $("#jPlannedSize").value = result.suggested_units;
+    $("#jSkipReason").value = "";
+  }
+});
+
 $("#jSaveBtn").addEventListener("click", async () => {
   await postJSON("/api/journal/add", {
     date: today(), instrument: $("#jInstrument").value, setup_type: $("#jSetup").value,
     entry_price: $("#jEntry").value || null, sl_price: $("#jSl").value || null,
     tp1_price: $("#jTp1").value || null, outcome: $("#jOutcome").value,
     personal_notes: $("#jNotes").value, lesson_learned: $("#jLesson").value,
+    planned_size: $("#jPlannedSize").value || null, actual_size: $("#jActualSize").value || null,
+    skip_reason: $("#jSkipReason").value || null,
   });
   toast("Tersimpan ke trading journal");
-  ["jSetup","jEntry","jSl","jTp1","jNotes","jLesson"].forEach(id => $("#" + id).value = "");
+  ["jSetup","jEntry","jSl","jTp1","jNotes","jLesson","jPlannedSize","jActualSize","jSkipReason"].forEach(id => $("#" + id).value = "");
+  $("#jSizingResult").textContent = "";
 });
 $("#pSaveBtn").addEventListener("click", async () => {
   const claim = $("#pClaim").value.trim();

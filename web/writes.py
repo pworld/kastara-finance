@@ -276,13 +276,25 @@ def insert_trading_journal(
     conn: sqlite3.Connection, *, date: str, instrument: str, setup_type: str | None,
     entry_price: float | None, sl_price: float | None, tp1_price: float | None,
     outcome: str | None, personal_notes: str | None, lesson_learned: str | None,
+    planned_size: float | None = None, actual_size: float | None = None,
+    skip_reason: str | None = None, return_asset_ccy: float | None = None,
+    return_idr: float | None = None,
 ) -> int:
+    """Ekstensi Phase J+ Build Contract v1.3 §14/J-13 (semua parameter baru
+    OPSIONAL, backward-compatible dgn caller lama): `planned_size` dari
+    `analysis/sizing.py::suggest_position_size()` (lihat `/api/sizing/
+    suggest`), `actual_size` yang benar-benar dieksekusi Giel (bisa beda
+    dari planned krn harga eksekusi riil), `skip_reason` kalau sinyal
+    dilewati (mis. RISK_CAPACITY_EXCEEDED), `return_asset_ccy`/
+    `return_idr` P&L ganda utk aset USD (kontrak §13.2)."""
     cur = conn.execute(
         "INSERT INTO trading_journal (date, instrument, setup_type, entry_price, "
-        "sl_price, tp1_price, outcome, personal_notes, lesson_learned, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "sl_price, tp1_price, outcome, personal_notes, lesson_learned, created_at, "
+        "planned_size, actual_size, skip_reason, return_asset_ccy, return_idr) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (date, instrument, setup_type, entry_price, sl_price, tp1_price,
-         outcome, personal_notes, lesson_learned, created_at()),
+         outcome, personal_notes, lesson_learned, created_at(),
+         planned_size, actual_size, skip_reason, return_asset_ccy, return_idr),
     )
     return cur.lastrowid
 

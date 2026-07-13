@@ -42,6 +42,15 @@
         <div><label class="field">TP1</label><input type="number" step="any" id="jTp1"></div>
       </div>
       <div class="form-row" style="margin-top:12px">
+        <button class="btn small secondary" id="jSizingBtn">Hitung Ukuran (sizing engine, khusus universe Phase J+)</button>
+        <span id="jSizingResult" class="src"></span>
+      </div>
+      <div class="form-grid" style="margin-top:12px">
+        <div><label class="field">Planned Size</label><input type="number" step="any" id="jPlannedSize" placeholder="dari sizing engine, atau isi manual"></div>
+        <div><label class="field">Actual Size</label><input type="number" step="any" id="jActualSize" placeholder="yang beneran dieksekusi"></div>
+        <div><label class="field">Skip Reason</label><input type="text" id="jSkipReason" placeholder="mis. RISK_CAPACITY_EXCEEDED"></div>
+      </div>
+      <div class="form-row" style="margin-top:12px">
         <label class="field">Catatan pribadi</label>
         <textarea id="jNotes"></textarea>
       </div>
