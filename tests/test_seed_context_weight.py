@@ -1,11 +1,13 @@
 """Test pipeline/seed_context_weight.py — idempotent seed per instrument (Master Plan §4.3)."""
 from db.connection import get_connection, init_db
 from pipeline.seed_context_weight import (
+    BBCA_WEIGHTS,
     BTC_WEIGHTS,
     FOREX_WEIGHTS,
     GOLD_WEIGHTS,
     IHSG_WEIGHTS,
     SP500_WEIGHTS,
+    TSLA_WEIGHTS,
     USDJPY_WEIGHTS,
     seed_instrument,
 )
@@ -65,3 +67,40 @@ def test_seed_other_instruments(tmp_path):
                 "SELECT driver FROM asset_context_weight WHERE instrument=?", (instrument,)
             ).fetchall()
             assert {r["driver"] for r in rows} == {d for d, _, _ in weights}
+
+
+# ---------- Phase J+ (BBCA/TSLA, Build Contract v1.3 J-10) ----------
+
+def test_seed_bbca_tsla_weights(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        n_bbca = seed_instrument(conn, "BBCA", BBCA_WEIGHTS)
+        n_tsla = seed_instrument(conn, "TSLA", TSLA_WEIGHTS)
+        conn.commit()
+        assert n_bbca == len(BBCA_WEIGHTS)
+        assert n_tsla == len(TSLA_WEIGHTS)
+
+        bbca_drivers = {
+            r["driver"] for r in conn.execute(
+                "SELECT driver FROM asset_context_weight WHERE instrument='BBCA'"
+            ).fetchall()
+        }
+        assert bbca_drivers == {d for d, _, _ in BBCA_WEIGHTS}
+        assert "ihsg_foreign_flow" in bbca_drivers  # bukan sekadar generic FOREX/BTC weights
+
+        tsla_drivers = {
+            r["driver"] for r in conn.execute(
+                "SELECT driver FROM asset_context_weight WHERE instrument='TSLA'"
+            ).fetchall()
+        }
+        assert tsla_drivers == {d for d, _, _ in TSLA_WEIGHTS}
+
+        # level DEFAULT 'INSTRUMENT' (schema.sql) -- belum bangun pewarisan
+        # index->sector->instrument, seed manual instrument-level saja (J-10 scope).
+        levels = {
+            r["level"] for r in conn.execute(
+                "SELECT level FROM asset_context_weight WHERE instrument IN ('BBCA','TSLA')"
+            ).fetchall()
+        }
+        assert levels == {"INSTRUMENT"}

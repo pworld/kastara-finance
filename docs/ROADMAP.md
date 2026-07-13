@@ -17,7 +17,7 @@
 | **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — `plan_d.txt` (dihapus setelah selesai) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
 | **E** | Telegram bot | ✅ **Selesai (push satu arah)** — `plan_e.txt` (dihapus setelah selesai) dieksekusi penuh, Daily Briefing manual (CLI + tombol Panel 6); bot commands dua-arah ditunda ke backlog |
 | **F+** | Multi-aset expansion | 🟡 **GOLD/SP500/IHSG/USDIDR/USDJPY aktif** (S&R+signals+context weight) — altcoin/saham/komoditas lain belum |
-| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026), Gerbang G1/G2/G3 DIJAWAB (13 Jul 2026)** — universe final Gelombang 1 = **BBCA + TSLA**; **J-14/J-2/J-4 SELESAI**; **J-3 groundwork** (S&R zona+sinyal uncalibrated, siap direview Giel) & **J-3b** (sizing engine, max risk 2.5%) SELESAI; **validasi bar-replay manual (lane_validated_at)**, **kalibrasi per-market §13**, dan **J-6 (bank ratio CAR/NPL/NIM/LDR — sumber IDX BELUM ketemu, riset ekstensif tidak berhasil pin down endpoint spesifik, kemungkinan tetap perlu OJK)** menunggu Giel |
+| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026), Gerbang G1/G2/G3 DIJAWAB (13 Jul 2026)** — universe = **BBCA + TSLA**; **J-14/J-2/J-4/J-3(groundwork)/J-3b/J-10/J-7 SELESAI**; sisa: **J-5** (sector benchmark, ditunda — belum worth dgn 1 ticker/sektor), **J-6** (bank ratio CAR/NPL/NIM/LDR — kemungkinan manual dari laporan, Giel masih pikirkan), **J-8/J-9/J-11/J-12/J-13/J-15**, + validasi bar-replay manual & kalibrasi §13 (keputusan Giel, bukan otomatis) |
 
 ---
 
@@ -1066,6 +1066,51 @@ sendiri lewat review chart, bukan sesuatu yang diputuskan otomatis di sini).
   `trading_journal.planned_size`/`actual_size`/`skip_reason` — itu J-13
   (SOP amendment final), butuh keputusan tambahan Giel soal alur konfirmasi
   di dashboard, bukan sekadar kalkulasi.
+
+**Update — J-10 selesai (seed asset_context_weight BBCA/TSLA):**
+- [x] `pipeline/seed_context_weight.py` — `BBCA_WEIGHTS` (ihsg_foreign_flow
+      HIGH, bi_rate HIGH, usd_idr MED, sector_fundamentals MED) & `TSLA_
+      WEIGHTS` (fed_path HIGH, earnings HIGH, net_liquidity MED, dxy MED) —
+      driver berbeda dari generic BTC/FOREX weights, mencerminkan karakter
+      bank-IDX vs growth-stock-US. `level` tetap default `'INSTRUMENT'`
+      (BELUM bangun pewarisan index→sector→instrument penuh dari kontrak
+      §3 — itu butuh desain lookup fallback terpisah, di luar scope seed
+      manual J-10). 4 test baru, dijalankan live: 4 baris baru masing²
+      utk BBCA/TSLA di DB asli.
+
+**Update — J-7 selesai (earnings_calendar, BBCA + TSLA):**
+- [x] **`scrapers/earnings_yf.py`** (BARU) — `Ticker.earnings_dates`
+      yfinance (butuh dependency baru `lxml`, ditambah `requirements.txt` —
+      tanpa itu yfinance raise `ImportError` diam-diam di balik try/except
+      pandas, ditemukan live saat first-try). Field lebih lengkap dari
+      `Ticker.calendar` (yang cuma kasih 1 tanggal ke depan tanpa histori
+      surprise): `EPS Estimate`/`Reported EPS`/`Surprise(%)` per tanggal,
+      histori + 1 baris earnings BELUM rilis (`Reported EPS=NaN` → dipetakan
+      `eps_actual=None`).
+- [x] **`db/schema.sql`**: `idx_earnings_calendar_dedup` UNIQUE(instrument,
+      earnings_date, event_type) — BARU (tabel sebelumnya tidak punya
+      index sama sekali), `CREATE UNIQUE INDEX IF NOT EXISTS` idempotent
+      utk DB lama/baru, tidak butuh `_migrate_columns()` (itu cuma utk
+      `ALTER TABLE ADD COLUMN`, bukan index).
+- [x] **`pipeline/backfill_earnings.py`** (BARU) — `upsert_earnings_
+      calendar()` UPSERT by natural key (forecast/actual ter-update kalau
+      re-run, BUKAN duplikat baris — penting krn `eps_actual` NULL→terisi
+      begitu earnings resmi rilis). `backfill_earnings()` 1 instrumen atau
+      semua di `instrument_metadata`. Dijalankan manual/berkala (bukan
+      bagian `run_daily`), pola sama `backfill_fundamentals.py`.
+- 9 test baru (`test_earnings_yf.py` + `test_backfill_earnings.py`, live
+  network — termasuk assert eksplisit ada baris `eps_actual=None` DAN ada
+  baris `eps_actual` terisi, dan test upsert re-run mengisi actual tanpa
+  duplikat), 219 test hijau total. **Diverifikasi live penuh terhadap DB
+  asli**: BBCA 25 baris, TSLA 25 baris earnings histori — **KEDUA
+  instrumen punya earnings BELUM rilis di tanggal SAMA: 2026-07-22** (9
+  hari dari hari ini, 13 Jul 2026) — langsung relevan utk rule SOP
+  terkunci "no hold through earnings" (kontrak §18 keputusan #3, versi
+  penuh utk saham AS).
+- **Belum dikerjakan** (di luar scope "data backfill" J-7): tampilan di
+  Panel 3 sumbu waktu (gabung visual dgn `econ_calendar`), WARNING utk
+  posisi `trading_journal.outcome='ONGOING'` yang mendekati earnings — itu
+  J-15 (prasyarat J-4 sudah selesai, tinggal J-11 grader + UI-nya).
 
 **Update — lanjutan kickoff (Giel bilang "oke lanjut", isi BBCA saja dulu):**
 - [x] **5 tabel Phase J+ dibangun sebagai DRAFT** (`fundamentals_quarterly`,

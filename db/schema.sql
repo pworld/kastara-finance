@@ -297,3 +297,10 @@ CREATE INDEX IF NOT EXISTS idx_trade_signals_instrument_date
 -- metric) sebagai natural key UPSERT, sama pola dengan idx_econ_calendar_dedup.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_positioning_dedup
     ON positioning(date, instrument, metric);
+
+-- earnings_calendar (Phase J+ Build Contract v1.3, J-7): eps_actual berubah
+-- dari NULL -> terisi begitu earnings resmi rilis (kolom estimate juga bisa
+-- direvisi analis sebelum tanggalnya) -> (instrument, earnings_date,
+-- event_type) natural key UPSERT, sama pola dgn idx_econ_calendar_dedup.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_earnings_calendar_dedup
+    ON earnings_calendar(instrument, earnings_date, event_type);

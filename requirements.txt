@@ -1,6 +1,7 @@
 requests
 curl_cffi
 yfinance
+lxml
 pandas
 feedparser
 beautifulsoup4

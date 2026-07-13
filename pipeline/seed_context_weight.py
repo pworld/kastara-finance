@@ -56,6 +56,28 @@ USDJPY_WEIGHTS = [
     ("trade_balance", "MED", "Neraca dagang Jepang-AS — tekanan struktural yen"),
 ]
 
+# Phase J+ (Build Contract v1.3, J-10) -- level='INSTRUMENT' saja utk sekarang
+# (BUKAN pewarisan index->sector->instrument penuh spt disinggung kontrak §3 --
+# butuh desain lookup fallback terpisah, di luar scope seed manual ini).
+BBCA_WEIGHTS = [
+    ("ihsg_foreign_flow", "HIGH",
+     "Arah dana asing ke saham IDX — emiten besar seperti BBCA sering jadi "
+     "proxy sentimen asing thd IHSG, bukan cuma level-index"),
+    ("bi_rate", "HIGH", "Arah suku bunga BI — langsung pengaruhi NIM/margin bunga bank"),
+    ("usd_idr", "MED", "Stabilitas rupiah — sentimen makro lebih luas, bukan driver langsung "
+     "earnings bank domestik"),
+    ("sector_fundamentals", "MED",
+     "Kondisi sektor perbankan (kredit, NPL industri) — dibaca manual, belum ada scraper otomatis"),
+]
+
+TSLA_WEIGHTS = [
+    ("fed_path", "HIGH", "Arah kebijakan Fed — saham growth/high-multiple sensitif ke suku bunga AS"),
+    ("earnings", "HIGH",
+     "Earnings season & guidance — volatilitas TSLA historis besar di sekitar rilis earnings"),
+    ("net_liquidity", "MED", "WALCL-RRP-TGA, driver sama dgn BTC/SP500 tapi bobot growth-stock spesifik"),
+    ("dxy", "MED", "Kekuatan dolar — pengaruh tidak langsung lewat sentimen risk-on/off growth stock"),
+]
+
 
 def seed_instrument(conn, instrument: str, weights: list[tuple[str, str, str]]) -> int:
     """Insert (instrument, driver, weight, notes) kalau (instrument, driver)
@@ -82,6 +104,7 @@ def main() -> None:
     targets = [
         ("BTC", BTC_WEIGHTS), ("GOLD", GOLD_WEIGHTS), ("SP500", SP500_WEIGHTS),
         ("IHSG", IHSG_WEIGHTS), ("USDIDR", FOREX_WEIGHTS), ("USDJPY", USDJPY_WEIGHTS),
+        ("BBCA", BBCA_WEIGHTS), ("TSLA", TSLA_WEIGHTS),
     ]
     with get_connection() as conn:
         for instrument, weights in targets:
