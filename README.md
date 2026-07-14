@@ -206,6 +206,7 @@ python -m db.connection
 ```bash
 python -m pipeline.run_daily              # tanggal hari ini (WIB)
 python -m pipeline.run_daily 2026-06-24   # tanggal tertentu
+python -m pipeline.run_investing_actual   # Evening Cron
 ```
 Idempotent — aman dijalankan berkali-kali untuk tanggal sama (UPSERT, bukan
 duplikat). Akhir run mencetak ringkasan `source ok / fail / skip` per API.

@@ -73,6 +73,45 @@ flowchart TD
 
 ---
 
+## 1b. Alur Sore/Malam (`pipeline/run_investing_actual.py`)
+
+Cron KEDUA, **terpisah** dari alur di atas (jadwal beda, belum ada di
+crontab — lihat README §5). Tujuan: isi `econ_calendar.actual` untuk event
+HIGH-importance yang forecast/previous-nya sudah masuk lewat alur pagi
+(ForexFactory tidak pernah menyediakan `actual`, lihat
+[ARCHITECTURE.md §6.14](ARCHITECTURE.md#614-scrapersinvesting_calendarpy--kenapa-tidak-digabung-ke-run_daily)
+kenapa ini bukan sekadar ditambah ke `run_daily`).
+
+```mermaid
+flowchart TD
+    A[python -m pipeline.run_investing_actual] --> B[investing_calendar.py: 1x GET halaman default]
+    B --> C{HTTP ok?}
+    C -->|gagal/rate-limit| C1[source_flags fail, items kosong, selesai]
+    C -->|ok| D[Parse: HANYA importance HIGH bintang-3, actual sudah terisi]
+    D --> E{Untuk tiap event scraped}
+    E --> F[Cari kandidat econ_calendar: HIGH + actual NULL + country sama + event_date +-1 hari]
+    F --> G[Fuzzy-match nama event - difflib, threshold 0.5]
+    G --> H{Match unik & yakin?}
+    H -->|tidak/ambigu| H1[Skip - actual tetap kosong]
+    H -->|ya| I[UPDATE econ_calendar.actual via set_econ_actual]
+    I --> J[Print ringkasan: fetched/matched/skipped]
+    H1 --> J
+    C1 --> J
+```
+
+**Poin penting:**
+- SENGAJA konservatif: kandidat yang ambigu (2+ skor sama tinggi) di-skip,
+  bukan ditebak — lebih baik `actual` tetap kosong (bisa diisi manual lewat
+  dashboard) daripada salah tempel ke event yang salah.
+- Normalisasi nama event menyamakan istilah 2 sumber ("m/m" ForexFactory
+  vs "(MoM)" investing.com jadi token `mom` yang sama) SEBELUM membuang
+  kurung — kalau kurung dibuang duluan, penanda MoM/YoY ikut hilang dan
+  event yang beda jadi kelihatan sama (ketemu saat verifikasi live, lihat
+  ARCHITECTURE.md §6.14).
+- Tidak pernah crash, pola `safe_call`/`source_flags` sama seperti scraper lain.
+
+---
+
 ## 2. Alur Backfill (`pipeline/backfill.py`)
 
 Dipakai manual untuk mengisi histori (mis. 5 tahun ke belakang), sedikit demi
@@ -180,6 +219,7 @@ sumber.
 | Komponen | Baca DB? | Tulis DB? | Tabel yang disentuh |
 |---|---|---|---|
 | `pipeline/run_daily.py` | ya (`volume_ma20`) | **ya** | `daily_market`, `asset_ohlcv`, `daily_news`, `econ_calendar`, `positioning` (COT/ETF/IHSG flow), `earnings_calendar` |
+| `pipeline/run_investing_actual.py` (sore/malam, terpisah) | ya (cari kandidat match) | **ya** | `econ_calendar.actual` saja (event HIGH yang sudah ada, tidak insert baris baru) |
 | `pipeline/backfill*.py` | ya (cek duplikat) | **ya** | `asset_ohlcv`, `daily_market`, `fundamentals_quarterly`, `earnings_calendar` |
 | `pipeline/run_analysis.py` | ya (histori) | **ya** | `sr_zones`, `trade_signals` |
 | `pipeline/run_grader.py` | ya | **ya** | `emiten_grade`, `grader_log` |

@@ -72,6 +72,7 @@ kastara-finance/
 │   ├── macro_yf.py           # yfinance (SP500, IHSG, Gold, USD/IDR, USD/JPY)
 │   ├── news.py               # RSS + scoring rule-based (bukan AI)
 │   ├── econ_calendar.py      # ForexFactory calendar (event masa depan)
+│   ├── investing_calendar.py # pass KEDUA: isi `actual` HIGH-only dari investing.com
 │   ├── positioning.py        # COT (CFTC) + BTC ETF flow (farside.co.uk)
 │   ├── idx_foreign_flow.py   # IHSG foreign flow level pasar (idx.co.id, curl_cffi)
 │   ├── idx_stock_foreign_flow.py  # foreign flow PER-SAHAM (J-8)
@@ -79,6 +80,7 @@ kastara-finance/
 │   └── equity_universe.py    # OHLCV harian saham universe (yfinance .JK/US, J-2)
 ├── pipeline/
 │   ├── run_daily.py          # orchestrator harian, UPSERT idempotent
+│   ├── run_investing_actual.py  # cron KEDUA (sore/malam, TERPISAH dari run_daily)
 │   ├── backfill.py           # tarik historis OHLCV, preview-before-commit
 │   ├── backfill_fundamentals.py / backfill_earnings.py  # fundamentals & earnings (J-4/J-7)
 │   ├── add_article.py        # CLI manual_articles (riset historis)
@@ -560,3 +562,41 @@ SETELAH Giel benar-benar kirim pesan ke bot (chat_id yang valid cuma bisa
 didapat dari update asli, bukan ditebak/disalin dari sumber lain). Pesan
 error Telegram `"Bad Request: chat not found"` jadi sinyal diagnostik yang
 tepat untuk kasus ini — sudah divalidasi cocok.
+
+### 6.14 `scrapers/investing_calendar.py` — kenapa TIDAK digabung ke `run_daily`
+
+Riset awal (isi `econ_calendar.actual` HIGH-importance dari investing.com,
+sumber yang genuinely tidak dipunyai ForexFactory) SEMPAT disimpulkan
+"skip" — tes langsung (`curl_cffi impersonate=chrome`, sama pola
+`idx_foreign_flow.py`) kena HTTP 429 yang tidak pulih setelah ~5-6 request
+riset dalam beberapa menit, dan endpoint AJAX untuk navigasi tanggal
+("Yesterday") tidak ketemu (parameter URL diabaikan, SSR selalu balikin
+"hari ini" versi investing.com).
+
+Yang disadari belakangan: masalah itu murni soal POLA RISET (burst request
+cepat), bukan soal PRODUKSI (1x/hari). Karena investing.com's default view
+sudah cukup KALAU discrape SORE/MALAM (bukan pagi), event HIGH hari itu
+biasanya sudah rilis actual-nya di jam segitu — navigasi tanggal jadi tidak
+dibutuhkan sama sekali. Solusinya: `pipeline/run_investing_actual.py`
+adalah entrypoint TERPISAH dengan cron sendiri (sore, bukan digabung ke
+`run_daily` pagi jam 00:00). Ini juga sadar KEPUTUSAN, bukan kelalaian:
+"gabung semua scraper ke 1x GET ekstra tiap `run_daily`" awalnya kelihatan
+lebih simpel, tapi berarti scraper lain yang juga rawan block (`idx_
+foreign_flow.py`, `idx_stock_foreign_flow.py`) ikut kena 2x request/hari
+tanpa manfaat — lihat diskusi di `docs/ROADMAP.md`.
+
+**Bug ditemukan saat verifikasi live pertama**: matching investing.com ->
+`econ_calendar` pakai fuzzy-match nama event (`difflib.SequenceMatcher`,
+`pipeline/run_investing_actual.py::_normalize_name`) karena 2 sumber pakai
+istilah beda utk event yang sama (ForexFactory "CPI m/m" vs investing.com
+"CPI (MoM) (Jun)"). Normalisasi pertama membuang SEMUA teks dalam kurung
+(termasuk penanda "(MoM)"/"(YoY)"), jadi "CPI (MoM)" dan "CPI (YoY)"
+sama-sama jadi "cpi" -> skor identik -> `_best_match` sengaja skip kalau
+ambigu (lebih baik kosong daripada salah tempel) -> run pertama: 3 event
+di-fetch, 0 match, 3 skip. Fix: samakan `m/m`/`(MoM)` jadi token `mom`
+(begitu juga yoy/qoq) SEBELUM membuka kurung, baru buang sisanya (nama
+bulan/kuartal). Setelah fix, run kedua terhadap DB asli: 3/3 match benar
+(CPI m/m, Core CPI m/m, CPI y/y — tidak tertukar MoM/YoY). Pelajaran sama
+dengan §6.11: verifikasi pakai kode yang BENAR-BENAR jalan di produksi,
+bukan cuma unit test dengan data buatan sendiri (unit test awal lolos
+karena kandidatnya sengaja tidak dibuat ambigu).

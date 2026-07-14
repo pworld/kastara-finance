@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Column from 'primevue/column'
 import DataTable from '../components/DataTable.vue'
 import { get, post } from '../lib/api'
@@ -10,14 +10,33 @@ import { useAppToast } from '../composables/useAppToast'
 const { toast } = useAppToast()
 
 // ---------- Economic Calendar ----------
-const econCal = ref([])
+const econCalRaw = ref([])
 const editingActualIds = ref(new Set())
 const actualInputs = ref({}) // id -> nilai sedang diketik, per baris (BUKAN 1 ref bersama -- banyak baris bisa butuh input bersamaan)
 const loadingCal = ref(true)
+// Default HIGH saja ("bintang 3") -- window backend HIGH+MED, tapi MED bikin
+// tabel penuh event kurang krusial. Toggle ke HIGH+MED kalau perlu lihat semua.
+const impFilter = ref('HIGH')
+
+const econCal = computed(() => {
+  const todayStr = today()
+  const filtered = impFilter.value === 'HIGH'
+    ? econCalRaw.value.filter((r) => r.importance === 'HIGH')
+    : econCalRaw.value
+  // Prioritaskan hari ini & mendatang (ascending) di ATAS -- event yang
+  // sudah lewat (cuma nunggu actual diisi manual) ditaruh di bawah, biar
+  // yang relevan SEKARANG langsung kelihatan tanpa pindah halaman dulu.
+  return [...filtered].sort((a, b) => {
+    const aPast = a.event_date < todayStr ? 1 : 0
+    const bPast = b.event_date < todayStr ? 1 : 0
+    if (aPast !== bPast) return aPast - bPast
+    return a.event_date.localeCompare(b.event_date)
+  })
+})
 
 async function loadEconCalendar() {
   loadingCal.value = true
-  econCal.value = await get('/api/econ_calendar')
+  econCalRaw.value = await get('/api/econ_calendar')
   loadingCal.value = false
 }
 onMounted(loadEconCalendar)
@@ -123,6 +142,13 @@ onMounted(async () => { disonansi.value = await get('/api/disonansi') })
   <section>
     <h2>Economic Calendar</h2>
     <div class="panel">
+      <div class="chart-head" style="margin-bottom:12px">
+        <label class="src">Importance</label>
+        <select v-model="impFilter" style="width:auto">
+          <option value="HIGH">HIGH saja (bintang 3)</option>
+          <option value="ALL">HIGH + MED</option>
+        </select>
+      </div>
       <p v-if="loadingCal" class="src">Memuat...</p>
       <DataTable
         v-else :rows="econCal" :dataKey="'id'"
