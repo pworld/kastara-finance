@@ -453,6 +453,45 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       biar event yang baru rilis kemarin masih muncul untuk diisi actual-nya.
       2 test baru (`test_web_writes.py`), diverifikasi live di browser +
       query DB langsung.
+- [x] ~~Forward panel: urutkan Economic Calendar berdasar tanggal + filter
+      importance~~ — sebelumnya event lama nongkrong di atas tabel, sekarang
+      di-sort (upcoming/hari-ini dulu, event lewat didorong ke bawah) + filter
+      dropdown default **HIGH saja (bintang 3)**, opsi "HIGH + MED" kalau
+      perlu lihat semua. Murni client-side (`ForwardView.vue`), tidak ubah API.
+- [x] ~~Auto-isi `actual` HIGH-importance dari investing.com (pass kedua)~~
+      — riset awal SEMPAT menyimpulkan skip (lihat percobaan pertama: kena
+      HTTP 429 yang tidak pulih setelah ~5-6 request cepat, dan endpoint AJAX
+      utk navigasi tanggal "Yesterday" tidak ketemu). Tapi masalah itu murni
+      soal RISET (burst request), bukan soal produksi (1x/hari) — begitu
+      disadari, scope diubah total: **tidak perlu navigasi tanggal sama
+      sekali**. Investing.com's default view ("hari ini") sudah cukup KALAU
+      di-scrape SORE/MALAM (bukan pagi bareng `run_daily`) -- event HIGH hari
+      itu sudah rilis actual-nya di jam segitu. Jadi 1x GET/hari, bukan
+      burst riset -- profil risiko beda total dari yang kena block.
+      **Dibangun**: `scrapers/investing_calendar.py` (curl_cffi
+      impersonate=chrome, sama pola `idx_foreign_flow.py`; parse HTML
+      Next.js SSR investing.com; HANYA importance HIGH/bintang-3 yang
+      diambil, sesuai permintaan awal; skip event yang actual-nya masih
+      kosong) + `pipeline/run_investing_actual.py` (entrypoint TERPISAH dari
+      `run_daily.py`, cron sore sendiri -- lihat rationale "grab semua cron
+      2x" di bawah kenapa TIDAK digabung ke run_daily). Matching ke baris
+      `econ_calendar` existing pakai `country` + `event_date` (+-1 hari,
+      jaga beda zona waktu investing.com vs WIB) + fuzzy-match `event_name`
+      (`difflib.SequenceMatcher`, threshold 0.5, SKIP kalau ambigu/tie --
+      **temuan penting saat verifikasi live**: normalisasi nama SEMPAT
+      membuang penanda "(MoM)"/"(YoY)" investing.com bareng bulan rilis
+      "(Jun)", bikin "CPI (MoM)" dan "CPI (YoY)" sama-sama jadi "cpi" ->
+      tie -> ke-skip semua; diperbaiki dengan menyamakan "m/m"/"(MoM)" jadi
+      token `mom` (dst utk yoy/qoq) SEBELUM membuang kurung, sisanya
+      (nama bulan/kuartal) baru dibuang). Ditulis lewat `set_econ_actual()`
+      yang sudah ada (tidak bikin write path baru). **Diverifikasi live**
+      terhadap DB asli: 3 event HIGH (CPI m/m, Core CPI m/m, CPI y/y,
+      14 Jul 2026) match dan ter-isi actual dengan BENAR (tidak
+      tertukar MoM/YoY). 19 test baru (`test_investing_calendar.py`,
+      `test_run_investing_actual.py`), 312 test hijau total.
+      **Belum dijadwalkan ke cron** — perlu 1 baris crontab evening
+      terpisah dari baris `run_daily` jam 00:00 yang sudah ada, Giel yang
+      pasang (lihat instruksi di README/percakapan).
 - [ ] Index/monitoring ukuran DB berkala saat volume bertambah (sanity check,
       bukan berarti perlu migrasi — lihat rationale SQLite di
       ARCHITECTURE.md).

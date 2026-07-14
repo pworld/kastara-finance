@@ -59,8 +59,18 @@ memutuskan** — tidak ada execution/trading logic otomatis di mana pun.
     langsung di `source_flags`/log, bukan backlog tersembunyi.
   - `scrapers/econ_calendar.py` — ForexFactory (event ekonomi masa depan:
     FOMC/CPI/dll), endpoint JSON gratis tidak resmi. Forecast/previous ikut
-    tersimpan; `actual` (hasil rilis) diisi **manual** lewat dashboard —
-    sumber ini tidak pernah menyediakan kolom itu.
+    tersimpan; `actual` (hasil rilis) sumber ini tidak pernah menyediakan
+    kolom itu — diisi manual ATAU otomatis lewat pass kedua di bawah.
+  - `scrapers/investing_calendar.py` — pass KEDUA, HANYA importance HIGH
+    (bintang 3), isi `actual` yang tidak dipunyai ForexFactory. investing.com
+    via `curl_cffi` (Cloudflare, pola sama `idx_foreign_flow.py`) — TAPI jauh
+    lebih agresif rate-limit, jadi SENGAJA cuma 1x GET/run, dijadwalkan
+    terpisah dari `run_daily` lewat `pipeline/run_investing_actual.py`
+    (cron sore/malam sendiri, bukan ditambah ke cron pagi — lihat
+    [ROADMAP.md](docs/ROADMAP.md) soal kenapa "grab semua cron 2x" tidak
+    dipakai). Matching ke baris `econ_calendar` existing pakai fuzzy-match
+    nama event (`difflib`) + `country`/`event_date` window, SKIP kalau
+    ambigu — konservatif, tidak pernah menebak.
   - `scrapers/positioning.py` (Phase D) — COT report (CFTC Socrata API,
     gratis tanpa key: BTC/DXY/GOLD/SP500 net-long spekulan) + BTC ETF net
     flow (farside.co.uk, HTML scrape tak-resmi, butuh header browser-
@@ -77,6 +87,10 @@ memutuskan** — tidak ada execution/trading logic otomatis di mana pun.
   - `scrapers/equity_universe.py` (J-2) — OHLCV harian saham universe (yfinance
     `.JK`/US) untuk instrumen di `instrument_metadata`.
 - **Pipeline** `pipeline/run_daily.py` — orchestrator harian, idempotent (UPSERT).
+- **Pipeline (sore/malam, terpisah)** `pipeline/run_investing_actual.py` —
+  cron KEDUA, isi `actual` HIGH-importance dari investing.com (lihat
+  `scrapers/investing_calendar.py`). Belum ada di crontab — jalankan manual
+  atau tambah baris cron sendiri (contoh: `0 21 * * *`, WIB).
 - **Backfill** `pipeline/backfill.py` — tarik data historis (BTC/macro), preview-before-commit.
 - **Manual article** `pipeline/add_article.py` — isi `manual_articles` untuk riset
   historis (RSS tidak bisa backfill — lihat [Artikel manual](#artikel-manual-riset-historis)).
