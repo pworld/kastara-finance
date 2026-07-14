@@ -1,7 +1,14 @@
 # Kastara Finance — Technical Architecture
 
-> Status per dokumen ini: **Phase A (data layer) + Phase 1 (read-only dashboard) selesai.**
-> Lihat [ROADMAP.md](ROADMAP.md) untuk status tiap phase, [FLOW.md](FLOW.md) untuk alur data.
+> Status per dokumen ini: **Phase A–F+ selesai + Phase J+ (ekspansi ekuitas)
+> build-complete di sisi kode.** Dashboard sekarang **8 panel write-enabled**,
+> **22 tabel**, engine S&R/signals + Emiten Grader + sizing engine + 4 Analisa
+> Persona. Lihat [ROADMAP.md](ROADMAP.md) untuk status tiap phase & keputusan
+> terkunci, [FLOW.md](FLOW.md) untuk alur data, [SOP.md](SOP.md) untuk ritme
+> pemakaian, [migrationFE.md](migrationFE.md) untuk rencana migrasi FE → Vue.
+>
+> Dokumen ini menjelaskan fondasi Phase A–C secara mendalam (rationale §6 tetap
+> berlaku); detail eksekusi Phase D/E/F+/J+ per-langkah ada di ROADMAP.
 
 ---
 
@@ -52,12 +59,13 @@ Semua di [requirements.txt](../requirements.txt). Tidak ada dependency berat
 
 ```
 kastara-finance/
-├── .env / .env.example     # secrets & config (FRED key, Binance override, dll)
+├── .env / .env.example     # secrets & config (FRED/OpenRouter/Coinalyze key, dll)
 ├── db/
-│   ├── schema.sql           # DDL 14 tabel + index
-│   └── connection.py        # get_connection(), init_db(), resolve path (WSL/Windows aware)
+│   ├── schema.sql           # DDL 22 tabel + index
+│   └── connection.py        # get_connection(), init_db(), EXPECTED_TABLES,
+│                              _migrate_columns() (ADD COLUMN utk DB lama), path WSL/Win
 ├── scrapers/                # 1 file = 1 sumber data, tiap file jalan sendiri
-│   ├── base.py               # http_get retry, SourceFlags, proxy, waktu WIB
+│   ├── base.py               # http_get retry, SourceFlags, safe_call, proxy, WIB
 │   ├── crypto.py             # CoinGecko + Binance + Alternative.me
 │   ├── coinalyze.py          # OI agregat (3 exchange) + liquidation L/S + LS ratio
 │   ├── macro_fred.py         # FRED (DXY, US10Y, VIX, WALCL, RRP, TGA, HY)
@@ -65,37 +73,40 @@ kastara-finance/
 │   ├── news.py               # RSS + scoring rule-based (bukan AI)
 │   ├── econ_calendar.py      # ForexFactory calendar (event masa depan)
 │   ├── positioning.py        # COT (CFTC) + BTC ETF flow (farside.co.uk)
-│   └── idx_foreign_flow.py   # IHSG foreign flow (idx.co.id, curl_cffi -- Cloudflare)
+│   ├── idx_foreign_flow.py   # IHSG foreign flow level pasar (idx.co.id, curl_cffi)
+│   ├── idx_stock_foreign_flow.py  # foreign flow PER-SAHAM (J-8)
+│   ├── idx_uma.py            # flag integritas UMA per emiten (J-11)
+│   └── equity_universe.py    # OHLCV harian saham universe (yfinance .JK/US, J-2)
 ├── pipeline/
 │   ├── run_daily.py          # orchestrator harian, UPSERT idempotent
-│   ├── backfill.py           # tarik historis, preview-before-commit
+│   ├── backfill.py           # tarik historis OHLCV, preview-before-commit
+│   ├── backfill_fundamentals.py / backfill_earnings.py  # fundamentals & earnings (J-4/J-7)
 │   ├── add_article.py        # CLI manual_articles (riset historis)
-│   ├── run_analysis.py       # orchestrator Phase B (S&R + sinyal, BTC)
-│   └── seed_context_weight.py  # seed asset_context_weight (BTC)
-├── indicators/
-│   └── calc.py               # net_liquidity, volume_ma20 (calculated fields, Phase A)
-├── analysis/                  # engine Phase B — S&R + breakout/retest
-│   ├── indicators.py           # MA, volume ratio, rolling_ma (beda dari indicators/calc.py)
-│   ├── sr_zones.py              # swing detection, clustering, touch count
-│   └── signals.py               # breakout/retest detection + R:R calculator
-├── tools/
-│   └── review_signal.py       # CLI approve/reject trade_signals (by id eksplisit)
-├── web/                      # dashboard: read-only (Phase 1) + write (Phase C)
-│   ├── app.py                 # Flask, endpoint JSON + halaman, 7 tab panel
-│   ├── writes.py               # pure functions tulis-DB Phase C (testable
-│   │                             tanpa Flask, pola sama add_article.py)
-│   ├── templates/
-│   │   ├── index.html         # shell tipis: head+nav+{% include %} tiap
-│   │   │                         panel+<script src> tiap JS, tanpa build step/CDN
-│   │   └── partials/panelN_*.html  # 1 file per tab (HTML saja)
-│   └── static/
-│       ├── css/dashboard.css  # semua style (dulu inline di index.html)
-│       └── js/{core,panel1..7,main}.js  # core = shared helpers + table
-│                                 utility; per-panel JS terpisah; main.js
-│                                 = refreshAll()+init. Load order penting
-│                                 (semua fungsi global, bukan module).
-├── tests/                    # 1 test file per modul utama
-└── docs/                     # dokumen ini
+│   ├── run_analysis.py       # orchestrator S&R + sinyal (Phase B/F+/J-3)
+│   ├── run_grader.py         # orchestrator Emiten Grader (J-11)
+│   ├── seed_context_weight.py / seed_universe.py  # seed bobot driver + universe
+│   ├── compose_briefing.py / send_briefing.py     # Daily Briefing (Phase E)
+│   └── compose_persona_context.py  # rakit konteks 4 Analisa (shared-core + slice)
+├── indicators/calc.py        # net_liquidity, volume_ma20 (calculated fields, Phase A)
+├── analysis/                  # engine PURE (tak baca/tulis DB) — Phase B + J+
+│   ├── indicators.py / sr_zones.py / signals.py  # MA, zona S&R, breakout/retest
+│   ├── calibration.py          # toleransi zona per fraksi harga IDX (J-3, DRAFT)
+│   ├── sizing.py               # position sizing 2.5% + buffer ARA/ARB 1.5x (J-3b)
+│   └── grader.py               # Emiten Grader dua-sumbu → kuadran (J-11)
+├── llm/persona_analysis.py    # panggilan OpenRouter 4 Analisa Persona (Panel 4)
+├── notify/telegram.py         # send_message push satu arah (Phase E)
+├── tools/review_signal.py     # CLI approve/reject trade_signals (by id eksplisit)
+├── prompts/persona_*.txt      # system prompt tiap persona (gitignored, IP Giel)
+├── web/                      # dashboard: read (Phase 1) + write (Phase C+/J+)
+│   ├── app.py                 # Flask, 57 endpoint JSON + shell, 8 tab panel
+│   ├── writes.py               # pure functions tulis-DB (testable tanpa Flask)
+│   ├── templates/index.html + partials/panel1..8_*.html  # shell + 1 file/tab
+│   └── static/css/dashboard.css + js/{core,panel1..8,main}.js
+│                              # core = shared helpers + table engine; per-panel
+│                              # JS terpisah; load order penting (global, bukan module)
+│                              # → akan dimigrasi ke web/frontend/ (Vue, lihat migrationFE.md)
+├── tests/                    # 1 test file per modul utama (287 test)
+└── docs/                     # dokumen ini + ROADMAP/FLOW/SOP/Master Plan/migrationFE
 ```
 
 Aturan modular: **tiap scraper harus bisa dijalankan & ditest sendiri**
@@ -105,9 +116,12 @@ Aturan modular: **tiap scraper harus bisa dijalankan & ditest sendiri**
 
 ## 4. Skema Database
 
-14 tabel total (11 dasar Phase A + 3 forward-layer, ditambah saat menutup
-gap terhadap Master Plan §10). Phase A **mengisi** 4 tabel aktif; sisanya
-struktur saja (disiapkan untuk Phase B/D, tidak dipakai sekarang).
+**22 tabel total** (11 dasar Phase A + 3 forward-layer Phase D + 7 ekuitas
+Phase J+ + 1 `lane_validation_log`). Daftar otoritatif dijaga di
+`db/connection.py::EXPECTED_TABLES` (di-assert `tests/test_db.py`). Berbeda dari
+saat dokumen ini pertama ditulis, mayoritas tabel kini **terisi** (Phase B–J+
+sudah dieksekusi) — bukan lagi struktur-saja. §4.2 & §4.5 di bawah merangkum
+per-kelompok; detail per-tabel ada di komentar `db/schema.sql`.
 
 ### 4.1 Tabel aktif (Phase A + B)
 
@@ -122,12 +136,14 @@ struktur saja (disiapkan untuk Phase B/D, tidak dipakai sekarang).
 | `asset_context_weight` | 1 baris / (instrument, driver) | Pembobotan driver per aset (Master Plan §4.3). BTC di-seed via `pipeline/seed_context_weight.py`. |
 | `manual_articles` | 1 baris / artikel | Riset historis manual (RSS tidak bisa backfill) via `pipeline/add_article.py`. |
 
-### 4.2 Tabel struktur-saja (Phase C/D)
+### 4.2 Tabel Phase C/D (kini terisi)
 
-`reading_workspace`, `trading_journal`, `prediction_log` (Phase C) +
-`expectations`, `positioning`, `policy_tracker` (Phase D, forward-layer
-Master Plan §4.2) — DDL sudah ada di `schema.sql`, belum ada scraper/writer
-yang mengisi.
+`reading_workspace`, `trading_journal`, `prediction_log` (Phase C, ditulis via
+`web/writes.py` dari Panel 4/6/7) + `expectations`, `positioning`,
+`policy_tracker` (Phase D forward-layer Master Plan §4.2 — `positioning` diisi
+otomatis COT+ETF+IHSG-flow tiap `run_daily`, sisanya manual via Panel 3).
+Saat dokumen ini pertama ditulis semuanya masih struktur-saja; sekarang aktif
+dipakai.
 
 > **Deviasi FK yang disengaja:** Master Plan menulis kolom `date` di tabel
 > ini sebagai *"FOREIGN KEY → daily_market"*. `schema.sql` tidak
@@ -162,6 +178,28 @@ Nilai: `"ok"` (sukses), `"fail"` (dicoba, error), `"skip"` (sengaja dilewati,
 mis. Binance dimatikan via env, atau FRED_API_KEY kosong). Ini adalah
 **audit trail** tiap run — jangan dihapus/diringkas, dashboard dan debugging
 bergantung padanya.
+
+### 4.5 Tabel ekuitas Phase J+ (Build Contract v1.3)
+
+7 tabel ekuitas + 1 lane-validation, semua untuk universe saham individual
+(BBCA + TSLA saat ini):
+
+| Tabel | Grain | Isi |
+|---|---|---|
+| `instrument_metadata` | 1 baris / instrumen | Metadata saham: `market`, `sector`, `lot_size`, `lane` (TRADE/INVEST/BOTH/NONE), `lane_validated_at`, `has_daily_limit` (ARA/ARB), `is_financial`. Menentukan lane engine & kalibrasi. |
+| `fundamentals_quarterly` | 1 baris / (instrumen, kuartal) | Revenue/net income/FCF (yfinance) + rasio bank CAR/NPL/NIM/LDR (manual, tak tertimpa). `confidence` FULL/LOW_CONFIDENCE. |
+| `earnings_calendar` | 1 baris / event | Jadwal earnings/corporate action — penegak rule no-hold-through-earnings saham AS. |
+| `emiten_grade` | 1 baris / grading | Hasil Grader: `fund_score`, `integrity_flags` (JSON), `quadrant`, `giel_override` (JSON — nilai mesin asli tak ditimpa). |
+| `grader_log` | append-only | Audit perubahan kuadran + widget outcome 3/6 bulan (anti-overtuning). |
+| `intake_log` | append-only | Keputusan intake kandidat (universe/watchlist/tolak) + alasan wajib. |
+| `sector_benchmark` | 1 baris / (sektor, kuartal) | Struktur pembanding sektor (J-5) — belum diisi (1 ticker/sektor belum worth). |
+| `lane_validation_log` | append-only | Jejak validasi lane bar-replay — **satu-satunya** penulis `lane_validated_at`, hanya lewat `web/writes.py::validate_lane()`, `evidence` wajib. |
+
+Prinsip kunci Phase J+: **engine sama, lane berbeda** — `lane` menentukan apakah
+`trade_signals` di-generate; instrumen baru wajib lewat validasi bar-replay
+manual (§13.1) sebelum lane naik ke TRADE. Kalibrasi zona per fraksi harga IDX
+(`analysis/calibration.py`) hanya berlaku untuk `market='IDX'`, DRAFT sampai
+Giel konfirmasi. Buffer ARA/ARB 1.5× (`analysis/sizing.py`) sudah locked (§18).
 
 ---
 
@@ -226,12 +264,19 @@ menulis logic baru langsung di route — semua reuse fungsi yang sudah ada
   Flask — `tests/test_web_writes.py`, tidak ada test Flask-route langsung,
   endpoint cukup diverifikasi manual via preview browser).
 
-Navigasi 6 tab (satu halaman, JS `display:none/block`, bukan reload) —
-urutan sama dengan alur pagi Master Plan §0: Snapshot → News → Forward →
-Reading → Chart → Synthesis.
+Navigasi **8 tab** (satu halaman, JS `display:none/block`, bukan reload):
+Snapshot → News → Forward → Reading → Chart → Synthesis (alur pagi TRADE lane,
+Master Plan §0) + **Riwayat** (arsip) + **Universe & Grader** (Phase J+, ritme
+mingguan/kuartalan INVEST lane). Panel 4 "4 Analisa" memanggil OpenRouter via
+`llm/persona_analysis.py` dengan konteks dari `pipeline/compose_persona_context.py`
+(shared-core + slice per persona) — satu-satunya titik AI/LLM di sistem, dipicu
+tombol manual. `web/app.py` sekarang **57 endpoint** (33 GET + 24 POST); route
+`/` cuma render shell statis (tanpa data server) — batas data yang bersih,
+fondasi migrasi FE → Vue ([migrationFE.md](migrationFE.md)).
 
 **Tanpa autentikasi** (keputusan sadar, `plan_c.txt` §6.4) — local-only,
-`WEB_HOST=127.0.0.1` default, belum ada rencana expose ke luar localhost.
+`WEB_HOST=127.0.0.1` default. Login/auth direncanakan bersama migrasi FE (Fase 3
+migrationFE.md) & Track A deploy — belum ada sekarang.
 
 **Chart Panel 5 (menyusul setelah Phase C awal):** candlestick + MA50/100/200
 overlay + volume bar/MA20 + 4 context mini-chart (DXY/S&P500/US10Y/Fear&

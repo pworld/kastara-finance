@@ -12,15 +12,21 @@
 Dijalankan via **crontab per-user** `0 0 * * *` (TZ sistem sudah WIB, lihat
 README §5), atau manual kapan saja.
 
+> Catatan: diagram di bawah menggambarkan inti Phase A (5 scraper makro). Sejak
+> Phase D/J+ `run_daily` juga memanggil `positioning.py` (COT+ETF), `coinalyze.py`
+> (OI/liquidation), `idx_foreign_flow.py` + `idx_stock_foreign_flow.py` (IHSG &
+> per-saham), dan `equity_universe.py` (OHLCV saham) — pola identik (`safe_call`
+> → `source_flags` → merge), cuma menambah cabang, tidak mengubah alur.
+
 ```mermaid
 flowchart TD
-    A[python -m pipeline.run_daily] --> B[init_db - pastikan 14 tabel ada]
-    B --> C{Panggil 5 scraper}
-    C --> C1[crypto.py: Binance/CoinGecko + Alternative.me]
-    C --> C2[macro_yf.py: yfinance 5 ticker]
+    A[python -m pipeline.run_daily] --> B[init_db - pastikan 22 tabel ada]
+    B --> C{Panggil scraper makro+ekuitas}
+    C --> C1[crypto.py + coinalyze.py]
+    C --> C2[macro_yf.py + equity_universe.py]
     C --> C3[macro_fred.py: FRED 7 series]
     C --> C4[news.py: RSS feeds]
-    C --> C5[econ_calendar.py: ForexFactory JSON]
+    C --> C5[econ_calendar.py + positioning.py + idx_*_flow.py]
 
     C1 --> D[Tiap scraper: safe_call per sub-request]
     C2 --> D
@@ -107,33 +113,33 @@ flowchart TD
 
 ---
 
-## 3. Alur Dashboard (`web/app.py`, read-only)
+## 3. Alur Dashboard (`web/app.py`, read **+ write** sejak Phase C)
 
 ```mermaid
 flowchart LR
     Browser -->|GET /| Flask[Flask app]
-    Flask -->|render| HTML[templates/index.html]
-    HTML -->|fetch JS| API1[/api/latest/]
-    HTML -->|fetch JS| API2[/api/assets/]
-    HTML -->|fetch JS| API3[/api/asset_ohlcv?instrument=X/]
-    HTML -->|fetch JS| API4[/api/news?impact=Y/]
+    Flask -->|render shell statis| HTML[templates/index.html + 8 partial]
+    HTML -->|fetch JS| GET[33 endpoint GET /api/*]
+    HTML -->|postJSON| POST[24 endpoint POST /api/*]
 
-    API1 --> DB[(kastara-finance.db\nmode DELETE + busy_timeout)]
-    API2 --> DB
-    API3 --> DB
-    API4 --> DB
+    GET --> DB[(kastara-finance.db\nmode DELETE + busy_timeout)]
+    POST -->|web/writes.py + reuse pipeline| DB
 
-    Pipeline[pipeline/run_daily.py\n+ backfill.py] -->|SATU-SATUNYA PENULIS| DB
+    Pipeline[pipeline/run_daily.py + backfill.py + run_analysis + run_grader] --> DB
 ```
 
 **Poin penting:**
-- Dashboard **hanya membaca** (`SELECT`) — tidak ada endpoint yang menulis
-  ke DB. Pipeline (dijalankan terpisah, manual/cron) tetap satu-satunya
-  penulis.
-- Mode **DELETE** + `busy_timeout=5000` (bukan WAL — lihat
-  [ARCHITECTURE.md §6.1](ARCHITECTURE.md#61-sqlite-vs-postgres-vs-nosql))
-  dipilih supaya akses lintas Windows↔WSL (mis. DBeaver) tetap predictable;
-  tulisan pipeline singkat jadi jarang benar-benar nabrak baca dashboard.
+- Sejak Phase C dashboard **membaca DAN menulis**: input manual (jurnal,
+  prediksi, policy, intake, override grade, validasi lane, dll) lewat 24 POST
+  endpoint. Penulisan tetap tidak menaruh logic baru di route — reuse
+  `web/writes.py` (pure, testable) + fungsi pipeline yang sudah teruji.
+- Route `/` cuma render **shell statis tanpa data server** — semua isi
+  di-fetch client-side dari `/api/*` (batas data bersih → fondasi migrasi
+  FE → Vue, [migrationFE.md](migrationFE.md)).
+- Tetap **single-writer secara praktik**: penulisan dashboard singkat & jarang
+  bersamaan dengan `run_daily`. Mode **DELETE** + `busy_timeout=5000` (bukan
+  WAL — [ARCHITECTURE.md §6.1](ARCHITECTURE.md#61-sqlite-vs-postgres-vs-nosql))
+  menjaga akses lintas Windows↔WSL predictable.
 - `/api/latest` mengurai `source_flags` JSON jadi struktur siap-render
   (dot indikator ok/fail/skip di UI).
 
@@ -158,7 +164,7 @@ sequenceDiagram
     end
 
     S-->>P: return dict + source_flags per scraper
-    P->>P: merge semua source_flags (5 scraper jadi 1 dict)
+    P->>P: merge semua source_flags (semua scraper jadi 1 dict)
     P->>DB: simpan sebagai JSON di kolom source_flags
     Note over DB: {"fred_dxy":"ok","binance_ohlcv":"fail","rss_Kontan":"skip",...}
 ```
@@ -173,12 +179,16 @@ sumber.
 
 | Komponen | Baca DB? | Tulis DB? | Tabel yang disentuh |
 |---|---|---|---|
-| `pipeline/run_daily.py` | ya (untuk `volume_ma20`) | **ya** | `daily_market`, `asset_ohlcv`, `daily_news`, `econ_calendar` |
-| `pipeline/backfill.py` | ya (cek duplikat) | **ya** | `asset_ohlcv`, `daily_market` |
-| `web/app.py` (dashboard) | ya | tidak | — (read-only semua) |
+| `pipeline/run_daily.py` | ya (`volume_ma20`) | **ya** | `daily_market`, `asset_ohlcv`, `daily_news`, `econ_calendar`, `positioning` (COT/ETF/IHSG flow), `earnings_calendar` |
+| `pipeline/backfill*.py` | ya (cek duplikat) | **ya** | `asset_ohlcv`, `daily_market`, `fundamentals_quarterly`, `earnings_calendar` |
+| `pipeline/run_analysis.py` | ya (histori) | **ya** | `sr_zones`, `trade_signals` |
+| `pipeline/run_grader.py` | ya | **ya** | `emiten_grade`, `grader_log` |
+| `web/app.py` + `web/writes.py` (dashboard) | ya | **ya** (Phase C+) | input manual: `reading_workspace`, `trading_journal`, `prediction_log`, `expectations`, `policy_tracker`, `intake_log`, `instrument_metadata`, `emiten_grade` (override), `lane_validation_log`, `fundamentals_quarterly` (rasio bank), dll |
 | `indicators/calc.py` | ya (`volume_ma20_for_instrument`) | tidak | — |
 
-Tidak ada dua proses penulis yang berjalan bersamaan dalam desain saat ini
-(single-writer). Kalau nanti butuh writer paralel, itu jadi salah satu
-trigger untuk meninjau ulang SQLite → Postgres (lihat
+Meski penulis kini lebih banyak, secara **praktik tetap single-writer**:
+`run_daily`/backfill/analysis/grader dijalankan manual/cron berurutan (bukan
+paralel), dan penulisan dashboard singkat & jarang bertabrakan. Kalau nanti
+butuh writer paralel sungguhan (mis. multi-user setelah deploy), itu salah satu
+trigger meninjau ulang SQLite → Postgres (lihat
 [ARCHITECTURE.md §6.1](ARCHITECTURE.md#61-sqlite-vs-postgres-vs-nosql)).

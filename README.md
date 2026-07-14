@@ -1,32 +1,51 @@
-# Kastara Finance — Phase A + B + C (Data Layer + Analysis Engine + Dashboard)
+# Kastara Finance — Data Layer + Analysis Engine + Dashboard + Equity Expansion
 
-**Phase A** (selesai): **kumpulkan data mentah** ke SQLite lokal dari
-sumber-sumber gratis (no paid API). **Phase B** (selesai untuk BTC): deteksi
-zona S&R + sinyal breakout/retest + R:R calculator dari histori
-`asset_ohlcv` — tetap **suggestion, bukan execution/trading logic**;
-keputusan akhir tetap manual (`approved`, direview via
-`tools/review_signal.py`). **Phase C** (selesai): dashboard 6-panel
-**write-enabled** — Data Snapshot, News Briefing, Forward Panel, Reading
-Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
-**tanpa pemanggilan AI/LLM otomatis** di mana pun.
+Personal finance/trading intelligence stack. **Mesin men-suggest, Giel
+memutuskan** — tidak ada execution/trading logic otomatis di mana pun.
 
-> Scope dikunci di `plan.txt` (Phase A). Execution plan Phase B-E
+**Status per Juli 2026 (detail lengkap di [`docs/ROADMAP.md`](docs/ROADMAP.md)):**
+- **Phase A** ✅ — kumpulkan data mentah makro/berita ke SQLite lokal (no paid API).
+- **Phase B** ✅ — engine S&R + breakout/retest + R:R (BTC).
+- **Phase C** ✅ — dashboard **write-enabled**, sekarang **8 panel/tab**.
+- **Phase D** ✅ — forward layer (FedWatch/Dot Plot manual, COT + BTC ETF flow
+  otomatis, Policy Tracker, Disonansi Flag).
+- **Phase E** ✅ — Daily Briefing → Telegram (push satu arah, manual trigger).
+- **Phase F+** ✅ — engine direplikasi ke GOLD/IHSG/SP500/USDIDR/USDJPY, +
+  4 Analisa Persona (Panel 4, OpenRouter, shared-core + slice v4).
+- **Phase J+** 🔶 — **ekspansi ekuitas (saham individual)**, universe = **BBCA +
+  TSLA**. Build Contract v1.3 selesai di sisi kode (universe OHLCV, fundamentals,
+  bank ratios, earnings, foreign-flow per-saham, Emiten Grader, sizing engine
+  2.5% + buffer ARA/ARB, fraksi-harga zone calibration, lane-validation
+  sign-off, Tab 8 Universe & Grader). Sisa = keputusan manual Giel (bar-replay,
+  kalibrasi §13 final, prompt persona J-9) — bukan pekerjaan kode.
+
+> **Berikutnya:** migrasi frontend vanilla HTML/CSS/JS → **Vue 3 + Vite** (rencana
+> di [`docs/migrationFE.md`](docs/migrationFE.md)) supaya bisa menambah
+> login/sidebar/dll tanpa beban stack mentah. Backend/API tidak berubah.
+
+> Scope Phase A dikunci di `plan.txt`. Execution plan Phase B-E
 > (`plan_b.txt`-`plan_e.txt`) dihapus setelah masing-masing selesai
 > dieksekusi — ringkasan hasilnya ada di `docs/ROADMAP.md`.
 
 📄 **Dokumen lengkap ada di [`docs/`](docs/):**
 [ARCHITECTURE.md](docs/ARCHITECTURE.md) (desain teknis & rationale),
 [FLOW.md](docs/FLOW.md) (alur data, diagram),
-[ROADMAP.md](docs/ROADMAP.md) (status tiap phase).
+[ROADMAP.md](docs/ROADMAP.md) (status tiap phase),
+[SOP.md](docs/SOP.md) (kapan buka panel apa),
+[Master Plan.md](docs/Master%20Plan.md) (strategi, v1.6),
+[migrationFE.md](docs/migrationFE.md) (rencana migrasi FE → Vue).
 
 ---
 
 ## 1. Apa yang dikerjakan
 
-- **SQLite** `kastara-finance.db` dengan 14 tabel (`db/schema.sql`) — 11
-  tabel Phase A + 3 tabel forward-layer (`expectations`/`positioning`/
-  `policy_tracker`, diisi Phase D — lihat `docs/ROADMAP.md` §Phase D).
-- **6 scraper** modular (tiap source bisa jalan sendiri):
+- **SQLite** `kastara-finance.db` dengan **22 tabel** (`db/schema.sql`) — 11
+  tabel Phase A + 3 forward-layer (Phase D) + 7 ekuitas Phase J+
+  (`instrument_metadata`, `fundamentals_quarterly`, `earnings_calendar`,
+  `sector_benchmark`, `emiten_grade`, `grader_log`, `intake_log`) + 1
+  `lane_validation_log` (bar-replay sign-off). `db/connection.py::EXPECTED_TABLES`
+  adalah daftar otoritatifnya.
+- **Scraper** modular (tiap source bisa jalan sendiri):
   - `scrapers/crypto.py` — CoinGecko + Binance + Alternative.me (BTC OHLCV,
     dominance, funding, OI, Fear & Greed). *Binance ke-block? otomatis fallback
     CoinGecko untuk OHLC.*
@@ -47,6 +66,16 @@ Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
     flow (farside.co.uk, HTML scrape tak-resmi, butuh header browser-
     realistis krn situs di belakang Cloudflare — lihat
     [ARCHITECTURE.md §6.11](docs/ARCHITECTURE.md#611-scraperspositioningpy--cloudflare-butuh-header-browser-realistis)).
+  - `scrapers/coinalyze.py` (Track B) — OI agregat lintas-exchange +
+    liquidation long/short 24h + long/short ratio (Coinalyze REST, free key).
+  - `scrapers/idx_foreign_flow.py` (Track C) — IHSG foreign flow level pasar
+    (F2F/F2D/D2F + net), idx.co.id via `curl_cffi` (Cloudflare TLS fingerprint).
+  - `scrapers/idx_stock_foreign_flow.py` (J-8) — foreign flow **per-saham**
+    (volume beli/jual/net asing) dari `TradingSummary/GetStockSummary`.
+  - `scrapers/idx_uma.py` (J-11) — cek flag integritas UMA (Unusual Market
+    Activity) per emiten, input Emiten Grader.
+  - `scrapers/equity_universe.py` (J-2) — OHLCV harian saham universe (yfinance
+    `.JK`/US) untuk instrumen di `instrument_metadata`.
 - **Pipeline** `pipeline/run_daily.py` — orchestrator harian, idempotent (UPSERT).
 - **Backfill** `pipeline/backfill.py` — tarik data historis (BTC/macro), preview-before-commit.
 - **Manual article** `pipeline/add_article.py` — isi `manual_articles` untuk riset
@@ -71,6 +100,24 @@ Workspace, Chart+S&R+Approve, Synthesis — semua form murni input manual,
     apa pun sendiri.
   - `pipeline/send_briefing.py` — CLI, dipicu manual (lihat
     [Daily Briefing](#daily-briefing-ke-telegram-phase-e)).
+- **Ekspansi ekuitas Phase J+** (saham individual, universe **BBCA + TSLA** —
+  Build Contract v1.3, detail per J-step di `docs/ROADMAP.md`):
+  - `analysis/grader.py` — Emiten Grader dua-sumbu (fund_score × integrity
+    flags → kuadran INVESTABLE/WATCH/SPECULATIVE/AVOID), log ke `emiten_grade`/
+    `grader_log`.
+  - `analysis/sizing.py` — position sizing MAX_RISK 2.5% (locked), kuantisasi
+    lot pembulatan-bawah, skip `RISK_CAPACITY_EXCEEDED` (tanpa geser SL), buffer
+    **ARA/ARB 1.5×** (§18, locked) via `has_daily_limit`.
+  - `analysis/calibration.py` — toleransi zona S&R per-market dari **fraksi
+    harga IDX** resmi (Peraturan No. II-A BEI); dipakai `run_analysis` khusus
+    instrumen `market='IDX'` (**DRAFT** pending validasi bar-replay Giel, §13.1).
+  - `pipeline/backfill_fundamentals.py` — fundamentals kuartalan (yfinance);
+    rasio bank CAR/NPL/NIM/LDR diisi **manual** (Panel 8), tak tertimpa scraper.
+  - `web/writes.py::validate_lane()` — satu-satunya jalur yang mengisi
+    `lane_validated_at` / menaikkan lane ke TRADE, murni manual (bar-replay
+    sign-off), log ke `lane_validation_log`.
+  - Tab 8 **Universe & Grader** (Panel 8) — intake kandidat, uji kelayakan,
+    detail emiten + override kuadran, rasio bank, validasi lane, grader log.
 
 Semua scraper **tahan API-fail**: kalau satu source mati, ditandai `fail` di
 `source_flags` dan pipeline tetap lanjut (tidak crash, tidak silent).
@@ -138,7 +185,7 @@ TLS fingerprint Python — kalau field ini kosong terus di Panel 3, cek dulu apa
 ### Inisialisasi DB (otomatis dipanggil pipeline, tapi bisa manual)
 ```bash
 python -m db.connection
-# -> bikin kastara-finance.db + 14 tabel
+# -> bikin kastara-finance.db + 22 tabel
 ```
 
 ### Jalankan pipeline harian
@@ -221,39 +268,44 @@ Semua sinyal dari `run_analysis` **suggestion only** — `approved`
 selalu 0 dari kode, cuma berubah lewat `review_signal approve`. Tidak ada
 execution/trading logic di mana pun.
 
-### Dashboard web (6 panel, write-enabled sejak Phase C)
+### Dashboard web (8 panel, write-enabled sejak Phase C)
 ```bash
 python -m web.app
 # buka http://127.0.0.1:5000
 ```
-Navigasi 6 tab sesuai alur pagi Master Plan §0: **1 Snapshot** (cards +
+Navigasi 8 tab: **1 Snapshot** (cards +
 source_flags + form Manual Backfill preview→confirm), **2 News** (list +
 filter impact + flag key trigger + Add Manual Article), **3 Forward**
 (Economic Calendar data asli + forecast/previous/actual manual, Expectations
 manual FedWatch/Dot Plot, Positioning COT+ETF otomatis & SBN manual, Policy
 Tracker manual, Disonansi Flag rule-based), **4 Reading**
-(4 lensa GEMA/LEON/AKELA/RIVAN + External AI Check manual + Conflict
-Notes), **5 Chart** (candlestick + S&R zone overlay + marker
-breakout/retest + Approve/Reject sinyal + MA50/100/200 + filter rentang),
-**6 Synthesis** (textarea + outlook 5 instrumen + Trading Journal +
-Prediction Log + skor prediksi).
+(4 lensa GEMA/LEON/AKELA/RIVAN via OpenRouter + External AI Check manual +
+Conflict Notes), **5 Chart** (candlestick + S&R zone overlay + marker
+breakout/retest + Approve/Reject sinyal + MA50/100/200 + filter rentang +
+badge lane), **6 Synthesis** (textarea + outlook instrumen + Trading Journal +
+position sizing + Prediction Log + skor prediksi + Daily Briefing), **7
+Riwayat** (arsip synthesis/prediksi/jurnal/lensa, sub-tab), **8 Universe &
+Grader** (Phase J+: universe saham, intake kandidat, uji kelayakan + grade,
+detail emiten + override kuadran, rasio bank manual, validasi lane bar-replay,
+grader log). Panel 1–6 = ritme harian TRADE lane; Panel 8 = ritme mingguan/
+kuartalan INVEST lane (lihat [SOP.md](docs/SOP.md)).
 
 **Tanpa autentikasi** (local-only, `WEB_HOST`/`WEB_PORT` bisa diatur via
 `.env`). **Tidak ada pemanggilan AI/LLM otomatis di mana pun** — "External
 AI Check" di Panel 4 itu kolom paste manual (kamu banding hasil tool lain
 sendiri), bukan Kastara yang manggil AI.
 
-Endpoint Phase 1 (read-only, tidak berubah): `/api/latest`,
-`/api/daily_market`, `/api/asset_ohlcv`, `/api/news`, `/api/assets`,
-`/api/health`. Endpoint Phase C (menulis, reuse fungsi yang sudah teruji —
-lihat `docs/ARCHITECTURE.md` §5.6): `/api/backfill/{preview,commit}`,
-`/api/news/flag_key`, `/api/articles/add`, `/api/econ_calendar`,
-`/api/econ_calendar/actual`, `/api/policy{,/add}`, `/api/reading{,/save}`,
-`/api/sr_zones`, `/api/signals{,/review}`, `/api/synthesis/save`,
-`/api/journal/add`, `/api/prediction/{add,due,score}`,
-`/api/outlook_instruments`. Endpoint Phase D:
-`/api/expectations{,/add}`, `/api/positioning{,/add}`, `/api/disonansi`.
-Endpoint Phase E: `/api/briefing/send`.
+API: **57 endpoint `/api/*`** (33 GET + 24 POST), semuanya `jsonify(...)` —
+`/` cuma render shell statis, semua data client-side fetch. Read-only Phase 1
+(`/api/latest`, `/api/daily_market`, `/api/asset_ohlcv`, `/api/news`,
+`/api/assets`, `/api/health`) tidak berubah. Grup lain: Phase C write
+(`/api/backfill/*`, `/api/reading/save`, `/api/signals/review`,
+`/api/synthesis/save`, `/api/journal/add`, `/api/prediction/*`), Phase D
+(`/api/expectations`, `/api/positioning`, `/api/disonansi`), Phase E
+(`/api/briefing/send`), Persona (`/api/persona/{run,status}`), dan Phase J+
+(`/api/universe`, `/api/intake/*`, `/api/emiten/<t>{,/override,/validate_lane}`,
+`/api/sizing/suggest`, `/api/fundamentals/bank_ratios`, `/api/grader_log`,
+`/api/lane_validation_log`). Daftar otoritatif = route di `web/app.py`.
 
 ### Daily Briefing ke Telegram (Phase E)
 ```bash
@@ -288,6 +340,12 @@ python -m pytest -q
 | `expectations` | 🖊️ manual | CME FedWatch cut probability, Fed Dot Plot median — tidak ada sumber gratis, isi via dashboard Panel 3 |
 | `policy_tracker` | 🖊️ manual | pernyataan pembuat kebijakan, `literal_statement` vs `inference` terpisah tegas, via dashboard Panel 3 |
 | `reading_workspace`, `trade_signals`, `sr_zones`, `trading_journal`, `prediction_log`, `asset_context_weight` | 🖊️/⚙️ | dipakai Phase B/C (lihat bagian masing-masing di atas) |
+| `instrument_metadata` | ✅ + 🖊️ | 1 row/saham universe Phase J+ — lane, lot_size, sektor, `has_daily_limit`, `lane_validated_at` (bar-replay) |
+| `fundamentals_quarterly` | ✅ + 🖊️ | fundamentals kuartalan (yfinance) + rasio bank CAR/NPL/NIM/LDR (manual) |
+| `earnings_calendar` | ✅ | jadwal earnings/corporate action (yfinance), penegak rule no-hold-through-earnings saham AS |
+| `emiten_grade`, `grader_log`, `intake_log` | ⚙️ + 🖊️ | hasil Emiten Grader + audit log + keputusan intake kandidat |
+| `lane_validation_log` | 🖊️ | jejak validasi lane bar-replay (append-only, hanya lewat `validate_lane()`) |
+| `sector_benchmark` | ⚙️ | struktur pembanding sektor (J-5, belum diisi — 1 ticker/sektor belum worth) |
 
 `source_flags` (JSON di `daily_market`) mencatat status tiap API per run, mis:
 ```json
@@ -391,4 +449,7 @@ Scheduler library (APScheduler dll) tetap belum dipakai — cron OS cukup.
 
 ---
 
-*Phase A dari Kastara Finance Master Plan v1.4. Phase berikutnya = plan terpisah.*
+*Kastara Finance Master Plan v1.6 (`docs/Master Plan.md`) + Phase J+ Build
+Contract v1.3. Status per-phase & keputusan terkunci: `docs/ROADMAP.md`. Ritme
+pemakaian: `docs/SOP.md`. Inisiatif berikutnya: migrasi FE → Vue
+(`docs/migrationFE.md`).*
