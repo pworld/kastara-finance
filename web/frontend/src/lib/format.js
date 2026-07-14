@@ -6,6 +6,12 @@ export function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
+export function daysAgo(n) {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return d.toISOString().slice(0, 10)
+}
+
 export function fmt(v) {
   if (v === null || v === undefined) return null
   if (typeof v !== 'number') return String(v)

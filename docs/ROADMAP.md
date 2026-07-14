@@ -1752,13 +1752,32 @@ yang sudah ter-install dipertahankan.
   fundamentals bank-spesifik + LOW_CONFIDENCE flag tampil benar), search/
   sort/paginate DataTable, Economic Calendar dgn actual sudah terisi vs
   kosong. `npm run build` sukses (~200KB gzip total, code-split per view).
-- **Fase 3 (cutover + login) SENGAJA DIJEDA** — belum dieksekusi. Cutover
-  berarti mengalihkan `/` Flask ke build Vue dan MENGHAPUS
-  `templates/partials/` + `static/js/*` lama (tool ini dipakai tiap hari,
-  penghapusan kode yang masih berfungsi + auth baru butuh konfirmasi
-  eksplisit dulu, bukan otomatis walau sudah diverifikasi ekstensif).
-  Backend/API + 292 test Python tetap tidak berubah sama sekali di seluruh
-  proses ini.
+- **Fase 3 (cutover + login) SELESAI (14 Jul 2026)**. Dijeda dulu utk
+  konfirmasi eksplisit Giel sebelum menghapus kode lama (lihat update di
+  bawah) — setelah dikonfirmasi, dieksekusi penuh:
+  - **Auth**: `@app.before_request` di `web/app.py` menolak (401) semua
+    `/api/*` kecuali `/api/auth/{login,status}` sampai `session["authed"]`.
+    `DASHBOARD_PASSWORD` wajib diisi manual di `.env` — TIDAK PERNAH
+    di-generate/default oleh kode (beda dari `RISK_CAPITAL_*` yang memang
+    placeholder angka; ini kredensial, aku tidak pernah mengetik/menguji
+    nilai aslinya sendiri). Kosong -> login endpoint menolak dgn pesan
+    jelas. `FLASK_SECRET_KEY` opsional. Password dibanding pakai
+    `secrets.compare_digest` (constant-time).
+  - **Serving**: route SPA catch-all (didaftarkan paling akhir) menyajikan
+    `web/frontend/dist/` — Flask `/` sekarang SATU proses/port utk API +
+    frontend, tidak perlu Vite dev server terpisah utk pemakaian sehari-hari.
+  - **Vue**: `src/stores/auth.js` (Pinia) + `src/views/LoginView.vue` +
+    router guard (`src/router/index.js`) + redirect otomatis ke `/login`
+    kalau sesi expired (`src/lib/api.js`).
+  - Kode vanilla lama (`web/templates/`, `web/static/` — 8 partial HTML +
+    10 file JS + 1 CSS) **dihapus**, Giel sendiri yang commit (`f7168f2
+    "Migrate to Vue JS"`), bukan auto-commit dariku — tetap recoverable
+    via `git show bcfa625:web/templates/index.html` dkk kalau perlu.
+  - **Diverifikasi**: redirect ke `/login` saat belum auth, 401 di `/api/*`
+    tanpa cookie, semua asset ke-serve benar (network tab: 200/304, nol
+    404), dan SETELAH Giel isi password & login sendiri — sidebar+tombol
+    Keluar+data real tampil benar dari sesi ter-autentikasi. Backend/API +
+    292 test Python tetap tidak berubah sama sekali di seluruh proses ini.
 
 Sesuai `plan.txt`: **jangan lompat phase tanpa instruksi baru.** Kalau ada
 kebutuhan mendesak di luar urutan (seperti Phase 1 kemarin), itu boleh — tapi

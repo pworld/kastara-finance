@@ -6,13 +6,13 @@
 > rencana migrasi FE ini. Track A (deploy/auth) tidak hilang — tetap ditrack
 > terpisah, dan justru bersinggungan dengan langkah "login" di Fase 3 di bawah.
 
-> **Status per 14 Jul 2026: Fase 0-2 SELESAI, diverifikasi live thd DB
-> produksi.** App Vue lengkap di `web/frontend/` (dev: `npm run dev` port
-> 5173, proxy `/api` ke Flask 5000; `npm run build` sukses, ~200KB gzip total,
-> code-split per view). Backend/API sama sekali TIDAK disentuh — dashboard
-> lama di `/` tetap jalan berdampingan tanpa perubahan. **Fase 3 (cutover +
-> login) BELUM dieksekusi** — sengaja dijeda utk konfirmasi Giel dulu sebelum
-> menghapus kode lama & mengalihkan `/` (lihat catatan akhir dokumen).
+> **Status per 14 Jul 2026: SEMUA FASE (0-3) SELESAI.** Migrasi FE tuntas —
+> dashboard sekarang Vue 3 + Vite + PrimeVue, satu proses/port (Flask
+> menyajikan build Vue langsung), dgn session auth. Kode vanilla lama
+> (`web/templates/`, `web/static/`) sudah dihapus (git-tracked, recoverable
+> via history `git show bcfa625:web/templates/index.html` dkk kalau perlu),
+> masuk commit `f7168f2 "Migrate to Vue JS"`. Backend/API TIDAK berubah sama
+> sekali sepanjang seluruh migrasi — 292 test Python tetap hijau di titik ini.
 >
 > Detail per-fase yang sudah selesai:
 > - **Fase 0**: scaffold Vite+Vue (`web/frontend/`, ditemukan sudah pernah
@@ -43,6 +43,42 @@
 >   salah kalau >1 baris butuh diisi bersamaan (kasus nyata, kalender
 >   biasanya banyak event future tanpa actual). Diperbaiki jadi state
 >   per-baris (`actualInputs` keyed by id) sebelum sempat jadi bug produksi.
+> - **Fase 3 (cutover + login), selesai 14 Jul 2026**:
+>   - **Auth**: `web/app.py` — `@app.before_request` menolak (401) SEMUA
+>     `/api/*` kecuali `/api/auth/{login,status}` selama `session["authed"]`
+>     belum `True`. `DASHBOARD_PASSWORD` **wajib diisi manual di .env** —
+>     TIDAK PERNAH di-generate/default oleh kode (beda dari `RISK_CAPITAL_*`
+>     yang memang placeholder angka; ini kredensial). Kosong -> endpoint
+>     login menolak dgn pesan jelas ("belum di-set"), bukan celah akses
+>     tanpa auth. `FLASK_SECRET_KEY` opsional (random tiap start kalau
+>     kosong -- sesi ke-invalidate tiap restart, bukan lubang keamanan).
+>     Password dibanding pakai `secrets.compare_digest` (constant-time).
+>   - **Serving**: route SPA catch-all (`@app.route("/<path:path>")`,
+>     didaftarkan PALING TERAKHIR) menyajikan `web/frontend/dist/` — file
+>     statis kalau ada di disk, else `index.html` (Vue Router history mode
+>     yang urus routing client-side). `Flask(__name__, static_folder=None)`
+>     -- folder `web/static/` lama sudah tidak ada, tidak perlu route
+>     otomatis Flask.
+>   - **Vue**: `src/stores/auth.js` (Pinia, sumber kebenaran tetap
+>     `/api/auth/status` server-side, bukan cuma state lokal), `src/views/
+>     LoginView.vue`, router guard di `src/router/index.js` (redirect ke
+>     `/login` kalau belum auth, redirect balik ke `/snapshot` kalau sudah
+>     auth tapi buka `/login`). `src/lib/api.js` — 401 di luar endpoint
+>     login sendiri (sesi expired) memicu full-page redirect ke `/login`,
+>     bukan silent-fail. `App.vue` sembunyikan sidebar di halaman login,
+>     tambah tombol "Keluar".
+>   - Kode vanilla lama (`web/templates/`, `web/static/`, 8 partial HTML +
+>     10 file JS + 1 CSS) **dihapus** — Giel sendiri yang commit
+>     (`f7168f2`), bukan auto-commit dariku.
+>   - **Diverifikasi live**: akses tanpa sesi -> redirect ke `/login` +
+>     tampil pesan "password belum di-set" (saat `.env` masih kosong);
+>     `curl /api/health` tanpa cookie -> 401; asset JS/CSS/font ke-serve
+>     benar via catch-all (network tab: semua 200/304, nol 404); SETELAH
+>     Giel isi `DASHBOARD_PASSWORD` & login sendiri (aku TIDAK pernah
+>     mengetik/menguji password asli manapun -- itu kredensial, bukan
+>     wilayahku) -- sidebar + tombol Keluar + Snapshot data real tampil
+>     benar dari sesi yang sudah authenticated. 292 test Python tetap
+>     hijau setelah semua perubahan auth/serving ini.
 
 ## Context
 

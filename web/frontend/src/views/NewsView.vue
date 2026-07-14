@@ -3,7 +3,7 @@ import { ref, onMounted, watch } from 'vue'
 import Column from 'primevue/column'
 import DataTable from '../components/DataTable.vue'
 import { get, post } from '../lib/api'
-import { today } from '../lib/format'
+import { today, daysAgo } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
 
 // Port dari web/static/js/panel2.js (lihat docs/migrationFE.md Fase 2).
@@ -11,8 +11,12 @@ const { toast } = useAppToast()
 
 const rows = ref([])
 const loading = ref(true)
-const dateFrom = ref('')
-const dateTo = ref('')
+// Default kemarin s.d. hari ini (bukan hari ini saja) -- run_daily jalan
+// 00:00 WIB, tapi RSS/scraper bisa telat masuk atau belum sempat dibuka
+// pagi itu juga, jadi "hari ini saja" sering kosong. Rentang 2 hari
+// jamin selalu ada data buat dibaca begitu panel dibuka.
+const dateFrom = ref(daysAgo(1))
+const dateTo = ref(today())
 const impact = ref('')
 
 async function loadNews() {
