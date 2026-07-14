@@ -1,9 +1,10 @@
 """Test web/app.py pure helpers (Panel 1 snapshot compare + data-gap detection)."""
 import pytest
 
+from db.connection import get_connection, init_db
 from indicators.calc import COMPARE_PERIODS
 from indicators.calc import compare_from_series as _compare_from_series
-from web.app import INSTRUMENT_SOURCE, SNAPSHOT_FIELDS, _detect_gaps
+from web.app import INSTRUMENT_SOURCE, SNAPSHOT_FIELDS, _all_instruments_with_gaps, _detect_gaps
 
 
 def test_compare_from_series_all_periods_available():
@@ -118,3 +119,80 @@ def test_instrument_source_covers_all_backfill_instruments():
         assert source in {"asset_ohlcv", "daily_market"}
         assert (col is None) == (source == "asset_ohlcv")
         assert calendar in {"DAILY", "WEEKDAY", "WEEKLY_WED"}
+
+
+# ---------- _all_instruments_with_gaps (Panel 1 "Cek & Backfill Semua Gap") ----------
+
+def _seed_asset_ohlcv(conn, instrument, dates):
+    for d in dates:
+        conn.execute(
+            "INSERT INTO asset_ohlcv (date, instrument, open, high, low, close, volume, created_at) "
+            "VALUES (?, ?, 1, 1, 1, 1, 1, '')", (d, instrument),
+        )
+
+
+def test_all_instruments_with_gaps_finds_macro_gap(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        # BTC pakai kalender DAILY -- gap 3 hari (07-03..07-05) jelas terdeteksi
+        _seed_asset_ohlcv(conn, "BTC", ["2026-07-01", "2026-07-02", "2026-07-06"])
+        conn.commit()
+        results = _all_instruments_with_gaps(conn)
+    btc = next((r for r in results if r["instrument"] == "BTC"), None)
+    assert btc is not None
+    assert btc["gap_from"] == "2026-07-03"
+    assert btc["gap_to"] == "2026-07-05"
+    assert btc["gaps_count"] == 1
+
+
+def test_all_instruments_with_gaps_skips_instrument_without_any_data(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        results = _all_instruments_with_gaps(conn)
+    # Tanpa histori sama sekali -- dilewati (backfill awal butuh keputusan
+    # sadar, bukan "isi gap" otomatis).
+    assert results == []
+
+
+def test_all_instruments_with_gaps_skips_weekly_wed_calendar(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        conn.execute("INSERT INTO daily_market (date, walcl, created_at) VALUES ('2026-06-24', 1, '')")
+        conn.execute("INSERT INTO daily_market (date, walcl, created_at) VALUES ('2026-07-08', 1, '')")
+        conn.commit()
+        results = _all_instruments_with_gaps(conn)
+    assert not any(r["instrument"] == "WALCL" for r in results)
+
+
+def test_all_instruments_with_gaps_includes_equity_universe(tmp_path):
+    """Instrumen Phase J+ (instrument_metadata, mis. BBCA) ikut dicek dgn
+    kalender WEEKDAY (bursa saham), sama seperti ekuitas macro existing."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        conn.execute(
+            "INSERT INTO instrument_metadata (instrument, market, created_at) VALUES ('BBCA', 'IDX', '')"
+        )
+        # Senin-Jumat penuh, lalu Senin-Jumat berikutnya hilang total (5 hari kerja)
+        _seed_asset_ohlcv(conn, "BBCA", [
+            "2026-06-29", "2026-06-30", "2026-07-01", "2026-07-02", "2026-07-03", "2026-07-13",
+        ])
+        conn.commit()
+        results = _all_instruments_with_gaps(conn)
+    bbca = next((r for r in results if r["instrument"] == "BBCA"), None)
+    assert bbca is not None
+    assert bbca["gap_from"] == "2026-07-06"
+    assert bbca["gap_to"] == "2026-07-10"
+
+
+def test_all_instruments_with_gaps_no_gap_returns_empty(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        _seed_asset_ohlcv(conn, "BTC", ["2026-07-07", "2026-07-08", "2026-07-09"])
+        conn.commit()
+        results = _all_instruments_with_gaps(conn)
+    assert results == []

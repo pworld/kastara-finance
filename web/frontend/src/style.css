@@ -1,42 +1,23 @@
+/* Design token + style dari web/static/css/dashboard.css (dashboard lama) --
+   diport 1:1 supaya tampilan konsisten selama migrasi berjalan berdampingan
+   (lihat docs/migrationFE.md). Bagian yang digantikan Vue Router (nav.tabs/
+   .tabpanel) atau PrimeVue (Toast/Dialog/DataTable sort-header) TIDAK
+   diport -- itu jadi tanggung jawab komponennya masing-masing. */
 :root {
   --bg: #0e1117; --panel: #171b23; --panel2: #1e2430; --border: #2a313c;
   --text: #e6edf3; --muted: #8b949e; --accent: #4c9aff;
   --ok: #3fb950; --fail: #f85149; --skip: #d29922;
   --high: #f85149; --med: #d29922; --low: #6e7681;
 }
+
 * { box-sizing: border-box; }
+
+html, body, #app { height: 100%; margin: 0; }
+
 body {
-  margin: 0; background: var(--bg); color: var(--text);
+  background: var(--bg); color: var(--text);
   font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
-header {
-  padding: 18px 24px; border-bottom: 1px solid var(--border);
-  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
-}
-header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
-header .sub { color: var(--muted); font-size: 13px; }
-header .spacer { flex: 1; }
-#refresh {
-  background: var(--panel2); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px;
-}
-#refresh:hover { border-color: var(--accent); }
-
-nav.tabs {
-  display: flex; gap: 4px; padding: 10px 24px 0; border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-}
-nav.tabs button {
-  background: none; border: none; color: var(--muted); padding: 10px 16px;
-  font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent;
-  white-space: nowrap;
-}
-nav.tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
-nav.tabs button:hover { color: var(--text); }
-
-main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
-.tabpanel { display: none; }
-.tabpanel.active { display: block; }
 
 .grid { display: grid; gap: 14px; }
 .cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
@@ -58,12 +39,14 @@ main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
 .card .delta.down { color: var(--fail); }
 .card .delta.flat { color: var(--muted); }
 .card .delta.na { color: var(--muted); opacity: .6; }
+
 section { margin-top: 26px; }
 section:first-child { margin-top: 4px; }
 section h2 { font-size: 15px; color: var(--text); margin: 0 0 12px;
   border-left: 3px solid var(--accent); padding-left: 10px; }
 section h3 { font-size: 13px; color: var(--muted); margin: 0 0 10px;
   text-transform: uppercase; letter-spacing: .4px; }
+
 .collapsible summary { font-size: 15px; color: var(--text); margin: 0 0 12px;
   border-left: 3px solid var(--accent); padding-left: 10px; cursor: pointer;
   list-style: none; }
@@ -71,8 +54,10 @@ section h3 { font-size: 13px; color: var(--muted); margin: 0 0 10px;
 .collapsible summary::before { content: "▸ "; color: var(--muted); }
 .collapsible[open] summary::before { content: "▾ "; }
 .collapsible[open] summary { margin-bottom: 12px; }
+
 .panel { background: var(--panel); border: 1px solid var(--border);
   border-radius: 8px; padding: 16px; }
+
 .flags { display: flex; flex-wrap: wrap; gap: 8px; }
 .flag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
   padding: 4px 9px; border-radius: 20px; background: var(--panel2);
@@ -80,7 +65,9 @@ section h3 { font-size: 13px; color: var(--muted); margin: 0 0 10px;
 .dot { width: 8px; height: 8px; border-radius: 50%; }
 .dot.ok { background: var(--ok); } .dot.fail { background: var(--fail); }
 .dot.skip { background: var(--skip); }
+
 .chart-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+
 select, input[type=text], input[type=date], input[type=number], input[type=url], textarea {
   background: var(--panel2); color: var(--text); border: 1px solid var(--border);
   border-radius: 6px; padding: 7px 9px; font: inherit; width: 100%;
@@ -90,6 +77,7 @@ label.field { display: block; font-size: 12px; color: var(--muted); margin-botto
 .form-row { margin-bottom: 12px; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px; }
+
 button.btn {
   background: var(--accent); color: #05131f; border: none; border-radius: 6px;
   padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
@@ -100,6 +88,7 @@ button.btn.secondary { background: var(--panel2); color: var(--text);
 button.btn.danger { background: rgba(248,81,73,.15); color: var(--high);
   border: 1px solid rgba(248,81,73,.4); }
 button.btn.small { padding: 4px 10px; font-size: 12px; }
+
 #chart { width: 100%; height: 400px; display: block; }
 #chartMeta { color: var(--muted); font-size: 12px; margin-top: 6px;
   font-variant-numeric: tabular-nums; }
@@ -109,12 +98,14 @@ button.btn.small { padding: 4px 10px; font-size: 12px; }
   margin-left: 8px; }
 .ma-swatch:first-child { margin-left: 0; }
 .ctx-chart { width: 100%; height: 90px; display: block; margin-top: 4px; }
+
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);
   font-size: 13px; vertical-align: top; }
 th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
 td a { color: var(--text); text-decoration: none; }
 td a:hover { color: var(--accent); text-decoration: underline; }
+
 .badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
 .badge.HIGH { background: rgba(248,81,73,.18); color: var(--high); }
 .badge.MED { background: rgba(210,153,34,.18); color: var(--med); }
@@ -125,32 +116,23 @@ td a:hover { color: var(--accent); text-decoration: underline; }
 .badge.lane-both { background: rgba(76,154,255,.18); color: var(--accent); }
 .badge.lane-invest { background: rgba(110,118,129,.2); color: var(--low); }
 .badge.lane-none { background: transparent; color: var(--muted); border: 1px dashed var(--border); }
+
 tr.news-key { background: rgba(76,154,255,.08); }
 tr.news-key td:first-child { border-left: 3px solid var(--accent); }
 .btn.key-on { background: rgba(76,154,255,.18); color: var(--accent);
   border-color: var(--accent); }
+
 .subtabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 .subtabs button { background: var(--panel2); color: var(--muted);
   border: 1px solid var(--border); border-radius: 6px; padding: 6px 14px;
   cursor: pointer; font-size: 13px; }
 .subtabs button.active { color: var(--text); border-color: var(--accent); }
-.subpanel { display: none; }
-.subpanel.active { display: block; }
-.tbl-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-.tbl-bar .tbl-search { width: 160px; }
-.tbl-foot { display: flex; align-items: center; justify-content: space-between;
-  gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.tbl-foot .tbl-pageinfo { display: flex; align-items: center; gap: 10px; }
-.tbl-foot select.tbl-pagesize { width: auto; }
-table[data-tblkey] th[data-sort] { cursor: pointer; user-select: none; }
-table[data-tblkey] th[data-sort]:hover { color: var(--text); }
-table[data-tblkey] th[data-sort]::after { content: " \21C5"; opacity: .35; font-size: 10px; }
-table[data-tblkey] th.sort-asc::after { content: " \25B2"; opacity: 1; }
-table[data-tblkey] th.sort-desc::after { content: " \25BC"; opacity: 1; }
+
 .empty { color: var(--muted); padding: 30px; text-align: center; }
 .empty-inline { color: var(--muted); font-size: 13px; padding: 14px; text-align: center;
   border: 1px dashed var(--border); border-radius: 8px; }
 .src { color: var(--muted); font-size: 12px; }
+
 .persona-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px; }
 .persona-card { border-left: 3px solid var(--accent); }
@@ -161,16 +143,58 @@ table[data-tblkey] th.sort-desc::after { content: " \25BC"; opacity: 1; }
 .persona-card.missing-prompt { border-left-style: dashed; opacity: .75; }
 .persona-preview { font-size: 13px; color: var(--muted); margin-top: 6px;
   max-height: 4.5em; overflow: hidden; }
-dialog.modal { border: 1px solid var(--border); border-radius: 10px;
-  background: var(--panel); color: var(--text); padding: 0;
-  max-width: 640px; width: 90vw; max-height: 80vh; }
-dialog.modal::backdrop { background: rgba(0,0,0,.6); }
-.modal-head { display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
-.modal-head h3 { margin: 0; font-size: 15px; }
-.modal-body { padding: 16px 18px; overflow-y: auto; max-height: calc(80vh - 60px);
-  white-space: pre-wrap; line-height: 1.6; font-size: 13px; }
-.toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2);
-  border: 1px solid var(--accent); border-radius: 8px; padding: 10px 16px;
-  font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
-.toast.show { opacity: 1; }
+
+/* ---------- PrimeVue overrides: paksa dark + selaraskan ke token dashboard
+   lama. `.app-dark` (main.js) mengaktifkan preset dark bawaan Aura, TAPI
+   warnanya beda dari token kita sendiri -- override eksplisit di sini
+   supaya DataTable/Dialog/Toast konsisten dgn --panel/--panel2/--border/
+   --text yang sama dipakai komponen lain (card, form, dll). Class PrimeVue
+   v4 stabil (p-datatable-*, p-dialog-*, dst), aman ditarget langsung. */
+.p-datatable-table-container { width: 100%; overflow-x: auto; }
+.p-datatable-table { width: 100%; }
+.p-datatable, .p-datatable-header, .p-datatable-footer {
+  background: transparent; color: var(--text); border-color: var(--border);
+}
+.p-datatable-thead > tr > th {
+  background: var(--panel2) !important; color: var(--muted); border-color: var(--border);
+  font-size: 12px; text-transform: uppercase; font-weight: 500;
+}
+/* PrimeVue zebra-striping (.p-row-even/.p-row-odd) punya spesifisitas lebih
+   tinggi dari selector polos -- !important supaya token kita yang menang,
+   bukan cuma keberuntungan urutan CSS. */
+.p-datatable-tbody > tr,
+.p-datatable-tbody > tr.p-row-even,
+.p-datatable-tbody > tr.p-row-odd {
+  background: var(--panel) !important; color: var(--text);
+}
+.p-datatable-tbody > tr > td {
+  border-color: var(--border); font-size: 13px; background: transparent;
+}
+.p-datatable-tbody > tr:hover,
+.p-datatable-tbody > tr.p-row-even:hover,
+.p-datatable-tbody > tr.p-row-odd:hover {
+  background: var(--panel2) !important;
+}
+.p-paginator {
+  background: transparent; color: var(--text); border-color: var(--border);
+}
+.p-paginator .p-paginator-page, .p-paginator .p-paginator-next,
+.p-paginator .p-paginator-prev, .p-paginator .p-paginator-first,
+.p-paginator .p-paginator-last {
+  color: var(--muted);
+}
+.p-paginator .p-paginator-page.p-paginator-page-selected {
+  background: var(--panel2); color: var(--text);
+}
+.p-select, .p-inputtext {
+  background: var(--panel2); color: var(--text); border-color: var(--border);
+}
+.p-dialog {
+  background: var(--panel); color: var(--text); border: 1px solid var(--border);
+}
+.p-dialog-header, .p-dialog-content, .p-dialog-footer {
+  background: var(--panel); color: var(--text);
+}
+.p-toast-message {
+  background: var(--panel2); color: var(--text); border-color: var(--border);
+}

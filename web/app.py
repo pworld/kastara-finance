@@ -12,19 +12,33 @@ manual (form Giel) atau reuse fungsi yang sudah ada & teruji
 /api/persona/run (Panel 4, deviasi eksplisit -- lihat llm/persona_analysis.py).
 
 Jalankan:
+    cd web/frontend && npm run build   # sekali, atau tiap kali FE berubah
     python -m web.app
     # buka http://127.0.0.1:5000
 
-Env (opsional): WEB_HOST, WEB_PORT. Tanpa auth (plan_c.txt §6.4 -- local-only).
+Frontend Vue (`web/frontend/`, lihat docs/migrationFE.md) di-build ke
+`web/frontend/dist/` dan disajikan langsung oleh Flask (route SPA catch-all
+di bagian bawah file ini) -- SATU proses, SATU port, tanpa Vite dev server
+perlu jalan bareng utk pemakaian sehari-hari (dev aktif FE tetap pakai
+`npm run dev` terpisah + proxy, lihat vite.config.js).
+
+Env: WEB_HOST, WEB_PORT (opsional). **DASHBOARD_PASSWORD wajib** (session
+auth sederhana, lihat §Auth di bawah -- dashboard ini sekarang bisa dibuka
+dari mana saja setelah `/` diproxy/expose, beda dari sebelumnya yang
+local-only tanpa auth). FLASK_SECRET_KEY opsional (kalau kosong,
+di-generate random tiap start -- sesi akan ke-invalidate tiap restart
+proses; isi di .env kalau mau sesi tahan lintas restart).
 """
 from __future__ import annotations
 
 import json
 import os
+import secrets
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request, send_from_directory, session
 
 import llm.persona_analysis as persona_analysis
 import pipeline.add_article as add_article
@@ -41,7 +55,29 @@ from pipeline.run_grader import run_grader
 from scrapers.base import today_wib
 from scrapers.idx_uma import fetch_uma_announcements, is_recently_flagged, uma_history_for
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=None)
+app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
+
+# ---------- Auth (session sederhana, ganti dari "tanpa auth" plan_c.txt §6.4
+# -- dashboard Vue sekarang satu proses/port dgn API, siap di-expose kalau
+# Giel deploy. DASHBOARD_PASSWORD WAJIB diisi manual di .env -- TIDAK PERNAH
+# di-generate/default oleh kode (itu kredensial, bukan angka placeholder spt
+# RISK_CAPITAL_*). Kosong -> login endpoint menolak dgn pesan jelas, bukan
+# diam-diam membolehkan siapa saja masuk. ----------
+DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "").strip()
+AUTH_EXEMPT_API_PATHS = {"/api/auth/login", "/api/auth/status"}
+FRONTEND_DIST = Path(__file__).resolve().parent / "frontend" / "dist"
+
+
+@app.before_request
+def _require_auth():
+    """Guard SEMUA /api/* (kecuali login/status) di belakang session.
+    Route non-API (shell SPA + asset statis) SELALU lolos -- Vue Router yang
+    tampilkan halaman login berdasar /api/auth/status, bukan redirect Flask,
+    supaya routing client-side (history mode) tetap utuh."""
+    if request.path.startswith("/api/") and request.path not in AUTH_EXEMPT_API_PATHS:
+        if not session.get("authed"):
+            return jsonify({"error": "unauthorized"}), 401
 
 # Instrumen dengan data asli utk Panel 6 outlook (plan_c.txt keputusan #5 --
 # USDJPY dikecualikan atas permintaan eksplisit Giel).
@@ -142,6 +178,48 @@ def _detect_gaps(dates: list[str], calendar: str) -> list[dict]:
     return gaps
 
 
+def _all_instruments_with_gaps(conn) -> list[dict]:
+    """Deteksi gap utk SEMUA instrument yang dikenal backfill sekaligus --
+    macro (`INSTRUMENT_SOURCE`) + universe ekuitas Phase J+
+    (`instrument_metadata`, kalender WEEKDAY -- bursa saham/FX, sama seperti
+    entri ekuitas macro yang sudah ada). Dipakai tombol "Cek & Backfill Semua
+    Gap" Panel 1 -- info gap per-instrument sudah lengkap dari sistem
+    (`/api/data_gaps`), jadi Giel tidak perlu pilih instrument satu-satu di
+    dropdown utk tahu apa yang bolong.
+
+    Instrument TANPA histori sama sekali (`total_rows=0`) DILEWATI -- itu
+    backfill awal yang butuh keputusan sadar (instrument mana, dari tanggal
+    berapa), bukan "isi gap" otomatis. Kalender WEEKLY_WED juga dilewati
+    (sama seperti `/api/data_gaps` -- kosong antar-Rabu itu wajar)."""
+    macro = [(name, *info) for name, info in INSTRUMENT_SOURCE.items()]
+    equity_rows = conn.execute("SELECT instrument FROM instrument_metadata").fetchall()
+    equity = [(r["instrument"], "asset_ohlcv", None, "WEEKDAY") for r in equity_rows]
+
+    out = []
+    for instrument, source, col, calendar in macro + equity:
+        if source == "asset_ohlcv":
+            rows = conn.execute(
+                "SELECT date FROM asset_ohlcv WHERE instrument = ? ORDER BY date", (instrument,)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"SELECT date FROM daily_market WHERE {col} IS NOT NULL ORDER BY date"
+            ).fetchall()
+        dates = [r["date"] for r in rows]
+        if not dates:
+            continue
+        gaps = _detect_gaps(dates, calendar)
+        if not gaps:
+            continue
+        out.append({
+            "instrument": instrument,
+            "gap_from": min(g["from"] for g in gaps),
+            "gap_to": max(g["to"] for g in gaps),
+            "gaps_count": len(gaps),
+        })
+    return out
+
+
 def _rows_to_dicts(rows) -> list[dict]:
     return [dict(r) for r in rows]
 
@@ -155,11 +233,33 @@ def _parse_flags(raw) -> dict:
         return {}
 
 
-# ---------- PAGES ----------
+# ---------- Auth endpoints ----------
 
-@app.route("/")
-def index():
-    return render_template("index.html")
+@app.post("/api/auth/login")
+def auth_login():
+    if not DASHBOARD_PASSWORD:
+        return jsonify({"error": "DASHBOARD_PASSWORD belum di-set di .env -- login tidak bisa dipakai"}), 500
+    body = request.get_json(force=True)
+    password = body.get("password", "")
+    if not secrets.compare_digest(password, DASHBOARD_PASSWORD):
+        return jsonify({"error": "Password salah"}), 401
+    session.permanent = True
+    session["authed"] = True
+    return jsonify({"ok": True})
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/auth/status")
+def auth_status():
+    return jsonify({
+        "authenticated": bool(session.get("authed")),
+        "password_configured": bool(DASHBOARD_PASSWORD),
+    })
 
 
 # ---------- API ----------
@@ -353,6 +453,45 @@ def backfill_commit():
         body["instrument"], body["from"], body["to"], assume_yes=True,
     )
     return jsonify(result)
+
+
+@app.post("/api/backfill/all/preview")
+def backfill_all_preview():
+    """Preview backfill utk SEMUA instrument yang punya gap sekaligus --
+    reuse `_all_instruments_with_gaps()` (DB-only, cepat) utk cari kandidat,
+    lalu `backfill_mod.backfill()` (network fetch) per instrument utk range
+    gap-nya masing-masing. Instrument yang gagal fetch dicatat error-nya,
+    TIDAK menghentikan instrument lain (pola sama `safe_call` scraper)."""
+    with get_connection() as conn:
+        candidates = _all_instruments_with_gaps(conn)
+    results = []
+    for c in candidates:
+        try:
+            r = backfill_mod.backfill(c["instrument"], c["gap_from"], c["gap_to"], preview_only=True)
+        except Exception as exc:  # noqa: BLE001
+            results.append({"instrument": c["instrument"], "error": str(exc)})
+            continue
+        if r["new"] > 0:
+            results.append({**r, "from": c["gap_from"], "to": c["gap_to"]})
+    return jsonify({"results": results})
+
+
+@app.post("/api/backfill/all/commit")
+def backfill_all_commit():
+    """Commit backfill utk item yang SUDAH di-preview (body: `{"items":
+    [{"instrument","from","to"}, ...]}`) -- BUKAN deteksi ulang gap, supaya
+    commit persis sesuai apa yang ditampilkan preview (hindari drift kalau
+    gap berubah di antara 2 request)."""
+    body = request.get_json(force=True)
+    results = []
+    for item in body.get("items", []):
+        try:
+            r = backfill_mod.backfill(item["instrument"], item["from"], item["to"], assume_yes=True)
+        except Exception as exc:  # noqa: BLE001
+            results.append({"instrument": item["instrument"], "error": str(exc)})
+            continue
+        results.append(r)
+    return jsonify({"results": results})
 
 
 # ---------- PHASE C: Panel 2 — key trigger + manual article ----------
@@ -956,8 +1095,29 @@ def lane_validation_log_list():
     return jsonify(rows)
 
 
+# ---------- SPA (Vue, web/frontend/dist/) — HARUS route PALING TERAKHIR
+# didaftarkan (bukan krn urutan penting utk Flask/werkzeug -- literal segment
+# spt /api/health selalu menang lawan <path:path> apa pun urutannya -- tapi
+# supaya jelas dibaca ini catch-all). Kalau dist/ belum di-build, kasih
+# pesan jelas (bukan traceback 500 yang membingungkan). ----------
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def spa(path):
+    if not (FRONTEND_DIST / "index.html").exists():
+        return (
+            "Frontend belum di-build. Jalankan: cd web/frontend && npm run build",
+            503,
+        )
+    if path and (FRONTEND_DIST / path).is_file():
+        return send_from_directory(FRONTEND_DIST, path)
+    return send_from_directory(FRONTEND_DIST, "index.html")
+
+
 def main() -> None:
     init_db()  # pastikan tabel ada (walau kosong) supaya API tidak error
+    if not DASHBOARD_PASSWORD:
+        print("[web] PERINGATAN: DASHBOARD_PASSWORD kosong -- login tidak akan bisa dipakai. Isi di .env.")
     host = os.getenv("WEB_HOST", "127.0.0.1")
     port = int(os.getenv("WEB_PORT", "5000"))
     print(f"[web] Kastara dashboard -> http://{host}:{port}  (db={get_db_path()})")

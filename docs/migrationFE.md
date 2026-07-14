@@ -6,6 +6,44 @@
 > rencana migrasi FE ini. Track A (deploy/auth) tidak hilang — tetap ditrack
 > terpisah, dan justru bersinggungan dengan langkah "login" di Fase 3 di bawah.
 
+> **Status per 14 Jul 2026: Fase 0-2 SELESAI, diverifikasi live thd DB
+> produksi.** App Vue lengkap di `web/frontend/` (dev: `npm run dev` port
+> 5173, proxy `/api` ke Flask 5000; `npm run build` sukses, ~200KB gzip total,
+> code-split per view). Backend/API sama sekali TIDAK disentuh — dashboard
+> lama di `/` tetap jalan berdampingan tanpa perubahan. **Fase 3 (cutover +
+> login) BELUM dieksekusi** — sengaja dijeda utk konfirmasi Giel dulu sebelum
+> menghapus kode lama & mengalihkan `/` (lihat catatan akhir dokumen).
+>
+> Detail per-fase yang sudah selesai:
+> - **Fase 0**: scaffold Vite+Vue (`web/frontend/`, ditemukan sudah pernah
+>   dijalankan Giel sendiri tapi ke-nested salah lokasi
+>   `web/frontend/web/frontend/` — dipindah ke lokasi benar, node_modules
+>   yang sudah ter-install dipertahankan, bukan install ulang). Tambah
+>   Vue Router (8 route, urutan sama tab lama) + Pinia + PrimeVue (preset
+>   Aura) + Vue Router history mode. `vite.config.js` proxy `/api` ke Flask.
+> - **Fase 1**: `src/lib/api.js` (get/post), `src/lib/format.js`
+>   (fmt/today/LANE_CLASS/LENS_LABELS, port dari core.js),
+>   `src/components/DataTable.vue` (wrap PrimeVue DataTable + search box,
+>   dipakai ~11 tabel), `src/composables/useAppToast.js` (wrap PrimeVue
+>   Toast, signature `toast(msg)` sama seperti lama).
+> - **Fase 2**: SEMUA 8 view dimigrasi & diverifikasi live dgn data real:
+>   `SnapshotView` (cards + backfill 1-instrumen + backfill-semua-gap),
+>   `NewsView`, `ForwardView` (econ calendar inline-edit + expectations +
+>   positioning + policy tracker + disonansi — paling banyak form),
+>   `ReadingView` (4 persona cards + PrimeVue Dialog modal, ganti `<dialog>`
+>   native), `ChartView` (SVG candlestick DIBUNGKUS APA ADANYA —
+>   `drawCandleChart`/`rollingMA`/`drawMiniLine` dipindah verbatim ke
+>   `src/lib/chartMath.js` + template refs, BUKAN ditulis ulang/ganti lib —
+>   dimigrasi TERAKHIR sesuai rencana), `SynthesisView`, `RiwayatView` (4
+>   sub-tab), `UniverseView` (paling besar — 8 sub-bagian: tabel utama,
+>   intake, uji kelayakan, detail emiten+override, validasi lane+riwayat,
+>   rasio bank, riwayat intake, grader log+outcome).
+> - Bug ditemukan & diperbaiki selama migrasi: `ForwardView` awal pakai 1
+>   `ref` bersama utk semua input "Actual" econ calendar yang kosong —
+>   salah kalau >1 baris butuh diisi bersamaan (kasus nyata, kalender
+>   biasanya banyak event future tanpa actual). Diperbaiki jadi state
+>   per-baris (`actualInputs` keyed by id) sebelum sempat jadi bug produksi.
+
 ## Context
 
 Frontend sekarang ~2,200 baris vanilla di 8 panel (`web/static/js/` 1,216 baris,

@@ -10,6 +10,16 @@
         "cd ~/LOCAL/kastara-finance && .venv/bin/python -m web.app"
       ],
       "port": 5000
+    },
+    {
+      "name": "kastara-frontend",
+      "runtimeExecutable": "wsl",
+      "runtimeArgs": [
+        "bash",
+        "-lc",
+        "export PATH=\"$HOME/.nvm/versions/node/v24.16.0/bin:$PATH\" && cd ~/LOCAL/kastara-finance/web/frontend && npm run dev -- --host 127.0.0.1 --port 5173"
+      ],
+      "port": 5173
     }
   ]
 }

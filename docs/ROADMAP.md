@@ -1685,7 +1685,80 @@ sebelumnya di Track D bahwa prompt persona adalah cara berpikir Giel).
   risk terjadwal. GEMA/LEON sengaja tidak diusulkan berubah sama sekali.
   Giel yang putuskan apakah dipakai, diedit, atau dibuang.
 
-## Prinsip Perubahan Roadmap
+**Update — Panel 1 "Cek & Backfill Semua Gap" (14 Jul 2026):** Giel menunjuk
+sistem deteksi gap yang sudah ada (`/api/data_gaps`, per-instrument dropdown)
+sudah informatif — pertanyaannya kenapa masih harus pilih instrument satu-satu
+kalau sistem sudah tahu semua yang bolong. Dibangun:
+- **`web/app.py::_all_instruments_with_gaps(conn)`** — fungsi pure (DB-only,
+  tanpa network) yang deteksi gap utk SEMUA instrument sekaligus: macro
+  (`INSTRUMENT_SOURCE`, 13 instrumen) + universe ekuitas Phase J+
+  (`instrument_metadata`, kalender WEEKDAY). Instrumen tanpa histori sama
+  sekali (`total_rows=0`) DILEWATI sengaja — itu backfill awal yang butuh
+  keputusan sadar (instrument mana, dari tanggal berapa), bukan "isi gap"
+  otomatis. Kalender `WEEKLY_WED` juga dilewati (pola sama `/api/data_gaps`).
+- **`POST /api/backfill/all/preview`** — pakai fungsi di atas utk cari
+  kandidat, lalu panggil `backfill_mod.backfill(..., preview_only=True)`
+  (network fetch asli) per instrument utk range gap-nya masing-masing.
+  Instrument yang gagal fetch dicatat error-nya, TIDAK menghentikan
+  instrument lain (pola sama `safe_call` scraper).
+- **`POST /api/backfill/all/commit`** — commit HANYA item yang sudah
+  di-preview (body `{"items": [...]}`, bukan deteksi ulang) — menghindari
+  drift kalau gap berubah di antara 2 request, request/response symmetric
+  dgn alur single-instrument existing.
+- **Panel 1 UI** (`panel1_snapshot.html`/`panel1.js`) — tombol baru "Cek &
+  Preview Semua Gap" di bawah form Manual Backfill existing, render tabel
+  instrument/range-gap/baru/duplikat + tombol "Commit Semua (N instrument)".
+  Setelah commit, `loadDataGaps()` dipanggil ulang supaya info gap dropdown
+  yang sedang dipilih ikut ter-refresh.
+- 5 test baru (`test_web_app.py`, DB-seeded, tanpa network — mirror pola
+  `_detect_gaps` existing): gap macro, skip instrument tanpa histori, skip
+  kalender WEEKLY_WED, include universe ekuitas (WEEKDAY), no-gap→hasil
+  kosong. 292 test total hijau. **Diverifikasi live thd DB produksi**: preview
+  menemukan gap asli BTC (2026-07-11 s.d. 2026-07-12, 2 baris), commit
+  menulis 2 baris baru (4.316→4.318), info gap dropdown BTC otomatis
+  ter-refresh jadi "tidak ada gap terdeteksi" — data yang ditulis REAL
+  (bukan dummy, tidak perlu dibersihkan).
+
+**Update — Migrasi FE ke Vue 3 + Vite, Fase 0-2 selesai (14 Jul 2026):** Giel
+minta "jalankan semua fase build FE" mengikuti rencana `docs/migrationFE.md`
+(app paralel + strangler cutover, keputusan sebelumnya: Vue 3 + Vite +
+PrimeVue, chart dibungkus apa adanya, backend tidak disentuh). Node/npm
+ternyata sudah diinstall Giel sendiri via nvm sebelum sesi ini (`v24.16.0`);
+scaffold Vite+Vue juga sudah pernah dijalankan Giel tapi ke-nested salah
+lokasi (`web/frontend/web/frontend/`, kemungkinan dijalankan dari dalam
+`web/frontend/`) — dipindah ke lokasi benar (`web/frontend/`), node_modules
+yang sudah ter-install dipertahankan.
+- **Fase 0** (scaffold): Vue Router (8 route 1:1 dgn tab lama) + Pinia +
+  PrimeVue (preset Aura) + proxy dev `/api` → Flask. Diverifikasi live:
+  data asli `/api/latest` termuat lewat proxy, routing SPA jalan.
+- **Fase 1** (fondasi bersama): `src/lib/api.js`, `src/lib/format.js`,
+  `src/components/DataTable.vue` (wrap PrimeVue DataTable, dipakai ~11
+  tabel), `src/composables/useAppToast.js`.
+- **Fase 2** (migrasi 8 panel): SEMUA 8 view selesai & diverifikasi live thd
+  DB produksi (bukan data dummy) — Snapshot (cards+backfill+backfill-semua-
+  gap), News, Forward (paling banyak form: econ calendar inline-edit,
+  expectations, positioning, policy tracker, disonansi), Reading (persona
+  cards + PrimeVue Dialog), Chart (SVG candlestick DIBUNGKUS APA ADANYA,
+  `rollingMA`/`drawCandleChart`/`drawMiniLine` dipindah ke
+  `src/lib/chartMath.js` nyaris verbatim, dimigrasi TERAKHIR sesuai
+  rencana), Synthesis, Riwayat (4 sub-tab), Universe (paling besar, 8
+  sub-bagian termasuk validasi lane & grader log). **Bug ditemukan &
+  diperbaiki SEBELUM produksi**: `ForwardView` awal pakai 1 `ref` bersama
+  utk semua input econ calendar "Actual" yang kosong — salah kalau >1 baris
+  butuh diisi bersamaan (kasus nyata, econ calendar biasa banyak event
+  future tanpa actual) — diperbaiki jadi state per-baris.
+- Verifikasi live mencakup: switch instrument BTC↔BBCA di Chart (harga +
+  lane badge ikut berubah benar), Detail Emiten BBCA di Universe (tabel
+  fundamentals bank-spesifik + LOW_CONFIDENCE flag tampil benar), search/
+  sort/paginate DataTable, Economic Calendar dgn actual sudah terisi vs
+  kosong. `npm run build` sukses (~200KB gzip total, code-split per view).
+- **Fase 3 (cutover + login) SENGAJA DIJEDA** — belum dieksekusi. Cutover
+  berarti mengalihkan `/` Flask ke build Vue dan MENGHAPUS
+  `templates/partials/` + `static/js/*` lama (tool ini dipakai tiap hari,
+  penghapusan kode yang masih berfungsi + auth baru butuh konfirmasi
+  eksplisit dulu, bukan otomatis walau sudah diverifikasi ekstensif).
+  Backend/API + 292 test Python tetap tidak berubah sama sekali di seluruh
+  proses ini.
 
 Sesuai `plan.txt`: **jangan lompat phase tanpa instruksi baru.** Kalau ada
 kebutuhan mendesak di luar urutan (seperti Phase 1 kemarin), itu boleh — tapi
