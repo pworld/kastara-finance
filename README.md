@@ -27,11 +27,13 @@ memutuskan** — tidak ada execution/trading logic otomatis di mana pun.
 > (`plan_b.txt`-`plan_e.txt`) dihapus setelah masing-masing selesai
 > dieksekusi — ringkasan hasilnya ada di `docs/ROADMAP.md`.
 
+Default password adalah 12345 gunakan untuk login
+
 📄 **Dokumen lengkap ada di [`docs/`](docs/):**
 [ARCHITECTURE.md](docs/ARCHITECTURE.md) (desain teknis & rationale),
 [FLOW.md](docs/FLOW.md) (alur data, diagram),
 [ROADMAP.md](docs/ROADMAP.md) (status tiap phase),
-[SOP.md](docs/SOP.md) (kapan buka panel apa),
+[SOP.md](docs/SOP.md) (kapan buka panel apa + **cara baca tiap item panel**),
 [Master Plan.md](docs/Master%20Plan.md) (strategi, v1.6),
 [migrationFE.md](docs/migrationFE.md) (rencana migrasi FE → Vue).
 

@@ -19,10 +19,20 @@ const navGroups = [
     ],
   },
   {
-    title: 'Universal',
+    // Lane INVEST (ritme mingguan/kuartalan) -- dulu digabung "Universal"
+    // bareng Riwayat, dipisah biar jelas ini lane investasi saham, bukan
+    // ritual harian (lihat docs/SOP.md Bagian C).
+    title: 'Investing',
+    items: [
+      { to: '/universe', label: 'Universe' },
+    ],
+  },
+  {
+    // Track record lintas-lane (synthesis/prediksi/jurnal/lensa) -- dibaca
+    // saat review mingguan/bulanan, bukan tiap hari.
+    title: 'Arsip',
     items: [
       { to: '/riwayat', label: 'Riwayat' },
-      { to: '/universe', label: 'Universe' },
     ],
   },
 ]
