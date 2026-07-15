@@ -58,6 +58,42 @@ async function saveActual(row) {
   loadEconCalendar()
 }
 
+// ---------- Earnings Emiten (READ-ONLY, kontrak §19.5) ----------
+// earnings_calendar di-surface di sini ("gabung visual dgn econ_calendar" =
+// section berdampingan, bukan 1 tabel dipaksakan). Warning = penegak rule
+// no-hold-through-earnings saham AS (keputusan #3).
+const earningsRaw = ref([])
+const earningsWarnings = ref([])
+const loadingEarnings = ref(true)
+
+const earnings = computed(() => {
+  const todayStr = today()
+  // Upcoming/hari-ini di atas, yang sudah lewat (nunggu actual EPS) di bawah --
+  // pola sama econCal.
+  return [...earningsRaw.value].sort((a, b) => {
+    const aPast = a.earnings_date < todayStr ? 1 : 0
+    const bPast = b.earnings_date < todayStr ? 1 : 0
+    if (aPast !== bPast) return aPast - bPast
+    return a.earnings_date.localeCompare(b.earnings_date)
+  })
+})
+
+async function loadEarnings() {
+  loadingEarnings.value = true
+  ;[earningsRaw.value, earningsWarnings.value] = await Promise.all([
+    get('/api/earnings'), get('/api/earnings/warnings'),
+  ])
+  loadingEarnings.value = false
+}
+onMounted(loadEarnings)
+
+// Surprise = actual - forecast (beat hijau / miss merah). null actual -> '-'.
+function surprise(row) {
+  if (row.eps_actual === null || row.eps_actual === undefined || row.eps_forecast === null) return null
+  const diff = row.eps_actual - row.eps_forecast
+  return { diff, beat: diff >= 0 }
+}
+
 // ---------- Expectations (Layer B) ----------
 const expectations = ref([])
 const exp = ref({ date: '', metric: 'cme_fedwatch_cut_prob', value: '', horizon: '' })
@@ -179,6 +215,44 @@ onMounted(async () => { disonansi.value = await get('/api/disonansi') })
         </Column>
       </DataTable>
     </div>
+  </section>
+
+  <section>
+    <h2>Earnings Emiten (Universe)</h2>
+    <div class="panel">
+      <div v-if="earningsWarnings.length" style="margin-bottom:12px">
+        <div v-for="w in earningsWarnings" :key="w.instrument" class="empty-inline" style="margin-bottom:6px">
+          <span class="badge" :class="w.hard_rule ? 'HIGH' : 'MED'">{{ w.hard_rule ? '⚠ TUTUP PENUH' : 'WASPADA' }}</span>
+          <span style="margin-left:8px">
+            <b>{{ w.instrument }}</b> earnings H-{{ w.days_until }} ({{ w.earnings_date }}) — posisi ONGOING.
+            <template v-if="w.hard_rule">Saham AS: WAJIB tutup penuh sebelum tanggal earnings (kontrak §18 keputusan #3).</template>
+            <template v-else>IDX tidak punya aturan tutup-penuh, tapi gap earnings tetap risiko — cek ulang premis posisi.</template>
+          </span>
+        </div>
+      </div>
+      <p v-if="loadingEarnings" class="src">Memuat...</p>
+      <DataTable
+        v-else :rows="earnings" :dataKey="'earnings_date'"
+        :searchFields="['instrument']" emptyMessage="belum ada data earnings"
+      >
+        <Column field="earnings_date" header="Tanggal" sortable />
+        <Column header="Countdown"><template #body="{ data }"><span class="src">{{ countdown(data.earnings_date) }}</span></template></Column>
+        <Column field="instrument" header="Ticker" sortable />
+        <Column field="market" header="Market" sortable><template #body="{ data }"><span class="src">{{ data.market || '-' }}</span></template></Column>
+        <Column header="EPS Forecast"><template #body="{ data }"><span class="src">{{ data.eps_forecast ?? '-' }}</span></template></Column>
+        <Column header="EPS Actual"><template #body="{ data }">{{ data.eps_actual ?? '—' }}</template></Column>
+        <Column header="Surprise">
+          <template #body="{ data }">
+            <span v-if="surprise(data)" :style="{ color: surprise(data).beat ? 'var(--ok)' : 'var(--fail)' }">
+              {{ surprise(data).beat ? '▲' : '▼' }} {{ (surprise(data).diff >= 0 ? '+' : '') + fmt(surprise(data).diff) }}
+            </span>
+            <span v-else class="src">—</span>
+          </template>
+        </Column>
+        <Column field="event_type" header="Tipe" sortable><template #body="{ data }"><span class="src">{{ data.event_type }}</span></template></Column>
+      </DataTable>
+    </div>
+    <div class="src" style="margin-top:6px">Data yfinance (J-7), diisi otomatis — bukan input manual. Earnings = event risk terjadwal (sama kelas dgn FOMC untuk AKELA). Posisi terbuka + earnings dekat → lihat warning di atas.</div>
   </section>
 
   <section>

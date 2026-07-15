@@ -1,7 +1,14 @@
 """Test web/writes.py — pure functions tulis-DB untuk Phase C (tanpa Flask)."""
 import json
+from datetime import datetime, timedelta
 
+from scrapers.base import today_wib
 from db.connection import get_connection, init_db
+
+
+def _date_shift(date_str: str, days: int) -> str:
+    """Geser 'YYYY-MM-DD' sekian hari (dipakai seed test earnings window)."""
+    return (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=days)).strftime("%Y-%m-%d")
 from web.writes import (
     compute_disonansi,
     flag_key_trigger,
@@ -41,6 +48,8 @@ from web.writes import (
     score_prediction,
     validate_lane,
     set_econ_actual,
+    list_earnings_calendar,
+    list_earnings_warnings,
 )
 
 
@@ -118,6 +127,105 @@ def test_set_econ_actual_unknown_id(tmp_path):
     init_db(db)
     with get_connection(db) as conn:
         assert set_econ_actual(conn, 9999, "3%") is False
+
+
+# ---------- Earnings emiten (READ-ONLY, J-15 gel.2) ----------
+
+def _seed_meta(conn, instrument, market):
+    conn.execute(
+        "INSERT INTO instrument_metadata (instrument, market) VALUES (?, ?)",
+        (instrument, market),
+    )
+
+
+def _seed_earnings(conn, instrument, earnings_date, **overrides):
+    row = {"eps_forecast": 1.0, "eps_actual": None, "event_type": "EARNINGS"}
+    row.update(overrides)
+    conn.execute(
+        "INSERT INTO earnings_calendar (instrument, earnings_date, eps_forecast, "
+        "eps_actual, event_type, created_at) VALUES (?, ?, ?, ?, ?, '')",
+        (instrument, earnings_date, row["eps_forecast"], row["eps_actual"], row["event_type"]),
+    )
+
+
+def _seed_ongoing(conn, instrument):
+    conn.execute(
+        "INSERT INTO trading_journal (date, instrument, outcome, created_at) "
+        "VALUES ('2026-07-15', ?, 'ONGOING', '')",
+        (instrument,),
+    )
+
+
+def test_list_earnings_calendar_window_and_market_join(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    today = today_wib()
+    with get_connection(db) as conn:
+        _seed_meta(conn, "TSLA", "US")
+        _seed_earnings(conn, "TSLA", _date_shift(today, 5))     # upcoming -> masuk
+        _seed_earnings(conn, "TSLA", _date_shift(today, -10))   # baru lewat (dalam 30d) -> masuk
+        _seed_earnings(conn, "TSLA", _date_shift(today, -60))   # di luar window -> keluar
+        conn.commit()
+        rows = list_earnings_calendar(conn)
+    dates = [r["earnings_date"] for r in rows]
+    assert _date_shift(today, 5) in dates
+    assert _date_shift(today, -10) in dates
+    assert _date_shift(today, -60) not in dates
+    assert all(r["market"] == "US" for r in rows)  # JOIN instrument_metadata
+
+
+def test_list_earnings_warnings_us_hard_rule(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    today = today_wib()
+    with get_connection(db) as conn:
+        _seed_meta(conn, "TSLA", "US")
+        _seed_ongoing(conn, "TSLA")
+        _seed_earnings(conn, "TSLA", _date_shift(today, 5))
+        conn.commit()
+        warns = list_earnings_warnings(conn, within_days=14)
+    assert len(warns) == 1
+    assert warns[0]["instrument"] == "TSLA"
+    assert warns[0]["hard_rule"] is True
+    assert warns[0]["days_until"] == 5
+
+
+def test_list_earnings_warnings_idx_soft_rule(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    today = today_wib()
+    with get_connection(db) as conn:
+        _seed_meta(conn, "BBCA", "IDX")
+        _seed_ongoing(conn, "BBCA")
+        _seed_earnings(conn, "BBCA", _date_shift(today, 5))
+        conn.commit()
+        warns = list_earnings_warnings(conn, within_days=14)
+    assert len(warns) == 1
+    assert warns[0]["hard_rule"] is False
+
+
+def test_list_earnings_warnings_empty_without_open_position(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    today = today_wib()
+    with get_connection(db) as conn:
+        _seed_meta(conn, "TSLA", "US")
+        _seed_earnings(conn, "TSLA", _date_shift(today, 5))  # ada earnings, TAPI tak ada posisi
+        conn.commit()
+        assert list_earnings_warnings(conn) == []
+
+
+def test_list_earnings_warnings_ignores_past_and_far(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    today = today_wib()
+    with get_connection(db) as conn:
+        _seed_meta(conn, "TSLA", "US")
+        _seed_ongoing(conn, "TSLA")
+        _seed_earnings(conn, "TSLA", _date_shift(today, -3))   # sudah lewat
+        _seed_earnings(conn, "TSLA", _date_shift(today, 20))   # > within_days
+        conn.commit()
+        assert list_earnings_warnings(conn, within_days=14) == []
 
 
 # ---------- Expectations (Layer B, manual) ----------

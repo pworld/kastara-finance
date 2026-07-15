@@ -458,6 +458,23 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       di-sort (upcoming/hari-ini dulu, event lewat didorong ke bawah) + filter
       dropdown default **HIGH saja (bintang 3)**, opsi "HIGH + MED" kalau
       perlu lihat semua. Murni client-side (`ForwardView.vue`), tidak ubah API.
+- [x] ~~Earnings emiten tampil di Forward panel (J-15 gel.2, kontrak §19.5)~~
+      — `earnings_calendar` (data J-7 sudah ada sejak lama, TAPI tidak pernah
+      di-surface: tak ada endpoint, tak ada di UI) sekarang tampil di
+      `ForwardView.vue` section "Earnings Emiten", berdampingan dgn Economic
+      Calendar ("gabung visual" = section terpisah, bukan 2 skema dipaksa 1
+      tabel). READ-ONLY (eps_actual diisi scraper, bukan manual). Kolom:
+      countdown, EPS forecast/actual, surprise (beat hijau/miss merah).
+      **WARNING earnings posisi terbuka** (kontrak §18 keputusan #3):
+      `trading_journal.outcome='ONGOING'` JOIN `earnings_calendar` mendatang →
+      badge merah "tutup penuh" utk saham AS (`hard_rule`, penegak rule
+      no-hold-through-earnings), badge informatif utk IDX (tak ada aturan
+      tutup-penuh, gap tetap risiko). 2 read helper baru
+      (`list_earnings_calendar`/`list_earnings_warnings`, `web/writes.py`) +
+      2 endpoint (`GET /api/earnings`, `/api/earnings/warnings`). 5 test baru
+      (`test_web_writes.py`), diverifikasi direct-Python ke DB asli (earnings
+      2026-07-22 muncul H-7) + skenario warning temp-DB (TSLA/US hard,
+      BBCA/IDX soft, posisi lewat/jauh di-skip).
 - [x] ~~Auto-isi `actual` HIGH-importance dari investing.com (pass kedua)~~
       — riset awal SEMPAT menyimpulkan skip (lihat percobaan pertama: kena
       HTTP 429 yang tidak pulih setelah ~5-6 request cepat, dan endpoint AJAX

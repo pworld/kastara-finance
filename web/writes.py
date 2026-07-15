@@ -57,6 +57,51 @@ def set_econ_actual(conn: sqlite3.Connection, event_id: int, actual: str) -> boo
     return True
 
 
+# ---------- Panel 3: Earnings emiten (READ-ONLY — J-15 gel.2, kontrak §19.5) ----------
+# earnings_calendar diisi scraper J-7 (backfill_earnings.py), BUKAN manual --
+# jadi di sini cuma read. Ditampilkan di Forward panel bareng econ_calendar
+# ("sumbu waktu katalis") + jadi penegak rule "no hold through earnings" saham
+# AS (kontrak §18 keputusan #3).
+
+def list_earnings_calendar(conn: sqlite3.Connection, limit: int = 40) -> list[dict[str, Any]]:
+    """Earnings emiten universe, dari 30 hari lalu s.d. mendatang (window
+    mirror econ_calendar: yang barusan lewat ikut tampil supaya actual EPS-nya
+    kebaca). LEFT JOIN instrument_metadata utk `market` (dipakai frontend
+    bedakan aturan US vs IDX). Urut naik by tanggal."""
+    rows = conn.execute(
+        "SELECT e.instrument, e.earnings_date, e.eps_forecast, e.eps_actual, "
+        "e.event_type, m.market "
+        "FROM earnings_calendar e "
+        "LEFT JOIN instrument_metadata m ON m.instrument = e.instrument "
+        "WHERE e.earnings_date >= date(?, '-30 days') "
+        "ORDER BY e.earnings_date ASC LIMIT ?",
+        (today_wib(), limit),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def list_earnings_warnings(conn: sqlite3.Connection, within_days: int = 14) -> list[dict[str, Any]]:
+    """Peringatan earnings utk posisi TERBUKA (trading_journal.outcome='ONGOING')
+    yang instrumennya punya earnings mendatang dalam `within_days` hari
+    (kontrak §19.5). 1 baris per instrument (earnings terdekat). `hard_rule`
+    True utk saham AS -- keputusan #3: WAJIB tutup penuh sebelum earnings;
+    IDX tidak punya aturan tutup-penuh (gap lebih kecil, §13.2) -> informatif."""
+    today = today_wib()
+    rows = conn.execute(
+        "SELECT j.instrument, m.market, MIN(e.earnings_date) AS earnings_date, "
+        "CAST(julianday(MIN(e.earnings_date)) - julianday(?) AS INTEGER) AS days_until "
+        "FROM trading_journal j "
+        "JOIN earnings_calendar e ON e.instrument = j.instrument "
+        "LEFT JOIN instrument_metadata m ON m.instrument = j.instrument "
+        "WHERE j.outcome = 'ONGOING' "
+        "AND e.earnings_date >= ? AND e.earnings_date <= date(?, '+' || ? || ' days') "
+        "GROUP BY j.instrument, m.market "
+        "ORDER BY earnings_date ASC",
+        (today, today, today, within_days),
+    ).fetchall()
+    return [{**dict(r), "hard_rule": r["market"] == "US"} for r in rows]
+
+
 # ---------- Panel 3: Expectations (Layer B, Phase D — manual, tidak ada
 # sumber gratis: CME FedWatch API resmi berbayar, Dot Plot rilis PDF
 # kuartalan) ----------

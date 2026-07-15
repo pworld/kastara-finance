@@ -555,6 +555,24 @@ def econ_calendar_set_actual():
     return jsonify({"ok": True})
 
 
+@app.get("/api/earnings")
+def earnings_list():
+    """Earnings emiten universe (30 hari lalu s.d. mendatang) -- READ-ONLY,
+    diisi scraper J-7. Ditampilkan di Forward panel bareng econ_calendar."""
+    with get_connection() as conn:
+        rows = writes.list_earnings_calendar(conn, limit=request.args.get("limit", 40, type=int))
+    return jsonify(rows)
+
+
+@app.get("/api/earnings/warnings")
+def earnings_warnings():
+    """Peringatan earnings utk posisi ONGOING (kontrak §19.5 + §18 keputusan
+    #3 no-hold-through-earnings saham AS)."""
+    with get_connection() as conn:
+        rows = writes.list_earnings_warnings(conn, within_days=request.args.get("within_days", 14, type=int))
+    return jsonify(rows)
+
+
 @app.get("/api/expectations")
 def expectations_list():
     with get_connection() as conn:
