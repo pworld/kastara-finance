@@ -50,6 +50,16 @@ from web.writes import (
     set_econ_actual,
     list_earnings_calendar,
     list_earnings_warnings,
+    save_thread,
+    patch_thread,
+    list_threads,
+    get_thread,
+    suggest_thread_links,
+    confirm_thread_link,
+    reject_thread_link,
+    add_thread_link_manual,
+    list_thread_links,
+    attach_thread_suggestions,
 )
 
 
@@ -1040,3 +1050,310 @@ def test_save_grader_outcome_unknown_id_returns_false(tmp_path):
     init_db(db)
     with get_connection(db) as conn:
         assert save_grader_outcome(conn, 9999, outcome_3m="BENAR") is False
+
+
+# ---------- News Threads (Addendum B §20, N-1 fondasi) ----------
+
+def _seed_news_row(conn, **overrides):
+    defaults = {
+        "date": "2026-07-15", "source": "CNBC", "headline": "Warsh signals hawkish stance",
+        "raw_url": "https://x.test", "impact_level": "HIGH", "is_key_trigger": 0,
+    }
+    defaults.update(overrides)
+    cur = conn.execute(
+        "INSERT INTO daily_news (date, source, headline, raw_url, impact_level, "
+        "is_key_trigger, created_at) VALUES (:date, :source, :headline, :raw_url, "
+        ":impact_level, :is_key_trigger, '')",
+        defaults,
+    )
+    return cur.lastrowid
+
+
+def test_save_thread_requires_title(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        try:
+            save_thread(conn, title="")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "title" in str(exc)
+
+
+def test_save_thread_enforces_max_active(tmp_path):
+    """Kontrak §20.1 keputusan #5: maks 7 thread ACTIVE bersamaan, ditegakkan
+    di write function -- bukan cuma UI."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        for i in range(7):
+            save_thread(conn, title=f"Thread {i}")
+        conn.commit()
+        try:
+            save_thread(conn, title="Thread ke-8")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "7" in str(exc)
+
+
+def test_save_thread_stores_keywords_as_json(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        row = save_thread(conn, title="Rezim Warsh Hawkish", keywords=["warsh", "fed"])
+        conn.commit()
+        assert row["keywords"] == ["warsh", "fed"]
+        assert row["status"] == "ACTIVE"
+        fetched = get_thread(conn, row["id"])
+        assert fetched["keywords"] == ["warsh", "fed"]
+
+
+def test_patch_thread_requires_verdict_when_closing(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        row = save_thread(conn, title="Thread A")
+        conn.commit()
+        try:
+            patch_thread(conn, row["id"], status="CLOSED")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "verdict" in str(exc)
+
+
+def test_patch_thread_closes_with_verdict(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        row = save_thread(conn, title="Thread A")
+        conn.commit()
+        updated = patch_thread(conn, row["id"], status="CLOSED", verdict="Tesis terbukti benar")
+        conn.commit()
+        assert updated["status"] == "CLOSED"
+        assert updated["verdict"] == "Tesis terbukti benar"
+
+
+def test_patch_thread_unknown_id_returns_none(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        assert patch_thread(conn, 9999, current_read="x") is None
+
+
+def test_list_threads_filters_by_status(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        a = save_thread(conn, title="Thread A")
+        save_thread(conn, title="Thread B")
+        conn.commit()
+        patch_thread(conn, a["id"], status="CLOSED", verdict="selesai")
+        conn.commit()
+        assert len(list_threads(conn)) == 2
+        assert len(list_threads(conn, status="ACTIVE")) == 1
+        assert len(list_threads(conn, status="CLOSED")) == 1
+
+
+def test_suggest_thread_links_matches_keyword_and_is_idempotent(tmp_path):
+    """Auto-suggest (§20.2): keyword match -> SUGGESTED, TIDAK PERNAH
+    CONFIRMED. Re-run dgn news_items sama TIDAK duplikat (idempoten via
+    UNIQUE index idx_news_thread_links_dedup)."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Rezim Warsh Hawkish", keywords=["warsh"])
+        conn.commit()
+        _seed_news_row(conn, headline="Warsh signals hawkish stance")
+        _seed_news_row(conn, headline="Unrelated tech news", date="2026-07-15", source="X")
+        conn.commit()
+        news_items = [
+            {"date": "2026-07-15", "headline": "Warsh signals hawkish stance"},
+            {"date": "2026-07-15", "headline": "Unrelated tech news"},
+        ]
+        n1 = suggest_thread_links(conn, news_items)
+        conn.commit()
+        assert n1 == 1  # cuma yang match keyword
+        links = list_thread_links(conn, thread["id"])
+        assert len(links) == 1
+        assert links[0]["link_status"] == "SUGGESTED"
+
+        n2 = suggest_thread_links(conn, news_items)  # re-run, sama news_items
+        conn.commit()
+        assert n2 == 0  # idempoten, tidak duplikat
+        assert len(list_thread_links(conn, thread["id"])) == 1
+
+
+def test_suggest_thread_links_only_scans_active_threads(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        closed = save_thread(conn, title="Thread Lama", keywords=["warsh"])
+        conn.commit()
+        patch_thread(conn, closed["id"], status="CLOSED", verdict="selesai")
+        conn.commit()
+        _seed_news_row(conn, headline="Warsh speaks again")
+        conn.commit()
+        n = suggest_thread_links(conn, [{"date": "2026-07-15", "headline": "Warsh speaks again"}])
+        conn.commit()
+        assert n == 0  # thread CLOSED tidak ikut di-scan
+
+
+def test_confirm_thread_link_requires_valid_stance(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Thread A", keywords=["warsh"])
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        suggest_thread_links(conn, [{"date": "2026-07-15", "headline": "Warsh signals hawkish stance"}])
+        conn.commit()
+        link_id = list_thread_links(conn, thread["id"])[0]["id"]
+        try:
+            confirm_thread_link(conn, link_id, "SETUJU")  # bukan salah satu dari 3 pilihan
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "stance" in str(exc)
+
+
+def test_confirm_thread_link_also_key_trigger_reuses_flag_key_trigger(tmp_path):
+    """also_key_trigger=True harus benar-benar set daily_news.is_key_trigger
+    lewat flag_key_trigger() yang sudah ada (reuse, bukan duplikat write path)."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Thread A", keywords=["warsh"])
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        suggest_thread_links(conn, [{"date": "2026-07-15", "headline": "Warsh signals hawkish stance"}])
+        conn.commit()
+        link_id = list_thread_links(conn, thread["id"])[0]["id"]
+        ok = confirm_thread_link(conn, link_id, "mendukung", also_key_trigger=True)
+        conn.commit()
+        assert ok is True
+        row = conn.execute("SELECT is_key_trigger FROM daily_news WHERE id=?", (news_id,)).fetchone()
+        assert row["is_key_trigger"] == 1
+        link = list_thread_links(conn, thread["id"])[0]
+        assert link["link_status"] == "CONFIRMED"
+        assert link["stance"] == "MENDUKUNG"  # dinormalisasi upper
+
+
+def test_confirm_thread_link_unknown_id_returns_false(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        assert confirm_thread_link(conn, 9999, "MENDUKUNG") is False
+
+
+def test_reject_thread_link(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Thread A", keywords=["warsh"])
+        _seed_news_row(conn)
+        conn.commit()
+        suggest_thread_links(conn, [{"date": "2026-07-15", "headline": "Warsh signals hawkish stance"}])
+        conn.commit()
+        link_id = list_thread_links(conn, thread["id"])[0]["id"]
+        assert reject_thread_link(conn, link_id) is True
+        assert list_thread_links(conn, thread["id"], status="REJECTED")[0]["link_status"] == "REJECTED"
+        assert reject_thread_link(conn, 9999) is False
+
+
+def test_add_thread_link_manual_confirmed_immediately(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Thread A")
+        pol_id = conn.execute(
+            "INSERT INTO policy_tracker (date, speaker, institution, literal_statement, created_at) "
+            "VALUES ('2026-07-14', 'Powell', 'Fed', 'Rates may stay higher for longer', '')"
+        ).lastrowid
+        conn.commit()
+        row = add_thread_link_manual(conn, thread["id"], "policy_tracker", pol_id, "kontra", note="catatan")
+        conn.commit()
+        assert row["link_status"] == "CONFIRMED"
+        assert row["stance"] == "KONTRA"
+        links = list_thread_links(conn, thread["id"])
+        assert links[0]["source_info"]["headline"] == "Rates may stay higher for longer"
+        assert links[0]["source_info"]["source"] == "Powell (Fed)"
+
+
+def test_add_thread_link_manual_rejects_unknown_ref_table(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Thread A")
+        conn.commit()
+        try:
+            add_thread_link_manual(conn, thread["id"], "some_other_table", 1, "MENDUKUNG")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "ref_table" in str(exc)
+
+
+def test_add_thread_link_manual_rejects_duplicate(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Thread A")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        add_thread_link_manual(conn, thread["id"], "daily_news", news_id, "MENDUKUNG")
+        conn.commit()
+        try:
+            add_thread_link_manual(conn, thread["id"], "daily_news", news_id, "KONTRA")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "sudah ada" in str(exc)
+
+
+def test_list_thread_links_joins_daily_news_and_manual_articles(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Thread A")
+        news_id = _seed_news_row(conn)
+        art_id = conn.execute(
+            "INSERT INTO manual_articles (date, source, url, headline, created_at) "
+            "VALUES ('2026-07-13', 'Reuters', 'https://x', 'Manual article headline', '')"
+        ).lastrowid
+        conn.commit()
+        add_thread_link_manual(conn, thread["id"], "daily_news", news_id, "MENDUKUNG")
+        add_thread_link_manual(conn, thread["id"], "manual_articles", art_id, "NETRAL")
+        conn.commit()
+        links = {l["ref_table"]: l for l in list_thread_links(conn, thread["id"])}
+        assert links["daily_news"]["source_info"]["headline"] == "Warsh signals hawkish stance"
+        assert links["manual_articles"]["source_info"]["headline"] == "Manual article headline"
+
+
+def test_attach_thread_suggestions_prefers_confirmed_over_suggested(tmp_path):
+    """Kalau 1 headline match >1 thread (1 SUGGESTED, 1 CONFIRMED), yang
+    ditampilkan CONFIRMED -- deterministik, bukan urutan sisipan acak."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        t1 = save_thread(conn, title="Thread Suggested Only")
+        t2 = save_thread(conn, title="Thread Confirmed")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        conn.execute(
+            "INSERT INTO news_thread_links (thread_id, ref_table, ref_id, link_status, linked_at) "
+            "VALUES (?, 'daily_news', ?, 'SUGGESTED', '')", (t1["id"], news_id),
+        )
+        add_thread_link_manual(conn, t2["id"], "daily_news", news_id, "MENDUKUNG")
+        conn.commit()
+        rows = [{"id": news_id, "headline": "Warsh signals hawkish stance"}]
+        attached = attach_thread_suggestions(conn, rows)
+        assert attached[0]["thread_link"]["thread_title"] == "Thread Confirmed"
+        assert attached[0]["thread_link"]["link_status"] == "CONFIRMED"
+
+
+def test_attach_thread_suggestions_none_when_no_link(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        rows = [{"id": news_id, "headline": "Warsh signals hawkish stance"}]
+        attached = attach_thread_suggestions(conn, rows)
+        assert attached[0]["thread_link"] is None

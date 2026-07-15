@@ -44,6 +44,9 @@ EXPECTED_TABLES = [
     "grader_log",
     "intake_log",
     "lane_validation_log",
+    "news_threads",
+    "news_thread_links",
+    "thread_relations",
 ]
 
 

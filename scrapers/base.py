@@ -8,6 +8,7 @@ Prinsip:
 from __future__ import annotations
 
 import os
+import re
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
@@ -139,3 +140,17 @@ def safe_call(
         flags.fail(name)
         print(f"[scraper:fail] {name}: {type(exc).__name__}: {exc}")
         return default
+
+
+def keyword_matches(text: str, keywords: list[str]) -> bool:
+    """True kalau salah satu keyword muncul sebagai kata/frasa utuh (word
+    boundary) di `text` -- 'rate' tidak match 'moderate'/'separate', tapi
+    frasa multi-kata seperti 'rate cut' tetap cocok. Rule-based (BUKAN LLM),
+    dipromosikan dari scrapers/news.py::_matches() -- dipakai 2 tempat:
+    scrapers/news.py::score_impact() (IMPACT_KEYWORDS) dan auto-suggest News
+    Threads (web/writes.py::suggest_thread_links(), Addendum B §20.2,
+    keyword thread), jadi tidak boleh duplikat logic di 2 file."""
+    for kw in keywords:
+        if re.search(rf"\b{re.escape(kw)}\b", text):
+            return True
+    return False

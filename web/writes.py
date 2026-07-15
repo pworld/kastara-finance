@@ -25,7 +25,7 @@ import json
 import sqlite3
 from typing import Any
 
-from scrapers.base import created_at, today_wib
+from scrapers.base import created_at, keyword_matches, today_wib
 
 READING_LENSES = ("GEMA", "LEON", "AKELA", "RIVAN")
 
@@ -734,3 +734,294 @@ def save_grader_outcome(
         (outcome_3m, outcome_6m, notes, log_id),
     )
     return True
+
+
+# ---------- News Threads (Addendum B §20, N-1 fondasi) ----------
+# Unit penautan = THREAD, BUKAN artikel-ke-artikel (keputusan #2). Auto-suggest
+# rule-based (BUKAN LLM, §20.0) TIDAK PERNAH langsung CONFIRMED -- selalu
+# lewat Giel (human gate). Stance WAJIB saat CONFIRMED (anti-confirmation-
+# funnel, keputusan #3). Maks 7 thread ACTIVE, ditegakkan di sini (bukan cuma
+# UI, keputusan #5). N-2 (strip Reading, injeksi persona, auto-DORMANT)
+# SENGAJA belum dibangun -- lihat docs/ROADMAP.md.
+
+MAX_ACTIVE_THREADS = 7
+ALLOWED_THREAD_STATUS = {"ACTIVE", "DORMANT", "CLOSED"}
+ALLOWED_STANCE = {"MENDUKUNG", "KONTRA", "NETRAL"}
+ALLOWED_REF_TABLES = {"daily_news", "manual_articles", "policy_tracker"}
+
+
+def _decode_thread(row: dict[str, Any]) -> dict[str, Any]:
+    row["keywords"] = json.loads(row["keywords"]) if row["keywords"] else []
+    row["persona_tags"] = json.loads(row["persona_tags"]) if row["persona_tags"] else []
+    return row
+
+
+def save_thread(
+    conn: sqlite3.Connection, *, title: str, description: str | None = None,
+    keywords: list[str] | None = None, persona_tags: list[str] | None = None,
+    current_read: str | None = None,
+) -> dict[str, Any]:
+    """Buat thread baru, status ACTIVE. Guard: title wajib, maks
+    MAX_ACTIVE_THREADS thread ACTIVE bersamaan (keputusan #5) -- ditegakkan
+    di sini, bukan cuma UI."""
+    if not title or not title.strip():
+        raise ValueError("title wajib diisi")
+    active_count = conn.execute(
+        "SELECT COUNT(*) c FROM news_threads WHERE status = 'ACTIVE'"
+    ).fetchone()["c"]
+    if active_count >= MAX_ACTIVE_THREADS:
+        raise ValueError(
+            f"sudah {MAX_ACTIVE_THREADS} thread ACTIVE -- tutup/dormant-kan satu dulu (keputusan #5)"
+        )
+    now = today_wib()
+    row = {
+        "title": title.strip(), "description": description, "current_read": current_read,
+        "keywords": json.dumps(keywords or []), "persona_tags": json.dumps(persona_tags or []),
+        "status": "ACTIVE", "verdict": None, "created_at": now, "updated_at": now,
+    }
+    cur = conn.execute(
+        "INSERT INTO news_threads (title, description, keywords, current_read, persona_tags, "
+        "status, verdict, created_at, updated_at) VALUES (:title, :description, :keywords, "
+        ":current_read, :persona_tags, :status, :verdict, :created_at, :updated_at)",
+        row,
+    )
+    return get_thread(conn, cur.lastrowid)
+
+
+def patch_thread(conn: sqlite3.Connection, thread_id: int, **fields: Any) -> dict[str, Any] | None:
+    """Update subset field thread (current_read/status/persona_tags/verdict).
+    Guard: status='CLOSED' wajib verdict non-kosong (vonis auditable, §20.1).
+    Return None kalau thread_id tidak ada."""
+    current = get_thread(conn, thread_id)
+    if current is None:
+        return None
+    if "status" in fields and fields["status"] not in ALLOWED_THREAD_STATUS:
+        raise ValueError(
+            f"status '{fields['status']}' tidak dikenal -- pilihan: {'/'.join(ALLOWED_THREAD_STATUS)}"
+        )
+    new_status = fields.get("status", current["status"])
+    new_verdict = fields.get("verdict", current["verdict"])
+    if new_status == "CLOSED" and not (new_verdict and new_verdict.strip()):
+        raise ValueError("verdict wajib diisi saat menutup thread (status=CLOSED)")
+    updates = dict(fields)
+    if "persona_tags" in updates:
+        updates["persona_tags"] = json.dumps(updates["persona_tags"])
+    updates["updated_at"] = today_wib()
+    cols = ", ".join(f"{k} = :{k}" for k in updates)
+    conn.execute(f"UPDATE news_threads SET {cols} WHERE id = :id", {**updates, "id": thread_id})
+    return get_thread(conn, thread_id)
+
+
+def list_threads(conn: sqlite3.Connection, status: str | None = None) -> list[dict[str, Any]]:
+    """Semua thread, terbaru diupdate dulu. Filter opsional by status."""
+    sql = "SELECT * FROM news_threads"
+    params: list[Any] = []
+    if status:
+        sql += " WHERE status = ?"
+        params.append(status.upper())
+    sql += " ORDER BY updated_at DESC, id DESC"
+    return [_decode_thread(dict(r)) for r in conn.execute(sql, params).fetchall()]
+
+
+def get_thread(conn: sqlite3.Connection, thread_id: int) -> dict[str, Any] | None:
+    row = conn.execute("SELECT * FROM news_threads WHERE id = ?", (thread_id,)).fetchone()
+    return _decode_thread(dict(row)) if row else None
+
+
+def suggest_thread_links(conn: sqlite3.Connection, news_items: list[dict[str, Any]]) -> int:
+    """Untuk tiap headline BARU & tiap thread ACTIVE: keyword match (rule-
+    based, `scrapers.base.keyword_matches`) -> INSERT news_thread_links
+    SUGGESTED (idempoten via UNIQUE index idx_news_thread_links_dedup).
+    Dipanggil pipeline/run_daily.py SETELAH insert_news_dedup() (butuh row id
+    asli daily_news, bukan dict item mentah pre-insert) -- lookup by
+    (date, headline), natural key sama dgn idx_daily_news_dedup. TIDAK PERNAH
+    set CONFIRMED (human gate, §20.0). Return jumlah link baru."""
+    if not news_items:
+        return 0
+    threads = conn.execute(
+        "SELECT id, keywords FROM news_threads WHERE status = 'ACTIVE'"
+    ).fetchall()
+    thread_kw = [
+        (t["id"], json.loads(t["keywords"]) if t["keywords"] else [])
+        for t in threads
+    ]
+    thread_kw = [(tid, kws) for tid, kws in thread_kw if kws]
+    if not thread_kw:
+        return 0
+    inserted = 0
+    now = today_wib()
+    for item in news_items:
+        row = conn.execute(
+            "SELECT id FROM daily_news WHERE date = ? AND headline = ?",
+            (item["date"], item["headline"]),
+        ).fetchone()
+        if not row:
+            continue
+        headline_lower = (item["headline"] or "").lower()
+        for thread_id, kws in thread_kw:
+            if not keyword_matches(headline_lower, kws):
+                continue
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO news_thread_links "
+                "(thread_id, ref_table, ref_id, link_status, linked_at) "
+                "VALUES (?, 'daily_news', ?, 'SUGGESTED', ?)",
+                (thread_id, row["id"], now),
+            )
+            inserted += cur.rowcount
+    return inserted
+
+
+def confirm_thread_link(
+    conn: sqlite3.Connection, link_id: int, stance: str, *, also_key_trigger: bool = False,
+) -> bool:
+    """CONFIRM 1 link dgn stance (WAJIB, anti-confirmation-funnel keputusan
+    #3). `also_key_trigger=True` sekalian set daily_news.is_key_trigger lewat
+    flag_key_trigger() yang SUDAH ADA (reuse, bukan duplikat write path).
+    Return False kalau link_id tidak ada."""
+    stance = (stance or "").upper()
+    if stance not in ALLOWED_STANCE:
+        raise ValueError(f"stance '{stance}' tidak dikenal -- pilihan: {'/'.join(ALLOWED_STANCE)}")
+    link = conn.execute(
+        "SELECT ref_table, ref_id FROM news_thread_links WHERE id = ?", (link_id,)
+    ).fetchone()
+    if not link:
+        return False
+    conn.execute(
+        "UPDATE news_thread_links SET link_status = 'CONFIRMED', stance = ?, linked_at = ? WHERE id = ?",
+        (stance, today_wib(), link_id),
+    )
+    if also_key_trigger and link["ref_table"] == "daily_news":
+        flag_key_trigger(conn, link["ref_id"], True)
+    return True
+
+
+def reject_thread_link(conn: sqlite3.Connection, link_id: int) -> bool:
+    """Tolak 1 link SUGGESTED. Return False kalau link_id tidak ada."""
+    exists = conn.execute("SELECT 1 FROM news_thread_links WHERE id = ?", (link_id,)).fetchone()
+    if not exists:
+        return False
+    conn.execute("UPDATE news_thread_links SET link_status = 'REJECTED' WHERE id = ?", (link_id,))
+    return True
+
+
+def add_thread_link_manual(
+    conn: sqlite3.Connection, thread_id: int, ref_table: str, ref_id: int,
+    stance: str, note: str | None = None,
+) -> dict[str, Any]:
+    """Tautkan manual (utk sumber yang tak ter-auto-suggest, mis. entri
+    policy_tracker atau manual_articles) -- langsung CONFIRMED (Giel sudah
+    tahu stance-nya, tidak lewat SUGGESTED dulu). Guard: ref_table dikenal,
+    stance wajib. Kalau pasangan (thread_id, ref_table, ref_id) sudah pernah
+    ditautkan (mis. sudah SUGGESTED dari auto-suggest) -> ValueError, arahkan
+    ke confirm_thread_link() pakai link_id yang sudah ada (jangan tautkan
+    ulang)."""
+    if ref_table not in ALLOWED_REF_TABLES:
+        raise ValueError(f"ref_table '{ref_table}' tidak dikenal -- pilihan: {'/'.join(ALLOWED_REF_TABLES)}")
+    stance = (stance or "").upper()
+    if stance not in ALLOWED_STANCE:
+        raise ValueError(f"stance '{stance}' tidak dikenal -- pilihan: {'/'.join(ALLOWED_STANCE)}")
+    cur = conn.execute(
+        "INSERT OR IGNORE INTO news_thread_links "
+        "(thread_id, ref_table, ref_id, stance, link_status, note, linked_at) "
+        "VALUES (?, ?, ?, ?, 'CONFIRMED', ?, ?)",
+        (thread_id, ref_table, ref_id, stance, note, today_wib()),
+    )
+    if cur.rowcount == 0:
+        raise ValueError(
+            "link ini sudah ada (thread+sumber ini sudah pernah ditautkan) -- "
+            "konfirmasi/tolak yang sudah ada lewat link_id, jangan tautkan ulang"
+        )
+    return {
+        "id": cur.lastrowid, "thread_id": thread_id, "ref_table": ref_table, "ref_id": ref_id,
+        "stance": stance, "link_status": "CONFIRMED", "note": note,
+    }
+
+
+def list_thread_links(
+    conn: sqlite3.Connection, thread_id: int, status: str | None = None,
+) -> list[dict[str, Any]]:
+    """Link 1 thread + info sumber asli (date/source/headline/url), di-JOIN
+    manual per ref_table (union Python-side -- lebih aman drpd dynamic-
+    table-name SQL). Dipakai halaman timeline thread (§20.5)."""
+    sql = (
+        "SELECT id, ref_table, ref_id, stance, link_status, note, linked_at "
+        "FROM news_thread_links WHERE thread_id = ?"
+    )
+    params: list[Any] = [thread_id]
+    if status:
+        sql += " AND link_status = ?"
+        params.append(status.upper())
+    sql += " ORDER BY linked_at ASC, id ASC"
+    links = [dict(r) for r in conn.execute(sql, params).fetchall()]
+
+    by_table: dict[str, list[int]] = {}
+    for link in links:
+        by_table.setdefault(link["ref_table"], []).append(link["ref_id"])
+
+    source_by_key: dict[tuple[str, int], dict[str, Any]] = {}
+    if by_table.get("daily_news"):
+        ids = by_table["daily_news"]
+        placeholders = ",".join("?" for _ in ids)
+        for r in conn.execute(
+            f"SELECT id, date, source, headline, raw_url FROM daily_news WHERE id IN ({placeholders})", ids,
+        ):
+            source_by_key[("daily_news", r["id"])] = {
+                "date": r["date"], "source": r["source"], "headline": r["headline"], "url": r["raw_url"],
+            }
+    if by_table.get("manual_articles"):
+        ids = by_table["manual_articles"]
+        placeholders = ",".join("?" for _ in ids)
+        for r in conn.execute(
+            f"SELECT id, date, source, headline, url FROM manual_articles WHERE id IN ({placeholders})", ids,
+        ):
+            source_by_key[("manual_articles", r["id"])] = {
+                "date": r["date"], "source": r["source"], "headline": r["headline"], "url": r["url"],
+            }
+    if by_table.get("policy_tracker"):
+        ids = by_table["policy_tracker"]
+        placeholders = ",".join("?" for _ in ids)
+        for r in conn.execute(
+            f"SELECT id, date, speaker, institution, literal_statement, source_url "
+            f"FROM policy_tracker WHERE id IN ({placeholders})", ids,
+        ):
+            source_by_key[("policy_tracker", r["id"])] = {
+                "date": r["date"], "source": f"{r['speaker'] or ''} ({r['institution'] or ''})".strip(),
+                "headline": r["literal_statement"], "url": r["source_url"],
+            }
+
+    for link in links:
+        link["source_info"] = source_by_key.get((link["ref_table"], link["ref_id"]))
+    return links
+
+
+def attach_thread_suggestions(conn: sqlite3.Connection, news_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Tempel info news_thread_links (SUGGESTED/CONFIRMED, REJECTED
+    diabaikan) ke tiap row daily_news yang SUDAH di-fetch -- dipakai
+    GET /api/news biar NewsView bisa render chip 'Saran: <thread>?' tanpa
+    endpoint terpisah. Kalau 1 headline match >1 thread, CONFIRMED menang
+    atas SUGGESTED (ORDER BY di query), sisanya diabaikan -- UI cuma
+    nampilkan 1 chip per berita di N-1."""
+    if not news_rows:
+        return news_rows
+    ids = [r["id"] for r in news_rows]
+    placeholders = ",".join("?" for _ in ids)
+    links = conn.execute(
+        f"SELECT l.id AS link_id, l.ref_id, l.thread_id, l.stance, l.link_status, "
+        f"t.title AS thread_title FROM news_thread_links l "
+        f"JOIN news_threads t ON t.id = l.thread_id "
+        f"WHERE l.ref_table = 'daily_news' AND l.ref_id IN ({placeholders}) "
+        f"AND l.link_status != 'REJECTED' "
+        f"ORDER BY l.ref_id, CASE l.link_status WHEN 'CONFIRMED' THEN 0 ELSE 1 END, l.id",
+        ids,
+    ).fetchall()
+    by_ref: dict[int, dict[str, Any]] = {}
+    for r in links:
+        by_ref.setdefault(r["ref_id"], dict(r))
+    for row in news_rows:
+        link = by_ref.get(row["id"])
+        row["thread_link"] = {
+            "link_id": link["link_id"], "thread_id": link["thread_id"],
+            "thread_title": link["thread_title"], "stance": link["stance"],
+            "link_status": link["link_status"],
+        } if link else None
+    return news_rows

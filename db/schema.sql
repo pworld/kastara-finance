@@ -300,6 +300,55 @@ CREATE TABLE IF NOT EXISTS lane_validation_log (
     created_at TEXT
 );
 
+-- 23. News threads (Addendum B §20.1, N-1) -- benang narasi lintas waktu.
+-- Unit penautan adalah THREAD, BUKAN artikel-ke-artikel (keputusan #2,
+-- mencegah "hairball" graph yang tidak terbaca). `keywords`/`persona_tags`
+-- disimpan JSON array (TEXT), pola sama emiten_grade.integrity_flags.
+-- Maks 7 thread status='ACTIVE' -- ditegakkan di web/writes.py::save_thread(),
+-- BUKAN cuma di UI (keputusan #5).
+CREATE TABLE IF NOT EXISTS news_threads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    keywords TEXT,           -- JSON array, dipakai auto-suggest keyword match
+    current_read TEXT,        -- bacaan terkini Giel, 1 kalimat, di-update
+    persona_tags TEXT,        -- JSON array subset {GEMA,LEON,AKELA,RIVAN} -- dipakai N-2
+    status TEXT DEFAULT 'ACTIVE',   -- ACTIVE / DORMANT / CLOSED
+    verdict TEXT,              -- WAJIB diisi saat status=CLOSED (vonis auditable)
+    created_at TEXT, updated_at TEXT
+);
+
+-- 24. News thread links (Addendum B §20.1, N-1) -- tautan polymorphic dari 1
+-- thread ke entri di daily_news/manual_articles/policy_tracker (ref_table +
+-- ref_id, bukan foreign key literal krn beda tabel sumber). Auto-suggest
+-- (pipeline/run_daily.py) HANYA INSERT link_status='SUGGESTED' -- TIDAK
+-- PERNAH langsung CONFIRMED (human gate, §20.0). `stance` WAJIB terisi saat
+-- link_status='CONFIRMED' (anti-confirmation-funnel, keputusan #3) --
+-- ditegakkan di web/writes.py::confirm_thread_link(), bukan di sini.
+CREATE TABLE IF NOT EXISTS news_thread_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    thread_id INTEGER NOT NULL REFERENCES news_threads(id),
+    ref_table TEXT NOT NULL,   -- daily_news / manual_articles / policy_tracker
+    ref_id INTEGER NOT NULL,
+    stance TEXT,                -- MENDUKUNG / KONTRA / NETRAL
+    link_status TEXT DEFAULT 'SUGGESTED',   -- SUGGESTED / CONFIRMED / REJECTED
+    note TEXT,
+    linked_at TEXT
+);
+
+-- 25. Thread relations (Addendum B §20.1, GELOMBANG 2) -- relasi antar-thread
+-- (CAUSES/CONTRADICTS/SUBSET_OF/RELATED), opsional. SCHEMA-ONLY di N-1 --
+-- tabel dibuat sekarang supaya tidak perlu migrasi baru saat N-2, TAPI belum
+-- ada kode baca/tulis apa pun ke tabel ini sampai N-2 terbukti perlu (§20.7).
+CREATE TABLE IF NOT EXISTS thread_relations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    thread_a INTEGER NOT NULL REFERENCES news_threads(id),
+    thread_b INTEGER NOT NULL REFERENCES news_threads(id),
+    relation TEXT,
+    note TEXT,
+    created_at TEXT
+);
+
 -- Index untuk performa query range-tanggal saat histori membesar (5 tahun+).
 
 -- asset_ohlcv: query utama selalu "WHERE instrument = ? ORDER BY date" (chart,
@@ -355,3 +404,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_positioning_dedup
 -- event_type) natural key UPSERT, sama pola dgn idx_econ_calendar_dedup.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_earnings_calendar_dedup
     ON earnings_calendar(instrument, earnings_date, event_type);
+
+-- news_thread_links (Addendum B §20.2): auto-suggest jalan tiap run_daily,
+-- (thread_id, ref_table, ref_id) natural key -- re-run TIDAK duplikat baris
+-- SUGGESTED utk pasangan thread+berita yang sama (idempoten via INSERT OR
+-- IGNORE di web/writes.py::suggest_thread_links()).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_news_thread_links_dedup
+    ON news_thread_links(thread_id, ref_table, ref_id);

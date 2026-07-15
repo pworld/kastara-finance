@@ -396,8 +396,12 @@ def news():
     sql += " ORDER BY date DESC, id DESC LIMIT ?"
     params.append(limit)
     with get_connection() as conn:
-        rows = conn.execute(sql, params).fetchall()
-    return jsonify(_rows_to_dicts(rows))
+        rows = _rows_to_dicts(conn.execute(sql, params).fetchall())
+        # News Threads N-1 (Addendum B §20.5): tempel info thread_link kalau
+        # ada, biar NewsView bisa render chip "Saran: <thread>?" tanpa
+        # endpoint terpisah.
+        rows = writes.attach_thread_suggestions(conn, rows)
+    return jsonify(rows)
 
 
 # ---------- PHASE C: Panel 1 — Manual Backfill ----------
@@ -1111,6 +1115,103 @@ def lane_validation_log_list():
             limit=request.args.get("limit", 200, type=int),
         )
     return jsonify(rows)
+
+
+# ---------- News Threads (Addendum B §20, N-1 fondasi). Auto-suggest jalan
+# di pipeline/run_daily.py (writes.suggest_thread_links) -- endpoint di sini
+# murni baca + konfirmasi/tolak/patch, tidak ada logic matching di route. ----------
+
+@app.get("/api/threads")
+def threads_list():
+    with get_connection() as conn:
+        rows = writes.list_threads(conn, status=request.args.get("status"))
+    return jsonify(rows)
+
+
+@app.get("/api/threads/<int:thread_id>")
+def thread_detail(thread_id):
+    with get_connection() as conn:
+        thread = writes.get_thread(conn, thread_id)
+        if thread is None:
+            return jsonify({"error": "thread tidak ditemukan"}), 404
+        thread["links"] = writes.list_thread_links(conn, thread_id)
+    return jsonify(thread)
+
+
+@app.post("/api/threads")
+def thread_create():
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            row = writes.save_thread(
+                conn, title=body.get("title", ""), description=body.get("description"),
+                keywords=body.get("keywords"), persona_tags=body.get("persona_tags"),
+                current_read=body.get("current_read"),
+            )
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(row)
+
+
+@app.post("/api/threads/<int:thread_id>")
+def thread_patch(thread_id):
+    # Pola konvensi app ini: SEMUA mutasi lewat POST (bukan PATCH/PUT --
+    # lihat POST /api/emiten/<ticker>/override, /api/grader_log/<id>/outcome,
+    # dll), meski secara REST-purist ini "update", bukan "create".
+    body = request.get_json(force=True)
+    fields = {k: v for k, v in body.items() if k in {"current_read", "status", "persona_tags", "verdict"}}
+    try:
+        with get_connection() as conn:
+            row = writes.patch_thread(conn, thread_id, **fields)
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if row is None:
+        return jsonify({"error": "thread tidak ditemukan"}), 404
+    return jsonify(row)
+
+
+@app.post("/api/threads/<int:thread_id>/links")
+def thread_link_add_manual(thread_id):
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            row = writes.add_thread_link_manual(
+                conn, thread_id, body.get("ref_table", ""), body.get("ref_id"),
+                body.get("stance", ""), note=body.get("note"),
+            )
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(row)
+
+
+@app.post("/api/threads/link/<int:link_id>/confirm")
+def thread_link_confirm(link_id):
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            ok = writes.confirm_thread_link(
+                conn, link_id, body.get("stance", ""),
+                also_key_trigger=bool(body.get("also_key_trigger")),
+            )
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if not ok:
+        return jsonify({"error": "link tidak ditemukan"}), 404
+    return jsonify({"ok": True})
+
+
+@app.post("/api/threads/link/<int:link_id>/reject")
+def thread_link_reject(link_id):
+    with get_connection() as conn:
+        ok = writes.reject_thread_link(conn, link_id)
+        conn.commit()
+    if not ok:
+        return jsonify({"error": "link tidak ditemukan"}), 404
+    return jsonify({"ok": True})
 
 
 # ---------- SPA (Vue, web/frontend/dist/) — HARUS route PALING TERAKHIR

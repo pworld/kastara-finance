@@ -12,6 +12,7 @@ const navGroups = [
     items: [
       { to: '/snapshot', label: 'Snapshot' },
       { to: '/news', label: 'News' },
+      { to: '/threads', label: 'Threads' },
       { to: '/forward', label: 'Forward' },
       { to: '/reading', label: 'Reading' },
       { to: '/chart', label: 'Chart' },

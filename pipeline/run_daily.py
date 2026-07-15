@@ -26,6 +26,7 @@ from scrapers.idx_stock_foreign_flow import fetch_idx_stock_foreign_flow
 from scrapers.macro_fred import fetch_macro_fred
 from scrapers.macro_yf import fetch_macro_yf
 from scrapers.news import fetch_all_news
+from web.writes import suggest_thread_links
 from scrapers.positioning import fetch_positioning
 
 # Kolom daily_market yang boleh ditulis pipeline (sisanya untuk Phase B+).
@@ -250,6 +251,12 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
         # 4) news
         n_news = insert_news_dedup(conn, news_items)
 
+        # 4b) News Threads N-1 auto-suggest (Addendum B §20.2) -- rule-based
+        # keyword match ke thread ACTIVE, SELALU cuma SUGGESTED (human gate,
+        # tidak pernah auto-CONFIRMED). Butuh row id asli daily_news, jadi
+        # SETELAH insert_news_dedup, bukan sebelumnya.
+        n_thread_links = suggest_thread_links(conn, news_items)
+
         # 5) economic calendar (event masa depan, upsert by natural key)
         n_econ = upsert_econ_calendar(conn, econ.get("items", []))
 
@@ -270,6 +277,7 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
         "sources_skip": flags.count("skip"),
         "asset_rows": len(asset_rows),
         "news_inserted": n_news,
+        "thread_links_suggested": n_thread_links,
         "rss_ok": sum(1 for v in news_health.values() if v == "ok"),
         "rss_dead": [name for name, status in news_health.items() if status == "dead"],
         "econ_events_new": n_econ,
@@ -288,6 +296,7 @@ def _print_summary(s: dict[str, Any]) -> None:
     print(f"  source skip   : {s['sources_skip']}")
     print(f"  asset rows    : {s['asset_rows']}")
     print(f"  news inserted : {s['news_inserted']}")
+    print(f"  thread suggest: {s['thread_links_suggested']} link baru (News Threads N-1)")
     rss_line = f"  RSS           : {s['rss_ok']} ok, {len(s['rss_dead'])} dead"
     if s["rss_dead"]:
         rss_line += f" → {s['rss_dead']}"

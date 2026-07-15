@@ -1,9 +1,10 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import Column from 'primevue/column'
+import Dialog from 'primevue/dialog'
 import DataTable from '../components/DataTable.vue'
 import { get, post } from '../lib/api'
-import { today, daysAgo } from '../lib/format'
+import { today, daysAgo, LINK_STATUS_CLASS } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
 
 // Port dari web/static/js/panel2.js (lihat docs/migrationFE.md Fase 2).
@@ -36,6 +37,36 @@ async function toggleKey(row) {
   const nowKey = !!row.is_key_trigger
   await post('/api/news/flag_key', { id: row.id, is_key: !nowKey })
   toast(nowKey ? 'Key trigger dilepas' : 'Ditandai key trigger')
+  loadNews()
+}
+
+// ---------- News Threads N-1: chip "Saran: <thread>?" + konfirmasi stance ----------
+// (Addendum B §20.5). SUGGESTED -> Konfirmasi (buka dialog pilih stance) /
+// Tolak. CONFIRMED -> chip solid + stance, tidak ada aksi lagi di sini.
+const stanceDialogOpen = ref(false)
+const stanceDialogLink = ref(null)
+const selectedStance = ref('MENDUKUNG')
+const alsoKeyTrigger = ref(false)
+
+function openStanceDialog(threadLink) {
+  stanceDialogLink.value = threadLink
+  selectedStance.value = 'MENDUKUNG'
+  alsoKeyTrigger.value = false
+  stanceDialogOpen.value = true
+}
+
+async function confirmThreadLink() {
+  await post(`/api/threads/link/${stanceDialogLink.value.link_id}/confirm`, {
+    stance: selectedStance.value, also_key_trigger: alsoKeyTrigger.value,
+  })
+  toast(`Ditautkan ke "${stanceDialogLink.value.thread_title}" (${selectedStance.value})`)
+  stanceDialogOpen.value = false
+  loadNews()
+}
+
+async function rejectThreadLink(threadLink) {
+  await post(`/api/threads/link/${threadLink.link_id}/reject`, {})
+  toast('Saran thread ditolak')
   loadNews()
 }
 
@@ -93,6 +124,20 @@ async function saveArticle() {
         <Column field="source" header="Sumber" sortable>
           <template #body="{ data }"><span class="src">{{ data.source }}</span></template>
         </Column>
+        <Column header="Thread">
+          <template #body="{ data }">
+            <template v-if="!data.thread_link"><span class="src">—</span></template>
+            <template v-else-if="data.thread_link.link_status === 'SUGGESTED'">
+              <span class="badge" :class="LINK_STATUS_CLASS.SUGGESTED">Saran: {{ data.thread_link.thread_title }}?</span>
+              <button class="btn small secondary" @click="openStanceDialog(data.thread_link)">Konfirmasi</button>
+              <button class="btn small danger" @click="rejectThreadLink(data.thread_link)">Tolak</button>
+            </template>
+            <template v-else>
+              <span class="badge" :class="LINK_STATUS_CLASS.CONFIRMED">{{ data.thread_link.thread_title }}</span>
+              <span class="src">({{ data.thread_link.stance }})</span>
+            </template>
+          </template>
+        </Column>
         <Column header="">
           <template #body="{ data }">
             <button
@@ -104,6 +149,28 @@ async function saveArticle() {
       </DataTable>
     </div>
   </section>
+
+  <Dialog v-model:visible="stanceDialogOpen" modal header="Konfirmasi Tautan Thread" style="width:420px; max-width:90vw">
+    <p v-if="stanceDialogLink" class="src">
+      Tautkan berita ini ke thread "<b>{{ stanceDialogLink.thread_title }}</b>" -- pilih stance
+      (WAJIB, anti-confirmation-funnel): apakah berita ini MENDUKUNG, KONTRA, atau NETRAL
+      terhadap bacaan thread saat ini?
+    </p>
+    <div class="form-row">
+      <label class="field">Stance</label>
+      <select v-model="selectedStance">
+        <option value="MENDUKUNG">MENDUKUNG</option>
+        <option value="KONTRA">KONTRA</option>
+        <option value="NETRAL">NETRAL</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="field"><input v-model="alsoKeyTrigger" type="checkbox"> Sekalian tandai key trigger</label>
+    </div>
+    <div class="form-row" style="margin-top:12px">
+      <button class="btn" @click="confirmThreadLink">Konfirmasi</button>
+    </div>
+  </Dialog>
 
   <section>
     <h2>+ Add Manual Article</h2>

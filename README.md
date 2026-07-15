@@ -41,11 +41,13 @@ Default password adalah 12345 gunakan untuk login
 
 ## 1. Apa yang dikerjakan
 
-- **SQLite** `kastara-finance.db` dengan **22 tabel** (`db/schema.sql`) — 11
+- **SQLite** `kastara-finance.db` dengan **25 tabel** (`db/schema.sql`) — 11
   tabel Phase A + 3 forward-layer (Phase D) + 7 ekuitas Phase J+
   (`instrument_metadata`, `fundamentals_quarterly`, `earnings_calendar`,
   `sector_benchmark`, `emiten_grade`, `grader_log`, `intake_log`) + 1
-  `lane_validation_log` (bar-replay sign-off). `db/connection.py::EXPECTED_TABLES`
+  `lane_validation_log` (bar-replay sign-off) + 3 News Threads (Addendum B
+  §20, N-1: `news_threads`, `news_thread_links`, `thread_relations`
+  schema-only). `db/connection.py::EXPECTED_TABLES`
   adalah daftar otoritatifnya.
 - **Scraper** modular (tiap source bisa jalan sendiri):
   - `scrapers/crypto.py` — CoinGecko + Binance + Alternative.me (BTC OHLCV,
@@ -89,6 +91,9 @@ Default password adalah 12345 gunakan untuk login
   - `scrapers/equity_universe.py` (J-2) — OHLCV harian saham universe (yfinance
     `.JK`/US) untuk instrumen di `instrument_metadata`.
 - **Pipeline** `pipeline/run_daily.py` — orchestrator harian, idempotent (UPSERT).
+  Sejak Addendum B N-1, sekalian panggil `web.writes.suggest_thread_links()`
+  setelah ingest berita (auto-suggest News Threads, rule-based, SELALU cuma
+  SUGGESTED — lihat [ROADMAP.md](docs/ROADMAP.md)).
 - **Pipeline (sore/malam, terpisah)** `pipeline/run_investing_actual.py` —
   cron KEDUA, isi `actual` HIGH-importance dari investing.com (lihat
   `scrapers/investing_calendar.py`). Belum ada di crontab — jalankan manual
@@ -201,7 +206,7 @@ TLS fingerprint Python — kalau field ini kosong terus di Panel 3, cek dulu apa
 ### Inisialisasi DB (otomatis dipanggil pipeline, tapi bisa manual)
 ```bash
 python -m db.connection
-# -> bikin kastara-finance.db + 22 tabel
+# -> bikin kastara-finance.db + 25 tabel
 ```
 
 ### Jalankan pipeline harian
@@ -290,12 +295,15 @@ execution/trading logic di mana pun.
 python -m web.app
 # buka http://127.0.0.1:5000
 ```
-Navigasi 8 tab: **1 Snapshot** (cards +
+Navigasi 9 tab: **1 Snapshot** (cards +
 source_flags + form Manual Backfill preview→confirm), **2 News** (list +
-filter impact + flag key trigger + Add Manual Article), **3 Forward**
-(Economic Calendar data asli + forecast/previous/actual manual, Expectations
-manual FedWatch/Dot Plot, Positioning COT+ETF otomatis & SBN manual, Policy
-Tracker manual, Disonansi Flag rule-based), **4 Reading**
+filter impact + flag key trigger + chip saran News Threads + Add Manual
+Article), **News Threads** (Addendum B §20, N-1: indeks + halaman timeline
+per thread, buat thread baru), **3 Forward**
+(Economic Calendar data asli + forecast/previous/actual otomatis/manual,
+Earnings Emiten + warning posisi terbuka, Expectations manual FedWatch/Dot
+Plot, Positioning COT+ETF otomatis & SBN manual, Policy Tracker manual,
+Disonansi Flag rule-based), **4 Reading**
 (4 lensa GEMA/LEON/AKELA/RIVAN via OpenRouter + External AI Check manual +
 Conflict Notes), **5 Chart** (candlestick + S&R zone overlay + marker
 breakout/retest + Approve/Reject sinyal + MA50/100/200 + filter rentang +
@@ -304,25 +312,29 @@ position sizing + Prediction Log + skor prediksi + Daily Briefing), **7
 Riwayat** (arsip synthesis/prediksi/jurnal/lensa, sub-tab), **8 Universe &
 Grader** (Phase J+: universe saham, intake kandidat, uji kelayakan + grade,
 detail emiten + override kuadran, rasio bank manual, validasi lane bar-replay,
-grader log). Panel 1–6 = ritme harian TRADE lane; Panel 8 = ritme mingguan/
-kuartalan INVEST lane (lihat [SOP.md](docs/SOP.md)).
+grader log). Panel 1–6 (+ News Threads) = ritme harian TRADE lane; Panel 8 =
+ritme mingguan/kuartalan INVEST lane (lihat [SOP.md](docs/SOP.md)).
 
-**Tanpa autentikasi** (local-only, `WEB_HOST`/`WEB_PORT` bisa diatur via
-`.env`). **Tidak ada pemanggilan AI/LLM otomatis di mana pun** — "External
-AI Check" di Panel 4 itu kolom paste manual (kamu banding hasil tool lain
-sendiri), bukan Kastara yang manggil AI.
+**Login session-based** (`DASHBOARD_PASSWORD` di `.env`, lihat §Setup —
+sejak Fase 3 migrasi Vue, BUKAN lagi tanpa autentikasi). **Tidak ada
+pemanggilan AI/LLM otomatis di mana pun** — "External AI Check" di Panel 4
+itu kolom paste manual (kamu banding hasil tool lain sendiri), bukan Kastara
+yang manggil AI. Auto-suggest News Threads juga rule-based (keyword match),
+BUKAN AI.
 
-API: **57 endpoint `/api/*`** (33 GET + 24 POST), semuanya `jsonify(...)` —
-`/` cuma render shell statis, semua data client-side fetch. Read-only Phase 1
-(`/api/latest`, `/api/daily_market`, `/api/asset_ohlcv`, `/api/news`,
-`/api/assets`, `/api/health`) tidak berubah. Grup lain: Phase C write
+API: **71 endpoint `/api/*`** (38 GET + 33 POST), semuanya `jsonify(...)` —
+`/` menyajikan build Vue (`web/frontend/dist/`), semua data client-side
+fetch. Read-only Phase 1 (`/api/latest`, `/api/daily_market`,
+`/api/asset_ohlcv`, `/api/news`, `/api/assets`, `/api/health`) tidak
+berubah. Grup lain: Phase C write
 (`/api/backfill/*`, `/api/reading/save`, `/api/signals/review`,
 `/api/synthesis/save`, `/api/journal/add`, `/api/prediction/*`), Phase D
 (`/api/expectations`, `/api/positioning`, `/api/disonansi`), Phase E
-(`/api/briefing/send`), Persona (`/api/persona/{run,status}`), dan Phase J+
+(`/api/briefing/send`), Persona (`/api/persona/{run,status}`), Phase J+
 (`/api/universe`, `/api/intake/*`, `/api/emiten/<t>{,/override,/validate_lane}`,
 `/api/sizing/suggest`, `/api/fundamentals/bank_ratios`, `/api/grader_log`,
-`/api/lane_validation_log`). Daftar otoritatif = route di `web/app.py`.
+`/api/lane_validation_log`, `/api/earnings{,/warnings}`), dan News Threads
+N-1 (`/api/threads*`). Daftar otoritatif = route di `web/app.py`.
 
 ### Daily Briefing ke Telegram (Phase E)
 ```bash

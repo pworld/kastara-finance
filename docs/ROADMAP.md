@@ -475,6 +475,59 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       (`test_web_writes.py`), diverifikasi direct-Python ke DB asli (earnings
       2026-07-22 muncul H-7) + skenario warning temp-DB (TSLA/US hard,
       BBCA/IDX soft, posisi lewat/jauh di-skip).
+- [x] ~~News Threads N-1 fondasi (Addendum B §20, adendum Giel)~~ — gap
+      Addendum B yang SEBELUMNYA belum dibangun sama sekali (beda dari
+      Addendum A/Panel Universe yang sudah selesai J-14/J-15). **N-1 saja**
+      (fondasi) — N-2 (strip Reading, injeksi digest ke `compose_persona_
+      context.py`, auto-DORMANT) SENGAJA belum dibangun, kontrak sendiri
+      membagi 2 gelombang & N-2 perlu N-1 dipakai beberapa hari dulu sbg
+      bahan uji.
+      **Schema**: 3 tabel baru (`news_threads`, `news_thread_links`,
+      `thread_relations` schema-only utk N-2) + 1 UNIQUE index dedup — 22→25
+      tabel total.
+      **Backend**: `scrapers/news.py::_matches` dipromosikan jadi
+      `scrapers/base.py::keyword_matches()` (reuse rule-based matcher, bukan
+      tulis ulang, dipakai 2 tempat sekarang). `web/writes.py` — `save_thread`
+      (guard title wajib + **maks 7 thread ACTIVE**, ditegakkan di write
+      function bukan cuma UI, keputusan #5), `patch_thread` (guard verdict
+      wajib saat status=CLOSED), `suggest_thread_links` (auto-suggest
+      rule-based, HANYA scan thread ACTIVE, SELALU cuma SUGGESTED — tidak
+      pernah auto-CONFIRMED, human gate §20.0), `confirm_thread_link` (stance
+      WAJIB — anti-confirmation-funnel keputusan #3 — `also_key_trigger`
+      reuse `flag_key_trigger()` existing), `reject_thread_link`,
+      `add_thread_link_manual` (guard ref_table dikenal + dedup), `list_
+      thread_links` (union manual 3 sumber: daily_news/manual_articles/
+      policy_tracker), `attach_thread_suggestions` (CONFIRMED menang atas
+      SUGGESTED kalau 1 berita match >1 thread). `pipeline/run_daily.py`:
+      hook `suggest_thread_links` SETELAH `insert_news_dedup` (butuh row id
+      asli), count masuk `summary`. 7 endpoint baru `/api/threads*`
+      (mutasi via POST, bukan PATCH — konsisten konvensi app ini yang tidak
+      pernah pakai PATCH/PUT di tempat lain) + `/api/news` di-extend nempel
+      `thread_link` per row.
+      **Frontend**: `NewsView.vue` — chip "Saran: `<thread>`?" + Konfirmasi
+      (Dialog pilih stance, checkbox "sekalian key trigger") / Tolak per
+      baris; `ThreadIndexView.vue` (baru, `<DataTable>` + form buat thread) +
+      `ThreadDetailView.vue` (baru, timeline vertikal link CONFIRMED + edit
+      current_read/status/verdict + tautkan manual) — **route `/threads/:id`
+      pertama di app ini yang pakai `:id` dinamis**. Nav sidebar "Threads"
+      ditambah di grup Daily (§20.6: konfirmasi SUGGESTED = ritual pagi) —
+      tanpa ini halaman baru tidak reachable lewat UI normal di N-1.
+      19 test baru (`test_web_writes.py`, guard 7-ACTIVE/verdict-wajib/
+      stance-wajib/ref_table-dikenal/dedup, idempotensi auto-suggest,
+      `also_key_trigger` beneran reuse `flag_key_trigger`). 336 test hijau
+      total. **Diverifikasi live**: `init_db()` dijalankan ke DB asli
+      (tabel baru butuh migrasi — awalnya sempat 500 "no such table" sebelum
+      ini disadari), Flask test-client round-trip penuh (create→list→detail→
+      patch→3 guard 400), DAN `suggest_thread_links` terhadap headline
+      PRODUKSI ASLI hari ini — keyword "hawkish" berhasil match "Bank
+      Sentral Makin Hawkish, Manulife IM Sarankan Pengelolaan Investasi
+      Aktif" dengan status SUGGESTED (bukan auto-CONFIRMED, human gate
+      terbukti jalan). Thread verifikasi di-CLOSE lagi setelahnya (tidak
+      ditinggal ACTIVE di DB asli). `npm run build` sukses (349 module,
+      termasuk `ThreadIndexView`/`ThreadDetailView` — bukti transform
+      SFC baru tidak error; console-check saja tidak cukup karena route
+      lazy-load di balik auth guard tidak pernah di-import kalau belum
+      login).
 - [x] ~~Auto-isi `actual` HIGH-importance dari investing.com (pass kedua)~~
       — riset awal SEMPAT menyimpulkan skip (lihat percobaan pertama: kena
       HTTP 429 yang tidak pulih setelah ~5-6 request cepat, dan endpoint AJAX

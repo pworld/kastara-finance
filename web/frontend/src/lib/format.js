@@ -40,3 +40,12 @@ export const LENS_LABELS = {
 export const LANE_CLASS = {
   TRADE: 'lane-trade', BOTH: 'lane-both', INVEST: 'lane-invest', NONE: 'lane-none',
 }
+
+// News Threads (Addendum B §20, N-1) -- badge class per news_threads.status
+// & news_thread_links.link_status.
+export const THREAD_STATUS_CLASS = {
+  ACTIVE: 'thread-active', DORMANT: 'thread-dormant', CLOSED: 'thread-closed',
+}
+export const LINK_STATUS_CLASS = {
+  SUGGESTED: 'link-suggested', CONFIRMED: 'link-confirmed', REJECTED: 'link-rejected',
+}

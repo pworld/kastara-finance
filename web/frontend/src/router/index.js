@@ -15,6 +15,10 @@ const routes = [
   { path: '/synthesis', name: 'synthesis', component: () => import('../views/SynthesisView.vue') },
   { path: '/riwayat', name: 'riwayat', component: () => import('../views/RiwayatView.vue') },
   { path: '/universe', name: 'universe', component: () => import('../views/UniverseView.vue') },
+  // News Threads N-1 (Addendum B §20) -- route dinamis PERTAMA di app ini
+  // (`:id` via useRoute().params.id, bukan props -- lihat ThreadDetailView.vue).
+  { path: '/threads', name: 'threads', component: () => import('../views/ThreadIndexView.vue') },
+  { path: '/threads/:id', name: 'thread-detail', component: () => import('../views/ThreadDetailView.vue') },
 ]
 
 const router = createRouter({

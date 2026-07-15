@@ -17,36 +17,25 @@ Acceptance:
 """
 from __future__ import annotations
 
-import re
 from typing import Any
 
 import feedparser
 import requests
 
-from scrapers.base import today_wib
+from scrapers.base import keyword_matches, today_wib
 from scrapers.feeds_config import FEEDS, IMPACT_KEYWORDS
 
 DEFAULT_TIMEOUT = 10
 HEADERS = {"User-Agent": "kastara-finance/0.1 (news feed health check)"}
 
 
-def _matches(text: str, keywords: list[str]) -> bool:
-    """True kalau salah satu keyword muncul sebagai kata/frasa utuh (word
-    boundary) -- 'rate' tidak match 'moderate'/'separate', tapi frasa
-    multi-kata seperti 'rate cut' tetap cocok."""
-    for kw in keywords:
-        if re.search(rf"\b{re.escape(kw)}\b", text):
-            return True
-    return False
-
-
 def score_impact(headline: str) -> str:
     """Return 'HIGH' | 'MED' | 'LOW' berdasar keyword rule-based.
     HIGH menang atas MED kalau headline cocok keduanya."""
     h = (headline or "").lower()
-    if _matches(h, IMPACT_KEYWORDS["HIGH"]):
+    if keyword_matches(h, IMPACT_KEYWORDS["HIGH"]):
         return "HIGH"
-    if _matches(h, IMPACT_KEYWORDS["MED"]):
+    if keyword_matches(h, IMPACT_KEYWORDS["MED"]):
         return "MED"
     return "LOW"
 
