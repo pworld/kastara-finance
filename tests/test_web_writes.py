@@ -11,7 +11,8 @@ def _date_shift(date_str: str, days: int) -> str:
     return (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=days)).strftime("%Y-%m-%d")
 from web.writes import (
     compute_disonansi,
-    flag_key_trigger,
+    set_for_reading,
+    set_display_subtitle,
     get_instrument_meta,
     insert_expectation,
     insert_policy_note,
@@ -60,44 +61,74 @@ from web.writes import (
     add_thread_link_manual,
     list_thread_links,
     attach_thread_suggestions,
+    create_tag,
+    list_tags,
+    resolve_tag,
+    apply_tag,
+    remove_tag,
+    list_content_tags,
+    attach_content_tags,
 )
 
 
 def _seed_news(conn, **overrides):
     defaults = {
         "date": "2026-01-01", "source": "CNBC", "headline": "Test headline",
-        "raw_url": "https://x.test", "impact_level": "LOW", "is_key_trigger": 0,
+        "raw_url": "https://x.test", "impact_level": "LOW", "for_reading": 0,
     }
     defaults.update(overrides)
     cur = conn.execute(
         "INSERT INTO daily_news (date, source, headline, raw_url, impact_level, "
-        "is_key_trigger, created_at) VALUES (:date, :source, :headline, :raw_url, "
-        ":impact_level, :is_key_trigger, '')",
+        "for_reading, created_at) VALUES (:date, :source, :headline, :raw_url, "
+        ":impact_level, :for_reading, '')",
         defaults,
     )
     return cur.lastrowid
 
 
-# ---------- flag_key_trigger ----------
+# ---------- set_for_reading / set_display_subtitle (Addendum C §21.2, renamed dari flag_key_trigger) ----------
 
-def test_flag_key_trigger_sets_flag(tmp_path):
+def test_set_for_reading_sets_flag(tmp_path):
     db = tmp_path / "t.db"
     init_db(db)
     with get_connection(db) as conn:
         nid = _seed_news(conn)
         conn.commit()
-        ok = flag_key_trigger(conn, nid, True)
+        ok = set_for_reading(conn, nid, True)
         conn.commit()
         assert ok is True
-        row = conn.execute("SELECT is_key_trigger FROM daily_news WHERE id=?", (nid,)).fetchone()
-        assert row["is_key_trigger"] == 1
+        row = conn.execute("SELECT for_reading FROM daily_news WHERE id=?", (nid,)).fetchone()
+        assert row["for_reading"] == 1
 
 
-def test_flag_key_trigger_unknown_id(tmp_path):
+def test_set_for_reading_unknown_id(tmp_path):
     db = tmp_path / "t.db"
     init_db(db)
     with get_connection(db) as conn:
-        assert flag_key_trigger(conn, 9999) is False
+        assert set_for_reading(conn, 9999) is False
+
+
+def test_set_display_subtitle_updates_and_keeps_headline_intact(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        nid = _seed_news(conn, headline="Original headline asli")
+        conn.commit()
+        ok = set_display_subtitle(conn, nid, "Catatan Giel di sini")
+        conn.commit()
+        assert ok is True
+        row = conn.execute(
+            "SELECT headline, display_subtitle FROM daily_news WHERE id=?", (nid,)
+        ).fetchone()
+        assert row["headline"] == "Original headline asli"  # tidak pernah ditimpa
+        assert row["display_subtitle"] == "Catatan Giel di sini"
+
+
+def test_set_display_subtitle_unknown_id(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        assert set_display_subtitle(conn, 9999, "x") is False
 
 
 # ---------- Economic Calendar actual ----------
@@ -1057,13 +1088,13 @@ def test_save_grader_outcome_unknown_id_returns_false(tmp_path):
 def _seed_news_row(conn, **overrides):
     defaults = {
         "date": "2026-07-15", "source": "CNBC", "headline": "Warsh signals hawkish stance",
-        "raw_url": "https://x.test", "impact_level": "HIGH", "is_key_trigger": 0,
+        "raw_url": "https://x.test", "impact_level": "HIGH", "for_reading": 0,
     }
     defaults.update(overrides)
     cur = conn.execute(
         "INSERT INTO daily_news (date, source, headline, raw_url, impact_level, "
-        "is_key_trigger, created_at) VALUES (:date, :source, :headline, :raw_url, "
-        ":impact_level, :is_key_trigger, '')",
+        "for_reading, created_at) VALUES (:date, :source, :headline, :raw_url, "
+        ":impact_level, :for_reading, '')",
         defaults,
     )
     return cur.lastrowid
@@ -1215,9 +1246,9 @@ def test_confirm_thread_link_requires_valid_stance(tmp_path):
             assert "stance" in str(exc)
 
 
-def test_confirm_thread_link_also_key_trigger_reuses_flag_key_trigger(tmp_path):
-    """also_key_trigger=True harus benar-benar set daily_news.is_key_trigger
-    lewat flag_key_trigger() yang sudah ada (reuse, bukan duplikat write path)."""
+def test_confirm_thread_link_also_for_reading_reuses_set_for_reading(tmp_path):
+    """also_for_reading=True harus benar-benar set daily_news.for_reading
+    lewat set_for_reading() yang sudah ada (reuse, bukan duplikat write path)."""
     db = tmp_path / "t.db"
     init_db(db)
     with get_connection(db) as conn:
@@ -1227,11 +1258,11 @@ def test_confirm_thread_link_also_key_trigger_reuses_flag_key_trigger(tmp_path):
         suggest_thread_links(conn, [{"date": "2026-07-15", "headline": "Warsh signals hawkish stance"}])
         conn.commit()
         link_id = list_thread_links(conn, thread["id"])[0]["id"]
-        ok = confirm_thread_link(conn, link_id, "mendukung", also_key_trigger=True)
+        ok = confirm_thread_link(conn, link_id, "mendukung", also_for_reading=True)
         conn.commit()
         assert ok is True
-        row = conn.execute("SELECT is_key_trigger FROM daily_news WHERE id=?", (news_id,)).fetchone()
-        assert row["is_key_trigger"] == 1
+        row = conn.execute("SELECT for_reading FROM daily_news WHERE id=?", (news_id,)).fetchone()
+        assert row["for_reading"] == 1
         link = list_thread_links(conn, thread["id"])[0]
         assert link["link_status"] == "CONFIRMED"
         assert link["stance"] == "MENDUKUNG"  # dinormalisasi upper
@@ -1357,3 +1388,206 @@ def test_attach_thread_suggestions_none_when_no_link(tmp_path):
         rows = [{"id": news_id, "headline": "Warsh signals hawkish stance"}]
         attached = attach_thread_suggestions(conn, rows)
         assert attached[0]["thread_link"] is None
+
+
+# ---------- Faceted Tagging (Addendum C §21, GELOMBANG C-1 fondasi) ----------
+
+def test_create_tag_and_derives_facet(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        tag = create_tag(conn, "who:warsh", aliases=["fed-warsh"], description="Fed governor")
+        conn.commit()
+        assert tag["facet"] == "who"
+        assert tag["aliases"] == ["fed-warsh"]
+        assert tag["usage_count"] == 0
+
+
+def test_create_tag_rejects_missing_colon(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        try:
+            create_tag(conn, "badformat")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "facet:value" in str(exc)
+
+
+def test_create_tag_rejects_unknown_facet(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        try:
+            create_tag(conn, "xx:warsh")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "facet" in str(exc)
+
+
+def test_create_tag_rejects_space_in_value(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        try:
+            create_tag(conn, "who:warsh guy")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "lowercase" in str(exc) or "valid" in str(exc)
+
+
+def test_create_tag_sym_requires_region_prefix(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        try:
+            create_tag(conn, "sym:bbca")  # tanpa region prefix
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "region-prefix" in str(exc)
+        ok = create_tag(conn, "sym:id-bbca")  # dgn region prefix -- lolos
+        assert ok["canonical"] == "sym:id-bbca"
+
+
+def test_create_tag_rejects_duplicate_canonical(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_tag(conn, "who:warsh")
+        conn.commit()
+        try:
+            create_tag(conn, "who:warsh")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "sudah ada" in str(exc)
+
+
+def test_list_tags_filters_by_facet(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_tag(conn, "who:warsh")
+        create_tag(conn, "org:fed")
+        conn.commit()
+        assert len(list_tags(conn)) == 2
+        assert len(list_tags(conn, facet="who")) == 1
+
+
+def test_resolve_tag_by_canonical_and_alias(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_tag(conn, "who:warsh", aliases=["fed-warsh", "warsh"])
+        conn.commit()
+        assert resolve_tag(conn, "who:warsh")["canonical"] == "who:warsh"
+        assert resolve_tag(conn, "fed-warsh")["canonical"] == "who:warsh"
+        assert resolve_tag(conn, "does-not-exist") is None
+
+
+def test_apply_tag_requires_existing_tag(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        try:
+            apply_tag(conn, "daily_news", news_id, "org:unknown")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "tidak ditemukan" in str(exc)
+
+
+def test_apply_tag_rejects_unknown_ref_table(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_tag(conn, "who:warsh")
+        conn.commit()
+        try:
+            apply_tag(conn, "policy_tracker", 1, "who:warsh")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "ref_table" in str(exc)
+
+
+def test_apply_tag_increments_usage_count_and_dedups(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_tag(conn, "who:warsh")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        applied = apply_tag(conn, "daily_news", news_id, "who:warsh")
+        conn.commit()
+        assert applied["canonical"] == "who:warsh"
+        assert list_tags(conn)[0]["usage_count"] == 1
+        try:
+            apply_tag(conn, "daily_news", news_id, "who:warsh")
+            assert False, "harusnya raise ValueError (dedup)"
+        except ValueError as exc:
+            assert "sudah terpasang" in str(exc)
+
+
+def test_apply_tag_resolves_via_alias(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_tag(conn, "who:warsh", aliases=["fed-warsh"])
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        applied = apply_tag(conn, "daily_news", news_id, "fed-warsh")
+        assert applied["canonical"] == "who:warsh"
+
+
+def test_remove_tag_and_unknown_id(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_tag(conn, "who:warsh")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        applied = apply_tag(conn, "daily_news", news_id, "who:warsh")
+        conn.commit()
+        assert remove_tag(conn, applied["id"]) is True
+        assert list_content_tags(conn, "daily_news", news_id) == []
+        assert remove_tag(conn, 9999) is False
+
+
+def test_list_content_tags_for_one_item(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_tag(conn, "who:warsh")
+        create_tag(conn, "org:fed")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        apply_tag(conn, "daily_news", news_id, "who:warsh")
+        apply_tag(conn, "daily_news", news_id, "org:fed")
+        conn.commit()
+        tags = list_content_tags(conn, "daily_news", news_id)
+        assert {t["canonical"] for t in tags} == {"who:warsh", "org:fed"}
+
+
+def test_attach_content_tags_batch(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_tag(conn, "who:warsh")
+        news_id_1 = _seed_news_row(conn, headline="A")
+        news_id_2 = _seed_news_row(conn, headline="B", date="2026-07-16")
+        conn.commit()
+        applied = apply_tag(conn, "daily_news", news_id_1, "who:warsh")
+        conn.commit()
+        rows = [{"id": news_id_1}, {"id": news_id_2}]
+        attached = attach_content_tags(conn, "daily_news", rows)
+        # `id` disertakan (content_tags PK) supaya UI bisa panggil remove_tag()
+        # langsung -- dicek eksplisit, bukan cuma canonical/facet.
+        assert attached[0]["tags"] == [{"id": applied["id"], "canonical": "who:warsh", "facet": "who"}]
+        assert attached[1]["tags"] == []
+
+
+def test_attach_content_tags_empty_rows(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        assert attach_content_tags(conn, "daily_news", []) == []

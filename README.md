@@ -41,13 +41,15 @@ Default password adalah 12345 gunakan untuk login
 
 ## 1. Apa yang dikerjakan
 
-- **SQLite** `kastara-finance.db` dengan **25 tabel** (`db/schema.sql`) — 11
+- **SQLite** `kastara-finance.db` dengan **27 tabel** (`db/schema.sql`) — 11
   tabel Phase A + 3 forward-layer (Phase D) + 7 ekuitas Phase J+
   (`instrument_metadata`, `fundamentals_quarterly`, `earnings_calendar`,
   `sector_benchmark`, `emiten_grade`, `grader_log`, `intake_log`) + 1
   `lane_validation_log` (bar-replay sign-off) + 3 News Threads (Addendum B
   §20, N-1: `news_threads`, `news_thread_links`, `thread_relations`
-  schema-only). `db/connection.py::EXPECTED_TABLES`
+  schema-only) + 2 Faceted Tagging (Addendum C §21, C-1: `tag_dictionary`,
+  `content_tags`; `daily_news` juga dapat 2 kolom baru lewat migrasi kolom —
+  `display_subtitle`, `for_reading`). `db/connection.py::EXPECTED_TABLES`
   adalah daftar otoritatifnya.
 - **Scraper** modular (tiap source bisa jalan sendiri):
   - `scrapers/crypto.py` — CoinGecko + Binance + Alternative.me (BTC OHLCV,
@@ -206,7 +208,7 @@ TLS fingerprint Python — kalau field ini kosong terus di Panel 3, cek dulu apa
 ### Inisialisasi DB (otomatis dipanggil pipeline, tapi bisa manual)
 ```bash
 python -m db.connection
-# -> bikin kastara-finance.db + 25 tabel
+# -> bikin kastara-finance.db + 27 tabel
 ```
 
 ### Jalankan pipeline harian
@@ -297,9 +299,10 @@ python -m web.app
 ```
 Navigasi 9 tab: **1 Snapshot** (cards +
 source_flags + form Manual Backfill preview→confirm), **2 News** (list +
-filter impact + flag key trigger + chip saran News Threads + Add Manual
-Article), **News Threads** (Addendum B §20, N-1: indeks + halaman timeline
-per thread, buat thread baru), **3 Forward**
+filter impact + tandai for Reading + chip saran News Threads + tag facet
+command-palette (Addendum C §21, filter AND/OR) + display_subtitle inline-edit
++ Add Manual Article), **News Threads** (Addendum B §20, N-1: indeks + halaman
+timeline per thread, buat thread baru), **3 Forward**
 (Economic Calendar data asli + forecast/previous/actual otomatis/manual,
 Earnings Emiten + warning posisi terbuka, Expectations manual FedWatch/Dot
 Plot, Positioning COT+ETF otomatis & SBN manual, Policy Tracker manual,
@@ -319,10 +322,10 @@ ritme mingguan/kuartalan INVEST lane (lihat [SOP.md](docs/SOP.md)).
 sejak Fase 3 migrasi Vue, BUKAN lagi tanpa autentikasi). **Tidak ada
 pemanggilan AI/LLM otomatis di mana pun** — "External AI Check" di Panel 4
 itu kolom paste manual (kamu banding hasil tool lain sendiri), bukan Kastara
-yang manggil AI. Auto-suggest News Threads juga rule-based (keyword match),
-BUKAN AI.
+yang manggil AI. Auto-suggest News Threads & validasi tag juga rule-based
+(keyword match / tata bahasa), BUKAN AI.
 
-API: **71 endpoint `/api/*`** (38 GET + 33 POST), semuanya `jsonify(...)` —
+API: **77 endpoint `/api/*`** (40 GET + 37 POST), semuanya `jsonify(...)` —
 `/` menyajikan build Vue (`web/frontend/dist/`), semua data client-side
 fetch. Read-only Phase 1 (`/api/latest`, `/api/daily_market`,
 `/api/asset_ohlcv`, `/api/news`, `/api/assets`, `/api/health`) tidak
@@ -333,8 +336,10 @@ berubah. Grup lain: Phase C write
 (`/api/briefing/send`), Persona (`/api/persona/{run,status}`), Phase J+
 (`/api/universe`, `/api/intake/*`, `/api/emiten/<t>{,/override,/validate_lane}`,
 `/api/sizing/suggest`, `/api/fundamentals/bank_ratios`, `/api/grader_log`,
-`/api/lane_validation_log`, `/api/earnings{,/warnings}`), dan News Threads
-N-1 (`/api/threads*`). Daftar otoritatif = route di `web/app.py`.
+`/api/lane_validation_log`, `/api/earnings{,/warnings}`), News Threads
+N-1 (`/api/threads*`), dan Faceted Tagging C-1 (`/api/tags*`,
+`/api/content_tags*`, `/api/news/for_reading`,
+`/api/news/<id>/display_subtitle`). Daftar otoritatif = route di `web/app.py`.
 
 ### Daily Briefing ke Telegram (Phase E)
 ```bash

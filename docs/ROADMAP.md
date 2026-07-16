@@ -528,6 +528,68 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       SFC baru tidak error; console-check saja tidak cukup karena route
       lazy-load di balik auth guard tidak pernah di-import kalau belum
       login).
+- [x] ~~Faceted Tagging C-1 fondasi (Addendum C §21, adendum Giel)~~ — **C-1
+      saja** (fondasi), C-2 (feed manual ke persona, tag-based thread
+      matching) SENGAJA belum dibangun — kontrak sendiri MENGUNCI ini
+      (§21.9 keputusan #7: "bangun C-1+C-2 sekaligus" eksplisit masuk daftar
+      "TIDAK dilakukan", beda dari News Threads yang cuma direkomendasikan).
+      **5 hal dalam 1 paket**: (a) kamus tag facet controlled-vocabulary
+      (geo/org/who/sym/theme/sec, mulai KOSONG), (b) UI command-palette
+      tagging, (c) `display_subtitle` (catatan Giel, headline asli TAK
+      PERNAH ditimpa), (d) rename fungsional `is_key_trigger` →
+      `for_reading` (tag = klasifikasi objektif, for_reading = kurasi
+      subjektif — 2 pertanyaan beda yang dulu dirangkap 1 flag).
+      **Schema**: 2 tabel baru (`tag_dictionary`, `content_tags` — 25→27
+      tabel) + 2 kolom baru di `daily_news` (`display_subtitle`,
+      `for_reading`) lewat `_COLUMN_MIGRATIONS` (BEDA dari tabel baru News
+      Threads — `daily_news` sudah punya data live, jadi lewat jalur
+      migrasi kolom, bukan `CREATE TABLE` — pola sama `asset_context_
+      weight.level`), termasuk backfill one-time `for_reading =
+      is_key_trigger` (idempotent, tidak jalan ulang tiap `init_db()`).
+      **Rename penuh, bukan alias**: `flag_key_trigger()` →
+      `set_for_reading()`, `/api/news/flag_key` → `/api/news/for_reading`,
+      `confirm_thread_link`'s `also_key_trigger` → `also_for_reading` —
+      disapu di ~8 file (writes.py, app.py, 2 file pipeline, 2 view Vue, 3
+      file test) via grep menyeluruh, `is_key_trigger` LAMA dibiarkan beku
+      di schema (jangan DROP, DB hidup) tapi tidak dibaca/ditulis lagi.
+      **Backend baru**: `create_tag` (validasi tata bahasa — facet:value,
+      lowercase-hyphen, `sym:` wajib region-prefix — regex PERTAMA di
+      writes.py, tapi idiom raise-ValueError sama persis fungsi lain),
+      `list_tags`/`resolve_tag` (alias), `apply_tag` (guard tag harus ada
+      di kamus dulu + dedup + usage_count naik), `remove_tag`,
+      `list_content_tags`/`attach_content_tags` (batch, mirror
+      `attach_thread_suggestions`). 6 endpoint `/api/tags*`+`/api/content_
+      tags*` baru + `/api/news/<id>/display_subtitle`, semua mutasi via
+      POST (bukan PATCH — konsisten konvensi app ini).
+      **Frontend**: `TagAutocomplete.vue` baru (bungkus PrimeVue
+      `AutoComplete`, sudah tersedia zero-dep di v4.5.5 — grouped dropdown
+      by facet + chip+remove-X bawaan, dikonfirmasi via `npm run build`
+      generate chunk `TagAutocomplete-*.js` beneran, bukan asumsi dari
+      package.json) dipakai 3 tempat: kolom Tag per-baris `NewsView.vue`,
+      filter-chip bar (AND/OR toggle) di News, filter tag di
+      `ReadingView.vue`. `NewsView.vue` juga dapat inline-edit
+      `display_subtitle` (endpoint sempat tidak ke-reach dari UI mana pun
+      sebelum ditambahkan — ketahuan saat review sendiri) + collapsible
+      "Telusuri Semua Tag" (pola sama `source_flags` di SnapshotView,
+      pakai `DataTable.vue` apa adanya).
+      **Bug ketemu saat implementasi**: `attach_content_tags()` awalnya
+      TIDAK menyertakan `content_tags.id` per tag (cuma canonical+facet) —
+      UI tidak akan bisa panggil `remove_tag()` sama sekali tanpa itu.
+      Ketahuan sebelum sempat jadi masalah produksi (saat menyambungkan ke
+      NewsView, bukan lewat bug report) — diperbaiki + test terkait di-update.
+      35 test baru (guard tata bahasa 4 kasus, dedup create/apply, alias
+      resolve, batch attach, migrasi backfill). 354 test hijau total.
+      **Diverifikasi live**: `init_db()` ke DB asli (1.973 baris `daily_news`
+      real — 100% `for_reading` cocok `is_key_trigger` pasca-backfill,
+      meski nilainya seragam 0 krn belum ada yang pernah di-flag "key"
+      sebelum sesi ini), Flask test-client round-trip penuh (create tag →
+      apply ke baris berita ASLI → list → remove → cek benar-benar hilang)
+      + 4 guard tata bahasa 400 semua benar, `npm run build` sukses (356
+      module). Tag verifikasi (`who:warsh-verify`) SENGAJA dibiarkan di
+      kamus asli (usage_count=0 setelah di-lepas) — tidak ada endpoint
+      hapus-dari-kamus di C-1 (memang bukan fitur C-1; pembersihan kamus
+      lewat review kuartalan §21.7, bukan tombol ad-hoc) — harmless, akan
+      kena saring natural saat review kuartalan pertama.
 - [x] ~~Auto-isi `actual` HIGH-importance dari investing.com (pass kedua)~~
       — riset awal SEMPAT menyimpulkan skip (lihat percobaan pertama: kena
       HTTP 429 yang tidak pulih setelah ~5-6 request cepat, dan endpoint AJAX

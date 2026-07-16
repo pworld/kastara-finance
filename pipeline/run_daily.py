@@ -158,8 +158,12 @@ def insert_news_dedup(conn: sqlite3.Connection, items: list[dict[str, Any]]) -> 
     inserted = 0
     for it in items:
         cur = conn.execute(
+            # Addendum C §21.2: for_reading gantikan is_key_trigger secara
+            # fungsional -- baris baru cuma set for_reading=0 (is_key_trigger
+            # beku sejak migrasi, biarkan DEFAULT 0 bawaan schema, jangan
+            # di-set lagi di sini).
             "INSERT OR IGNORE INTO daily_news "
-            "(date, source, headline, raw_url, impact_level, is_key_trigger, created_at) "
+            "(date, source, headline, raw_url, impact_level, for_reading, created_at) "
             "VALUES (?, ?, ?, ?, ?, 0, ?)",
             (it["date"], it["source"], it["headline"], it["raw_url"],
              it["impact_level"], created_at()),

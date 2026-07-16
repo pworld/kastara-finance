@@ -374,8 +374,11 @@ def news():
     date = request.args.get("date")            # exact match (dipakai Panel 4 key news)
     date_from = request.args.get("date_from")  # rentang (Panel 2 filter from/to)
     date_to = request.args.get("date_to")
-    key_only = request.args.get("key_only")  # "1"/truthy -> cuma yang di-flag key
-    sql = "SELECT id, date, source, headline, raw_url, impact_level, is_key_trigger FROM daily_news"
+    # Addendum C §21.2: key_only -> for_reading (rename fungsional dari
+    # is_key_trigger -- kurasi "penting utk dibaca", beda dari tag klasifikasi).
+    reading_only = request.args.get("for_reading")
+    sql = ("SELECT id, date, source, headline, raw_url, impact_level, "
+           "display_subtitle, for_reading FROM daily_news")
     where, params = [], []
     if impact:
         where.append("impact_level = ?")
@@ -389,8 +392,8 @@ def news():
     if date_to:
         where.append("date <= ?")
         params.append(date_to)
-    if key_only and key_only not in ("0", "false", ""):
-        where.append("is_key_trigger = 1")
+    if reading_only and reading_only not in ("0", "false", ""):
+        where.append("for_reading = 1")
     if where:
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY date DESC, id DESC LIMIT ?"
@@ -401,6 +404,8 @@ def news():
         # ada, biar NewsView bisa render chip "Saran: <thread>?" tanpa
         # endpoint terpisah.
         rows = writes.attach_thread_suggestions(conn, rows)
+        # Faceted Tagging C-1 (Addendum C §21): tempel tag terpasang per baris.
+        rows = writes.attach_content_tags(conn, "daily_news", rows)
     return jsonify(rows)
 
 
@@ -498,15 +503,83 @@ def backfill_all_commit():
     return jsonify({"results": results})
 
 
-# ---------- PHASE C: Panel 2 — key trigger + manual article ----------
+# ---------- PHASE C: Panel 2 — for_reading curation + manual article
+# (Addendum C §21.2: was "flag_key" / is_key_trigger, renamed) ----------
 
-@app.post("/api/news/flag_key")
-def news_flag_key():
+@app.post("/api/news/for_reading")
+def news_set_for_reading():
     body = request.get_json(force=True)
     with get_connection() as conn:
-        ok = writes.flag_key_trigger(conn, int(body["id"]), bool(body.get("is_key", True)))
+        ok = writes.set_for_reading(conn, int(body["id"]), bool(body.get("for_reading", True)))
         conn.commit()
     return jsonify({"ok": ok})
+
+
+@app.post("/api/news/<int:news_id>/display_subtitle")
+def news_set_display_subtitle(news_id):
+    body = request.get_json(force=True)
+    with get_connection() as conn:
+        ok = writes.set_display_subtitle(conn, news_id, body.get("display_subtitle"))
+        conn.commit()
+    if not ok:
+        return jsonify({"error": "berita tidak ditemukan"}), 404
+    return jsonify({"ok": True})
+
+
+# ---------- Faceted Tagging (Addendum C §21, GELOMBANG C-1) ----------
+
+@app.get("/api/tags")
+def tags_list():
+    with get_connection() as conn:
+        rows = writes.list_tags(conn, facet=request.args.get("facet"))
+    return jsonify(rows)
+
+
+@app.post("/api/tags")
+def tags_create():
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            row = writes.create_tag(
+                conn, body.get("canonical", ""), aliases=body.get("aliases"),
+                description=body.get("description"),
+            )
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(row)
+
+
+@app.post("/api/content_tags")
+def content_tags_apply():
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            row = writes.apply_tag(
+                conn, body.get("ref_table", ""), body.get("ref_id"),
+                body.get("tag", ""), source=body.get("source", "MANUAL"),
+            )
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(row)
+
+
+@app.post("/api/content_tags/<int:content_tag_id>/remove")
+def content_tags_remove(content_tag_id):
+    with get_connection() as conn:
+        ok = writes.remove_tag(conn, content_tag_id)
+        conn.commit()
+    if not ok:
+        return jsonify({"error": "tag pada konten ini tidak ditemukan"}), 404
+    return jsonify({"ok": True})
+
+
+@app.get("/api/content_tags/<ref_table>/<int:ref_id>")
+def content_tags_list(ref_table, ref_id):
+    with get_connection() as conn:
+        rows = writes.list_content_tags(conn, ref_table, ref_id)
+    return jsonify(rows)
 
 
 @app.post("/api/articles/add")
@@ -1194,7 +1267,7 @@ def thread_link_confirm(link_id):
         with get_connection() as conn:
             ok = writes.confirm_thread_link(
                 conn, link_id, body.get("stance", ""),
-                also_key_trigger=bool(body.get("also_key_trigger")),
+                also_for_reading=bool(body.get("also_for_reading")),
             )
             conn.commit()
     except ValueError as exc:

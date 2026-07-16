@@ -52,12 +52,12 @@ def test_key_news_shown_and_filtered(tmp_path):
     conn = _seed_db(tmp_path)
     conn.execute(
         "INSERT INTO daily_news (date, source, headline, raw_url, impact_level, "
-        "is_key_trigger, created_at) VALUES ('2026-07-08', 'CNBC', "
+        "for_reading, created_at) VALUES ('2026-07-08', 'CNBC', "
         "'Fed signals rate cut', 'https://x.test', 'HIGH', 1, '')"
     )
     conn.execute(
         "INSERT INTO daily_news (date, source, headline, raw_url, impact_level, "
-        "is_key_trigger, created_at) VALUES ('2026-07-08', 'CNBC', "
+        "for_reading, created_at) VALUES ('2026-07-08', 'CNBC', "
         "'Berita biasa', 'https://x.test', 'LOW', 0, '')"
     )
     conn.commit()

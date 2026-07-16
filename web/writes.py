@@ -22,6 +22,7 @@ Konvensi `reading_workspace.lens` (Panel 4 & 6, bukan enum ketat di DB):
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from typing import Any
 
@@ -30,16 +31,35 @@ from scrapers.base import created_at, keyword_matches, today_wib
 READING_LENSES = ("GEMA", "LEON", "AKELA", "RIVAN")
 
 
-# ---------- Panel 2: flag key trigger ----------
+# ---------- Panel 2: for_reading curation (Addendum C §21.2 — renamed dari
+# is_key_trigger; is_key_trigger LAMA dibiarkan beku di schema, jangan DROP,
+# DB hidup, tapi tidak dibaca/ditulis lagi setelah migrasi one-time di
+# db/connection.py::_migrate_columns()) ----------
 
-def flag_key_trigger(conn: sqlite3.Connection, news_id: int, is_key: bool = True) -> bool:
-    """Update daily_news.is_key_trigger by id. Return False kalau id tidak ada."""
+def set_for_reading(conn: sqlite3.Connection, news_id: int, for_reading: bool = True) -> bool:
+    """Update daily_news.for_reading by id. Return False kalau id tidak ada.
+    Kurasi ("penting untuk saya, sekarang") -- beda pertanyaan dari tag
+    (klasifikasi "berita ini tentang apa"), lihat docstring modul §21.0."""
     exists = conn.execute("SELECT 1 FROM daily_news WHERE id = ?", (news_id,)).fetchone()
     if not exists:
         return False
     conn.execute(
-        "UPDATE daily_news SET is_key_trigger = ? WHERE id = ?",
-        (1 if is_key else 0, news_id),
+        "UPDATE daily_news SET for_reading = ? WHERE id = ?",
+        (1 if for_reading else 0, news_id),
+    )
+    return True
+
+
+def set_display_subtitle(conn: sqlite3.Connection, news_id: int, display_subtitle: str | None) -> bool:
+    """Update daily_news.display_subtitle by id -- judul/catatan Giel di
+    kolom TERPISAH (headline asli TIDAK PERNAH ditimpa, keputusan #3, pola
+    sama literal_statement vs giel_inference). Return False kalau id tidak ada."""
+    exists = conn.execute("SELECT 1 FROM daily_news WHERE id = ?", (news_id,)).fetchone()
+    if not exists:
+        return False
+    conn.execute(
+        "UPDATE daily_news SET display_subtitle = ? WHERE id = ?",
+        (display_subtitle, news_id),
     )
     return True
 
@@ -872,11 +892,12 @@ def suggest_thread_links(conn: sqlite3.Connection, news_items: list[dict[str, An
 
 
 def confirm_thread_link(
-    conn: sqlite3.Connection, link_id: int, stance: str, *, also_key_trigger: bool = False,
+    conn: sqlite3.Connection, link_id: int, stance: str, *, also_for_reading: bool = False,
 ) -> bool:
     """CONFIRM 1 link dgn stance (WAJIB, anti-confirmation-funnel keputusan
-    #3). `also_key_trigger=True` sekalian set daily_news.is_key_trigger lewat
-    flag_key_trigger() yang SUDAH ADA (reuse, bukan duplikat write path).
+    #3). `also_for_reading=True` sekalian set daily_news.for_reading lewat
+    set_for_reading() yang SUDAH ADA (reuse, bukan duplikat write path;
+    param ini dulu bernama also_key_trigger sebelum Addendum C §21.2 rename).
     Return False kalau link_id tidak ada."""
     stance = (stance or "").upper()
     if stance not in ALLOWED_STANCE:
@@ -890,8 +911,8 @@ def confirm_thread_link(
         "UPDATE news_thread_links SET link_status = 'CONFIRMED', stance = ?, linked_at = ? WHERE id = ?",
         (stance, today_wib(), link_id),
     )
-    if also_key_trigger and link["ref_table"] == "daily_news":
-        flag_key_trigger(conn, link["ref_id"], True)
+    if also_for_reading and link["ref_table"] == "daily_news":
+        set_for_reading(conn, link["ref_id"], True)
     return True
 
 
@@ -1025,3 +1046,180 @@ def attach_thread_suggestions(conn: sqlite3.Connection, news_rows: list[dict[str
             "link_status": link["link_status"],
         } if link else None
     return news_rows
+
+
+# ---------- Faceted Tagging (Addendum C §21, GELOMBANG C-1 fondasi) ----------
+# Tag menjawab "berita ini TENTANG apa" (klasifikasi, objektif, controlled
+# vocabulary) -- BEDA pertanyaan dari for_reading (kurasi, subjektif, di atas).
+# Rule-based di sini pun murni validasi tata bahasa, BUKAN LLM (konsisten
+# filosofi impact scoring §21.0). C-2 (auto-suggest tag, feed manual ke
+# persona, tag-based thread matching) SENGAJA belum dibangun -- lihat
+# docs/ROADMAP.md.
+
+ALLOWED_FACETS = {"geo", "org", "who", "sym", "theme", "sec"}
+ALLOWED_CONTENT_TAG_REF_TABLES = {"daily_news", "manual_articles", "news_threads"}
+_TAG_VALUE_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+
+
+def _validate_tag_grammar(canonical: str) -> str:
+    """Tata bahasa tag (§21.1): "facet:value", facet dari ALLOWED_FACETS,
+    value lowercase+hyphen (tanpa spasi/karakter lain), `sym:` WAJIB
+    region-prefix (mis. "id-bbca" -- dideteksi lewat keberadaan hyphen,
+    membedakan dari ticker polos tanpa region spt "bbca"). Return facet
+    (dipakai caller, single source of truth -- bukan param terpisah yang
+    bisa mismatch dgn canonical). Raise ValueError kalau melanggar."""
+    canonical = (canonical or "").strip()
+    if ":" not in canonical:
+        raise ValueError(f"tag '{canonical}' harus format facet:value (mis. 'who:warsh')")
+    facet, _, value = canonical.partition(":")
+    if facet not in ALLOWED_FACETS:
+        raise ValueError(f"facet '{facet}' tidak dikenal -- pilihan: {'/'.join(sorted(ALLOWED_FACETS))}")
+    if not value or not _TAG_VALUE_RE.match(value):
+        raise ValueError(
+            f"value tag '{value}' tidak valid -- lowercase, hyphen (bukan spasi), "
+            "tanpa karakter lain (mis. 'rate-policy', bukan 'Rate Policy'/'rate_policy')"
+        )
+    if facet == "sym" and "-" not in value:
+        raise ValueError(
+            f"sym:{value} wajib region-prefix (mis. 'sym:id-bbca'/'sym:us-tsla'), "
+            "bukan ticker polos tanpa region"
+        )
+    return facet
+
+
+def _decode_tag(row: dict[str, Any]) -> dict[str, Any]:
+    row["aliases"] = json.loads(row["aliases"]) if row["aliases"] else []
+    return row
+
+
+def create_tag(
+    conn: sqlite3.Connection, canonical: str, aliases: list[str] | None = None,
+    description: str | None = None,
+) -> dict[str, Any]:
+    """Tambah tag baru ke kamus. Facet DIDERIVE dari canonical (bukan param
+    terpisah) -- satu-satunya pintu nambah kamus (§21.3 "+ buat tag baru").
+    Guard: tata bahasa (lihat _validate_tag_grammar) + UNIQUE canonical."""
+    canonical = canonical.strip().lower()
+    facet = _validate_tag_grammar(canonical)
+    now = today_wib()
+    cur = conn.execute(
+        "INSERT OR IGNORE INTO tag_dictionary "
+        "(canonical, facet, aliases, description, usage_count, created_at) "
+        "VALUES (?, ?, ?, ?, 0, ?)",
+        (canonical, facet, json.dumps(aliases or []), description, now),
+    )
+    if cur.rowcount == 0:
+        raise ValueError(f"tag '{canonical}' sudah ada di kamus")
+    return _decode_tag(dict(conn.execute(
+        "SELECT * FROM tag_dictionary WHERE id = ?", (cur.lastrowid,)
+    ).fetchone()))
+
+
+def list_tags(conn: sqlite3.Connection, facet: str | None = None) -> list[dict[str, Any]]:
+    """Semua tag di kamus, terpakai dulu. Filter opsional by facet."""
+    sql = "SELECT * FROM tag_dictionary"
+    params: list[Any] = []
+    if facet:
+        sql += " WHERE facet = ?"
+        params.append(facet)
+    sql += " ORDER BY usage_count DESC, canonical ASC"
+    return [_decode_tag(dict(r)) for r in conn.execute(sql, params).fetchall()]
+
+
+def resolve_tag(conn: sqlite3.Connection, name_or_alias: str) -> dict[str, Any] | None:
+    """Cari tag by canonical EXACT match, atau by alias (JSON array
+    containment). Vocab kecil di awal -- Python-side loop cukup, tidak perlu
+    index alias terpisah."""
+    name_or_alias = (name_or_alias or "").strip().lower()
+    row = conn.execute(
+        "SELECT * FROM tag_dictionary WHERE canonical = ?", (name_or_alias,)
+    ).fetchone()
+    if row:
+        return _decode_tag(dict(row))
+    for r in conn.execute("SELECT * FROM tag_dictionary").fetchall():
+        aliases = json.loads(r["aliases"]) if r["aliases"] else []
+        if name_or_alias in aliases:
+            return _decode_tag(dict(r))
+    return None
+
+
+def apply_tag(
+    conn: sqlite3.Connection, ref_table: str, ref_id: int, tag_name: str, source: str = "MANUAL",
+) -> dict[str, Any]:
+    """Pasang 1 tag ke 1 konten (berita/artikel/thread). Guard: ref_table
+    dikenal, tag harus SUDAH ada di kamus (resolve_tag -- "buat dulu" alur
+    §21.3), dedup (INSERT OR IGNORE + rowcount check, pola
+    add_thread_link_manual). Naikkan usage_count (dipakai review kuartalan
+    §21.7)."""
+    if ref_table not in ALLOWED_CONTENT_TAG_REF_TABLES:
+        raise ValueError(
+            f"ref_table '{ref_table}' tidak dikenal -- pilihan: "
+            f"{'/'.join(sorted(ALLOWED_CONTENT_TAG_REF_TABLES))}"
+        )
+    tag = resolve_tag(conn, tag_name)
+    if tag is None:
+        raise ValueError(f"tag '{tag_name}' tidak ditemukan di kamus -- buat dulu")
+    now = today_wib()
+    cur = conn.execute(
+        "INSERT OR IGNORE INTO content_tags (ref_table, ref_id, tag_id, source, created_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (ref_table, ref_id, tag["id"], source, now),
+    )
+    if cur.rowcount == 0:
+        raise ValueError(f"tag '{tag['canonical']}' sudah terpasang di konten ini")
+    conn.execute(
+        "UPDATE tag_dictionary SET usage_count = usage_count + 1 WHERE id = ?", (tag["id"],)
+    )
+    return {
+        "id": cur.lastrowid, "ref_table": ref_table, "ref_id": ref_id,
+        "tag_id": tag["id"], "canonical": tag["canonical"], "facet": tag["facet"], "source": source,
+    }
+
+
+def remove_tag(conn: sqlite3.Connection, content_tag_id: int) -> bool:
+    """Lepas 1 tag dari 1 konten by content_tags.id (bukan usage_count
+    dikurangi -- histori pemakaian tetap dihitung naik, konsisten dgn
+    grader_log/prediction_log yang juga append-only utk audit trail)."""
+    exists = conn.execute("SELECT 1 FROM content_tags WHERE id = ?", (content_tag_id,)).fetchone()
+    if not exists:
+        return False
+    conn.execute("DELETE FROM content_tags WHERE id = ?", (content_tag_id,))
+    return True
+
+
+def list_content_tags(conn: sqlite3.Connection, ref_table: str, ref_id: int) -> list[dict[str, Any]]:
+    """Semua tag terpasang di 1 konten spesifik (dipakai halaman detail)."""
+    rows = conn.execute(
+        "SELECT c.id, c.tag_id, c.source, c.created_at, t.canonical, t.facet "
+        "FROM content_tags c JOIN tag_dictionary t ON t.id = c.tag_id "
+        "WHERE c.ref_table = ? AND c.ref_id = ? ORDER BY t.facet, t.canonical",
+        (ref_table, ref_id),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def attach_content_tags(conn: sqlite3.Connection, ref_table: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Tempel tag ke SEKUMPULAN row sekaligus (mis. daftar berita) -- 1 query
+    batch, bukan N+1. Mirrors attach_thread_suggestions()'s shape. Set
+    row["tags"] = [{id, canonical, facet}, ...] per row -- `id` (content_tags
+    PK, BUKAN tag_id) disertakan supaya UI bisa panggil remove_tag() langsung
+    tanpa query tambahan."""
+    if not rows:
+        return rows
+    ids = [r["id"] for r in rows]
+    placeholders = ",".join("?" for _ in ids)
+    tagged = conn.execute(
+        f"SELECT c.id, c.ref_id, t.canonical, t.facet FROM content_tags c "
+        f"JOIN tag_dictionary t ON t.id = c.tag_id "
+        f"WHERE c.ref_table = ? AND c.ref_id IN ({placeholders}) "
+        f"ORDER BY c.ref_id, t.facet, t.canonical",
+        [ref_table, *ids],
+    ).fetchall()
+    by_ref: dict[int, list[dict[str, Any]]] = {}
+    for r in tagged:
+        by_ref.setdefault(r["ref_id"], []).append(
+            {"id": r["id"], "canonical": r["canonical"], "facet": r["facet"]}
+        )
+    for row in rows:
+        row["tags"] = by_ref.get(row["id"], [])
+    return rows

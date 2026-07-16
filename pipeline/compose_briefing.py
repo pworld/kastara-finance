@@ -50,7 +50,7 @@ def compose_daily_briefing(conn: sqlite3.Connection, date: str) -> str:
     ).strip()
 
     key_events = conn.execute(
-        "SELECT headline FROM daily_news WHERE date = ? AND is_key_trigger = 1 "
+        "SELECT headline FROM daily_news WHERE date = ? AND for_reading = 1 "
         "ORDER BY id", (date,),
     ).fetchall()
 

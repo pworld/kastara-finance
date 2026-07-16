@@ -125,6 +125,15 @@ td a:hover { color: var(--accent); text-decoration: underline; }
 .badge.link-confirmed { background: rgba(63,185,80,.18); color: var(--ok); }
 .badge.link-rejected { background: rgba(110,118,129,.2); color: var(--low); }
 
+/* Faceted Tagging (Addendum C §21.1) -- 1 warna per facet (6 dimensi tetap,
+   vocab isinya sendiri dimulai kosong). Dipakai badge tag & dropdown grup. */
+.badge.facet-geo { background: rgba(59,130,246,.18); color: #3b82f6; }
+.badge.facet-org { background: rgba(163,113,247,.18); color: #a371f7; }
+.badge.facet-who { background: rgba(247,120,186,.18); color: #f778ba; }
+.badge.facet-sym { background: rgba(45,212,191,.18); color: #2dd4bf; }
+.badge.facet-theme { background: rgba(251,146,60,.18); color: #fb923c; }
+.badge.facet-sec { background: rgba(163,190,80,.18); color: #a3be50; }
+
 tr.news-key { background: rgba(76,154,255,.08); }
 tr.news-key td:first-child { border-left: 3px solid var(--accent); }
 .btn.key-on { background: rgba(76,154,255,.18); color: var(--accent);

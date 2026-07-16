@@ -66,7 +66,7 @@ def test_briefing_key_events_shown(tmp_path):
         _seed_market(conn, "2026-07-08")
         conn.execute(
             "INSERT INTO daily_news (date, source, headline, raw_url, impact_level, "
-            "is_key_trigger, created_at) VALUES ('2026-07-08', 'CNBC', "
+            "for_reading, created_at) VALUES ('2026-07-08', 'CNBC', "
             "'Fed signals rate cut', 'https://x.test', 'HIGH', 1, '')"
         )
         conn.commit()

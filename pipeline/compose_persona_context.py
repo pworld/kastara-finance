@@ -113,10 +113,10 @@ def _value_line(history: list[dict[str, Any]], column: str, label: str, decimals
 def _key_news_lines(conn: sqlite3.Connection, date: str) -> list[str]:
     rows = conn.execute(
         "SELECT headline, source, impact_level FROM daily_news "
-        "WHERE date = ? AND is_key_trigger = 1 ORDER BY id", (date,),
+        "WHERE date = ? AND for_reading = 1 ORDER BY id", (date,),
     ).fetchall()
     if not rows:
-        return ["(belum ada berita yang di-flag key hari ini)"]
+        return ["(belum ada berita yang ditandai for_reading hari ini)"]
     return [f"- [{r['impact_level']}] {r['headline']} ({r['source']})" for r in rows]
 
 

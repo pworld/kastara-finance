@@ -49,3 +49,13 @@ export const THREAD_STATUS_CLASS = {
 export const LINK_STATUS_CLASS = {
   SUGGESTED: 'link-suggested', CONFIRMED: 'link-confirmed', REJECTED: 'link-rejected',
 }
+
+// Faceted Tagging (Addendum C §21.1) -- badge/chip color per facet. Vocab
+// dimulai KOSONG (tag tumbuh dari pemakaian) tapi facet-nya sendiri FIXED (6).
+export const FACET_COLOR = {
+  geo: 'facet-geo', org: 'facet-org', who: 'facet-who',
+  sym: 'facet-sym', theme: 'facet-theme', sec: 'facet-sec',
+}
+export const FACET_LABELS = {
+  geo: 'Geo', org: 'Organisasi', who: 'Orang', sym: 'Simbol', theme: 'Tema', sec: 'Sektor',
+}

@@ -47,6 +47,8 @@ EXPECTED_TABLES = [
     "news_threads",
     "news_thread_links",
     "thread_relations",
+    "tag_dictionary",
+    "content_tags",
 ]
 
 
@@ -145,6 +147,10 @@ _COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
         ("outcome_6m", "TEXT"),
         ("outcome_notes", "TEXT"),
     ],
+    "daily_news": [
+        ("display_subtitle", "TEXT"),
+        ("for_reading", "INTEGER"),
+    ],
 }
 
 
@@ -162,6 +168,16 @@ def _migrate_columns(conn: sqlite3.Connection) -> None:
                     conn.execute(
                         "UPDATE asset_context_weight SET level = 'INSTRUMENT' "
                         "WHERE level IS NULL"
+                    )
+                if table == "daily_news" and col == "for_reading":
+                    # Addendum C §21.2: for_reading gantikan is_key_trigger
+                    # secara FUNGSIONAL (klasifikasi tag vs kurasi baca beda
+                    # pertanyaan) -- copy nilai lama SEKALI saat kolom baru
+                    # ini pertama kali dibuat. is_key_trigger TETAP di schema
+                    # (jangan DROP, DB hidup) tapi beku sejak titik ini --
+                    # semua baca/tulis berikutnya pakai for_reading.
+                    conn.execute(
+                        "UPDATE daily_news SET for_reading = is_key_trigger"
                     )
 
 

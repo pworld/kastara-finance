@@ -2,7 +2,8 @@
 impact scoring (BUKAN AI/LLM).
 
 Output ke daily_news: source, headline, raw_url, impact_level (HIGH/MED/LOW).
-is_key_trigger DEFAULT 0 (Giel flag manual nanti).
+for_reading DEFAULT 0 (Giel flag manual nanti -- rename fungsional dari
+is_key_trigger, Addendum C §21.2).
 
 Health check per feed tiap run (`check_feed_health`) — pola sama dengan
 `source_flags` API di Phase A: feed mati harus KELIHATAN tiap run lewat

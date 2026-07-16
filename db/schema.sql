@@ -349,6 +349,36 @@ CREATE TABLE IF NOT EXISTS thread_relations (
     created_at TEXT
 );
 
+-- 26. Tag dictionary (Addendum C §21.1/21.2) -- controlled vocabulary utk tag
+-- facet (geo/org/who/sym/theme/sec, prefix "facet:value"). SENGAJA mulai
+-- KOSONG -- tag tumbuh dari pemakaian, bukan didesain 200 tag di depan.
+-- `usage_count` naik tiap kali tag dipasang (apply_tag), dipakai review
+-- kuartalan (§21.7) buang tag yang jarang dipakai.
+CREATE TABLE IF NOT EXISTS tag_dictionary (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    canonical TEXT UNIQUE NOT NULL,
+    facet TEXT NOT NULL,
+    aliases TEXT,
+    description TEXT,
+    usage_count INTEGER DEFAULT 0,
+    created_at TEXT
+);
+
+-- 27. Content tags (Addendum C §21.2) -- polymorphic, pola sama
+-- news_thread_links (ref_table/ref_id, BUKAN foreign key literal krn beda
+-- tabel sumber) TAPI ref_table set BEDA: daily_news/manual_articles/
+-- news_threads (tidak ada policy_tracker di sini -- itu domain News Threads,
+-- bukan tagging). `source` bedakan tag yang Giel pasang manual vs (nanti,
+-- C-2) hasil auto-suggest rule-based.
+CREATE TABLE IF NOT EXISTS content_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ref_table TEXT NOT NULL,
+    ref_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL REFERENCES tag_dictionary(id),
+    source TEXT DEFAULT 'MANUAL',
+    created_at TEXT
+);
+
 -- Index untuk performa query range-tanggal saat histori membesar (5 tahun+).
 
 -- asset_ohlcv: query utama selalu "WHERE instrument = ? ORDER BY date" (chart,
@@ -411,3 +441,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_earnings_calendar_dedup
 -- IGNORE di web/writes.py::suggest_thread_links()).
 CREATE UNIQUE INDEX IF NOT EXISTS idx_news_thread_links_dedup
     ON news_thread_links(thread_id, ref_table, ref_id);
+
+-- content_tags (Addendum C §21.2): 1 tag cuma sekali per konten (dedup di
+-- level DB, bukan cek SELECT dulu di app code) -- pola sama idx_news_thread_links_dedup.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_content_tags_dedup
+    ON content_tags(ref_table, ref_id, tag_id);

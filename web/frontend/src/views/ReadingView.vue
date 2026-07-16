@@ -1,17 +1,37 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Dialog from 'primevue/dialog'
+import TagAutocomplete from '../components/TagAutocomplete.vue'
 import { get, post } from '../lib/api'
-import { today, LENS_LABELS } from '../lib/format'
+import { today, LENS_LABELS, FACET_COLOR } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
 
 // Port dari web/static/js/panel4.js (lihat docs/migrationFE.md Fase 2).
 const { toast } = useAppToast()
 
-// ---------- Berita Key Hari Ini ----------
-const keyNews = ref([])
+// ---------- Berita for_reading Hari Ini (Addendum C §21.2/21.6: rename
+// fungsional dari "key news" -- kurasi "penting utk dibaca", beda dari tag
+// klasifikasi) + filter by tag (§21.3, "filterable by tag") ----------
+const readingNews = ref([])
 onMounted(async () => {
-  keyNews.value = await get('/api/news', { date: today(), key_only: 1, limit: 50 })
+  readingNews.value = await get('/api/news', { date: today(), for_reading: 1, limit: 50 })
+})
+
+const filterTags = ref([])
+function addFilterTag(tag) {
+  if (!filterTags.value.includes(tag.canonical)) filterTags.value.push(tag.canonical)
+}
+function removeFilterTag(canonical) {
+  filterTags.value = filterTags.value.filter((c) => c !== canonical)
+}
+// Kosmetik AND semantics: berita harus punya SEMUA tag terpilih -- cukup utk
+// Reading Page (kontrak cuma minta "filterable by tag" di sini, AND/OR
+// toggle penuh ada di News page).
+const filteredReadingNews = computed(() => {
+  if (!filterTags.value.length) return readingNews.value
+  return readingNews.value.filter((r) =>
+    filterTags.value.every((c) => (r.tags || []).some((t) => t.canonical === c))
+  )
 })
 
 // ---------- 4 Analisa (AI) ----------
@@ -65,24 +85,32 @@ async function saveReading() {
 
 <template>
   <section>
-    <h2>Berita Key Hari Ini</h2>
+    <h2>Berita for Reading Hari Ini</h2>
     <div class="panel">
-      <div v-if="!keyNews.length" class="empty-inline">belum ada berita yang di-flag key hari ini — flag di Panel 2 (News) dulu.</div>
+      <div class="chart-head" style="margin-bottom:12px">
+        <label class="src">Filter tag</label>
+        <span v-for="c in filterTags" :key="c" class="badge" :class="FACET_COLOR[c.split(':')[0]]" style="margin-right:4px">
+          {{ c }} <a href="#" style="color:inherit" @click.prevent="removeFilterTag(c)">&times;</a>
+        </span>
+        <TagAutocomplete :excludeCanonicals="filterTags" placeholder="filter by tag..." @select="addFilterTag" />
+      </div>
+      <div v-if="!filteredReadingNews.length" class="empty-inline">belum ada berita for_reading hari ini (sesuai filter) — tandai di Panel News dulu.</div>
       <table v-else>
         <thead><tr><th>Impact</th><th>Headline</th><th>Sumber</th></tr></thead>
         <tbody>
-          <tr v-for="r in keyNews" :key="r.id">
+          <tr v-for="r in filteredReadingNews" :key="r.id">
             <td><span class="badge" :class="r.impact_level">{{ r.impact_level }}</span></td>
             <td>
               <a v-if="r.raw_url" :href="r.raw_url" target="_blank" rel="noopener">{{ r.headline }}</a>
               <span v-else>{{ r.headline }}</span>
+              <div v-if="r.display_subtitle" class="src">✎ {{ r.display_subtitle }}</div>
             </td>
             <td class="src">{{ r.source }}</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <div class="src" style="margin-top:6px">Berita yang kamu flag "key" di Panel 2 — bahan buat nulis 4 lensa di bawah.</div>
+    <div class="src" style="margin-top:6px">Berita yang kamu tandai "for Reading" di Panel News — bahan buat nulis 4 lensa di bawah.</div>
   </section>
 
   <section>
