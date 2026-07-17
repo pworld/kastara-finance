@@ -162,6 +162,46 @@ def test_unknown_lens_raises(tmp_path):
         compose_persona_context(conn, "2026-07-08", "UNKNOWN")
 
 
+# ---------- extra_news_ids (Addendum C §21.4, GELOMBANG C-2, jalur ke-3
+# konteks -- "kirim ke lensa" manual dari NewsView) ----------
+
+def test_extra_news_ids_appends_additional_block(tmp_path):
+    conn = _seed_db(tmp_path)
+    cur = conn.execute(
+        "INSERT INTO daily_news (date, source, headline, raw_url, impact_level, "
+        "for_reading, display_subtitle, created_at) VALUES ('2026-07-08', 'CNBC', "
+        "'Obscure regional bank note', 'https://x.test', 'LOW', 0, 'Giel: relevan ke rezim Warsh', '')"
+    )
+    conn.commit()
+    text = compose_persona_context(conn, "2026-07-08", "GEMA", extra_news_ids=[cur.lastrowid])
+    assert "[BERITA PILIHAN GIEL -- tambahan, BUKAN pengganti slice di atas]" in text
+    assert "Obscure regional bank note" in text
+    assert "[catatan Giel: Giel: relevan ke rezim Warsh]" in text
+
+
+def test_extra_news_ids_never_replaces_slice(tmp_path):
+    """Guard non-negotiable §21.4: slice tetap utuh terlepas dari extra_news_ids."""
+    conn = _seed_db(tmp_path)
+    cur = conn.execute(
+        "INSERT INTO daily_news (date, source, headline, raw_url, impact_level, "
+        "for_reading, created_at) VALUES ('2026-07-08', 'CNBC', "
+        "'Manual pick', 'https://x.test', 'LOW', 0, '')"
+    )
+    conn.commit()
+    with_extra = compose_persona_context(conn, "2026-07-08", "GEMA", extra_news_ids=[cur.lastrowid])
+    without_extra = compose_persona_context(conn, "2026-07-08", "GEMA")
+    assert "[SLICE GEMA -- Global & Capital Flow]" in with_extra
+    assert "[SLICE GEMA -- Global & Capital Flow]" in without_extra
+    # Slice + shared core identik di kedua kasus (extra block cuma NAMBAH di akhir)
+    assert without_extra in with_extra
+
+
+def test_extra_news_ids_none_or_empty_produces_no_block(tmp_path):
+    conn = _seed_db(tmp_path)
+    assert "BERITA PILIHAN GIEL" not in compose_persona_context(conn, "2026-07-08", "GEMA")
+    assert "BERITA PILIHAN GIEL" not in compose_persona_context(conn, "2026-07-08", "GEMA", extra_news_ids=[])
+
+
 def test_rivan_slice_shows_equity_fundamentals_and_grade(tmp_path):
     """J-9 data plumbing: RIVAN slice mendapat ringkasan fundamental saham
     individual (revenue/net income/FCF, grade, foreign flow per-saham)."""

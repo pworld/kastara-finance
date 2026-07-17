@@ -775,6 +775,11 @@ ALLOWED_REF_TABLES = {"daily_news", "manual_articles", "policy_tracker"}
 # catch-up SEKALI saat dibuat (scan N hari ke belakang), biar tidak nunggu
 # cron besok buat suggestion pertama muncul.
 THREAD_CATCHUP_DAYS = 7
+# Auto-DORMANT (Addendum C §21.8 C-2, 17 Jul 2026) -- thread ACTIVE yang tidak
+# di-update (patch_thread/link baru) selama STALE_THREAD_DAYS otomatis turun
+# ke DORMANT saat run_daily. Bukan hapus/CLOSED -- DORMANT tetap bisa
+# diaktifkan lagi manual, cuma tidak lagi ikut hitungan 7/ACTIVE & auto-suggest.
+STALE_THREAD_DAYS = 30
 
 
 def _decode_thread(row: dict[str, Any]) -> dict[str, Any]:
@@ -880,25 +885,40 @@ def get_thread(conn: sqlite3.Connection, thread_id: int) -> dict[str, Any] | Non
 
 
 def suggest_thread_links(conn: sqlite3.Connection, news_items: list[dict[str, Any]]) -> int:
-    """Untuk tiap headline BARU & tiap thread ACTIVE: keyword match (rule-
-    based, `scrapers.base.keyword_matches`) -> INSERT news_thread_links
-    SUGGESTED (idempoten via UNIQUE index idx_news_thread_links_dedup).
-    Dipanggil pipeline/run_daily.py SETELAH insert_news_dedup() (butuh row id
-    asli daily_news, bukan dict item mentah pre-insert) -- lookup by
-    (date, headline), natural key sama dgn idx_daily_news_dedup. TIDAK PERNAH
-    set CONFIRMED (human gate, §20.0). Return jumlah link baru."""
+    """Untuk tiap headline BARU & tiap thread ACTIVE, DUA jalur match (§21.5
+    -- tag-match TAMBAHAN, keyword TIDAK dihapus, jadi "legacy/fallback"
+    persis kata kontrak, bukan diganti):
+    1) keyword match (rule-based, `scrapers.base.keyword_matches`) terhadap
+       `news_threads.keywords`.
+    2) tag-overlap: kalau berita & thread SAMA-SAMA punya >=1 facet tag yang
+       sama (`content_tags`, thread pakai ref_table='news_threads') -> match.
+       Thread tanpa facet tag otomatis fallback ke keyword-only (union kosong
+       tidak pernah match, tidak butuh cabang if terpisah).
+    Kedua jalur INSERT ke news_thread_links SUGGESTED yang sama (idempoten
+    via UNIQUE index idx_news_thread_links_dedup -- overlap keyword+tag pada
+    pasangan sama tidak dobel). Dipanggil pipeline/run_daily.py SETELAH
+    insert_news_dedup() (butuh row id asli daily_news) DAN SETELAH
+    suggest_tags_for_news() (biar tag-match lihat tag yang baru disarankan di
+    run yang sama) -- lookup row by (date, headline), natural key sama dgn
+    idx_daily_news_dedup. TIDAK PERNAH set CONFIRMED (human gate, §20.0).
+    Return jumlah link baru."""
     if not news_items:
         return 0
     threads = conn.execute(
         "SELECT id, keywords FROM news_threads WHERE status = 'ACTIVE'"
     ).fetchall()
-    thread_kw = [
-        (t["id"], json.loads(t["keywords"]) if t["keywords"] else [])
-        for t in threads
-    ]
-    thread_kw = [(tid, kws) for tid, kws in thread_kw if kws]
-    if not thread_kw:
+    if not threads:
         return 0
+    thread_kw = {
+        t["id"]: (json.loads(t["keywords"]) if t["keywords"] else []) for t in threads
+    }
+    thread_tag_rows = conn.execute(
+        "SELECT ref_id AS thread_id, tag_id FROM content_tags WHERE ref_table = 'news_threads'"
+    ).fetchall()
+    thread_tags: dict[int, set[int]] = {}
+    for r in thread_tag_rows:
+        thread_tags.setdefault(r["thread_id"], set()).add(r["tag_id"])
+    active_ids = set(thread_kw)
     inserted = 0
     now = today_wib()
     for item in news_items:
@@ -909,8 +929,17 @@ def suggest_thread_links(conn: sqlite3.Connection, news_items: list[dict[str, An
         if not row:
             continue
         headline_lower = (item["headline"] or "").lower()
-        for thread_id, kws in thread_kw:
-            if not keyword_matches(headline_lower, kws):
+        news_tag_ids = {
+            r["tag_id"] for r in conn.execute(
+                "SELECT tag_id FROM content_tags WHERE ref_table = 'daily_news' AND ref_id = ?",
+                (row["id"],),
+            ).fetchall()
+        }
+        for thread_id in active_ids:
+            matched = keyword_matches(headline_lower, thread_kw[thread_id]) or bool(
+                news_tag_ids & thread_tags.get(thread_id, set())
+            )
+            if not matched:
                 continue
             cur = conn.execute(
                 "INSERT OR IGNORE INTO news_thread_links "
@@ -1235,15 +1264,17 @@ def list_content_tags(conn: sqlite3.Connection, ref_table: str, ref_id: int) -> 
 def attach_content_tags(conn: sqlite3.Connection, ref_table: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Tempel tag ke SEKUMPULAN row sekaligus (mis. daftar berita) -- 1 query
     batch, bukan N+1. Mirrors attach_thread_suggestions()'s shape. Set
-    row["tags"] = [{id, canonical, facet}, ...] per row -- `id` (content_tags
-    PK, BUKAN tag_id) disertakan supaya UI bisa panggil remove_tag() langsung
-    tanpa query tambahan."""
+    row["tags"] = [{id, canonical, facet, source}, ...] per row -- `id`
+    (content_tags PK, BUKAN tag_id) disertakan supaya UI bisa panggil
+    remove_tag() langsung tanpa query tambahan. `source` (MANUAL/SUGGESTED,
+    Addendum C §21.9 GELOMBANG C-2) disertakan sejak suggest_tags_for_news()
+    ada -- UI bedakan visual tag yang Giel ketik sendiri vs auto-suggest."""
     if not rows:
         return rows
     ids = [r["id"] for r in rows]
     placeholders = ",".join("?" for _ in ids)
     tagged = conn.execute(
-        f"SELECT c.id, c.ref_id, t.canonical, t.facet FROM content_tags c "
+        f"SELECT c.id, c.ref_id, c.source, t.canonical, t.facet FROM content_tags c "
         f"JOIN tag_dictionary t ON t.id = c.tag_id "
         f"WHERE c.ref_table = ? AND c.ref_id IN ({placeholders}) "
         f"ORDER BY c.ref_id, t.facet, t.canonical",
@@ -1252,8 +1283,224 @@ def attach_content_tags(conn: sqlite3.Connection, ref_table: str, rows: list[dic
     by_ref: dict[int, list[dict[str, Any]]] = {}
     for r in tagged:
         by_ref.setdefault(r["ref_id"], []).append(
-            {"id": r["id"], "canonical": r["canonical"], "facet": r["facet"]}
+            {"id": r["id"], "canonical": r["canonical"], "facet": r["facet"], "source": r["source"]}
         )
     for row in rows:
         row["tags"] = by_ref.get(row["id"], [])
     return rows
+
+
+# ---------- Settings -> Tag & Thread Management (Addendum C §21.11, C-1 gap
+# ditutup 17 Jul 2026) -- kurasi lambat/reflektif, TERPISAH dari command-
+# palette News/Reading yang cepat (§21.11 prinsip "capture cepat, curate
+# lambat"). merge_tag/delete_tag SENGAJA tidak ada di NewsView -- operasi ini
+# butuh konteks penuh kamus (usage_count, tag lain yang mirip), bukan aksi
+# 1-klik saat baca berita. ----------
+
+def update_tag(
+    conn: sqlite3.Connection, tag_id: int, *, description: str | None = None,
+    facet: str | None = None,
+) -> dict[str, Any]:
+    """Koreksi description/facet tag yang sudah ada (bukan ganti canonical --
+    itu domain merge_tag). Guard: tag harus ada, facet baru (kalau diisi)
+    harus dikenal."""
+    current = conn.execute("SELECT * FROM tag_dictionary WHERE id = ?", (tag_id,)).fetchone()
+    if current is None:
+        raise ValueError(f"tag id {tag_id} tidak ditemukan")
+    if facet is not None and facet not in ALLOWED_FACETS:
+        raise ValueError(f"facet '{facet}' tidak dikenal -- pilihan: {'/'.join(sorted(ALLOWED_FACETS))}")
+    updates: dict[str, Any] = {}
+    if description is not None:
+        updates["description"] = description
+    if facet is not None:
+        updates["facet"] = facet
+    if updates:
+        cols = ", ".join(f"{k} = :{k}" for k in updates)
+        conn.execute(f"UPDATE tag_dictionary SET {cols} WHERE id = :id", {**updates, "id": tag_id})
+    return _decode_tag(dict(conn.execute("SELECT * FROM tag_dictionary WHERE id = ?", (tag_id,)).fetchone()))
+
+
+def delete_tag(conn: sqlite3.Connection, tag_id: int, force: bool = False) -> bool:
+    """Hapus tag dari kamus. Guard: kalau masih terpakai (usage_count > 0)
+    DAN force=False -> ValueError (cegah hapus diam-diam yang meninggalkan
+    content_tags yatim tanpa Giel sadar dampaknya). force=True hapus tag
+    DAN semua content_tags yang menunjuknya sekaligus (bukan cuma kamusnya)."""
+    row = conn.execute("SELECT usage_count FROM tag_dictionary WHERE id = ?", (tag_id,)).fetchone()
+    if row is None:
+        return False
+    if row["usage_count"] > 0 and not force:
+        raise ValueError(
+            f"tag masih dipakai {row['usage_count']} kali -- pakai force=true kalau yakin"
+        )
+    conn.execute("DELETE FROM content_tags WHERE tag_id = ?", (tag_id,))
+    conn.execute("DELETE FROM tag_dictionary WHERE id = ?", (tag_id,))
+    return True
+
+
+def merge_tag(conn: sqlite3.Connection, from_id: int, into_id: int) -> dict[str, Any]:
+    """Gabung 2 tag duplikat (mis. `us-fed` ke `org:fed`) -- operasi yang
+    MUSTAHIL dilakukan inline di News (§21.11). `from_id` jadi alias
+    `into_id`: semua content_tags re-point (dedup-aware -- baris yang sudah
+    ditag `into` tidak diduplikasi, baris `from` yang jadi redundan setelah
+    re-point dihapus), canonical `from` masuk `aliases` `into` (referensi lama
+    tetap resolve lewat resolve_tag), `usage_count` `into` dihitung ULANG dari
+    content_tags aktual (bukan dijumlah -- re-point bisa collide & tidak
+    nambah baris baru, jumlah naif akan salah)."""
+    if from_id == into_id:
+        raise ValueError("tidak bisa merge tag ke dirinya sendiri")
+    src = conn.execute("SELECT * FROM tag_dictionary WHERE id = ?", (from_id,)).fetchone()
+    dst = conn.execute("SELECT * FROM tag_dictionary WHERE id = ?", (into_id,)).fetchone()
+    if src is None or dst is None:
+        raise ValueError("tag from_id/into_id tidak ditemukan")
+    # Re-point tiap content_tags baris dari from -> into. INSERT OR IGNORE
+    # dulu (kena UNIQUE(ref_table, ref_id, tag_id) kalau baris itu sudah
+    # ditag `into` juga -- diam-diam diabaikan, itu yang diinginkan), baru
+    # hapus baris `from` yang sekarang redundan.
+    from_rows = conn.execute(
+        "SELECT ref_table, ref_id, source, created_at FROM content_tags WHERE tag_id = ?", (from_id,)
+    ).fetchall()
+    for r in from_rows:
+        conn.execute(
+            "INSERT OR IGNORE INTO content_tags (ref_table, ref_id, tag_id, source, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (r["ref_table"], r["ref_id"], into_id, r["source"], r["created_at"]),
+        )
+    conn.execute("DELETE FROM content_tags WHERE tag_id = ?", (from_id,))
+    dst_aliases = json.loads(dst["aliases"]) if dst["aliases"] else []
+    if src["canonical"] not in dst_aliases:
+        dst_aliases.append(src["canonical"])
+    for alias in (json.loads(src["aliases"]) if src["aliases"] else []):
+        if alias not in dst_aliases:
+            dst_aliases.append(alias)
+    new_usage = conn.execute(
+        "SELECT COUNT(*) AS n FROM content_tags WHERE tag_id = ?", (into_id,)
+    ).fetchone()["n"]
+    conn.execute(
+        "UPDATE tag_dictionary SET aliases = ?, usage_count = ? WHERE id = ?",
+        (json.dumps(dst_aliases), new_usage, into_id),
+    )
+    conn.execute("DELETE FROM tag_dictionary WHERE id = ?", (from_id,))
+    return _decode_tag(dict(conn.execute("SELECT * FROM tag_dictionary WHERE id = ?", (into_id,)).fetchone()))
+
+
+def list_orphan_tags(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """Tag yang dibuat tapi tak pernah dipakai (usage_count=0) -- kandidat
+    hapus di review kuartalan (§21.7/§21.11)."""
+    rows = conn.execute(
+        "SELECT * FROM tag_dictionary WHERE usage_count = 0 ORDER BY created_at DESC"
+    ).fetchall()
+    return [_decode_tag(dict(r)) for r in rows]
+
+
+# ---------- Addendum C, GELOMBANG C-2 (17 Jul 2026, Giel override 2-minggu-
+# tunggu §21.8 -- "Section 21 & C-1/C-2. FINAL"). ----------
+
+def suggest_tags_for_news(conn: sqlite3.Connection, news_items: list[dict[str, Any]]) -> int:
+    """Auto-suggest tag rule-based (BUKAN LLM, §21.9) ke headline BARU:
+    untuk tiap tag di kamus, keyword pool = aliases + value-nya sendiri
+    (hyphen->spasi, mis. "rate-policy" -> "rate policy") di-match ke headline
+    (`keyword_matches`, sama fungsi yg dipakai suggest_thread_links). Match ->
+    INSERT content_tags source='SUGGESTED' (idempoten via
+    idx_content_tags_dedup). usage_count naik HANYA saat insert baru beneran
+    (rowcount check, pola sama apply_tag). Mirrors suggest_thread_links()'s
+    shape persis -- dipanggil pipeline/run_daily.py SETELAH insert_news_dedup
+    (butuh row id asli), SEBELUM suggest_thread_links (biar tag-match §21.5
+    lihat tag yang baru saja disarankan di run yang sama). Return jumlah tag
+    baru terpasang."""
+    if not news_items:
+        return 0
+    tags = conn.execute("SELECT id, canonical, aliases FROM tag_dictionary").fetchall()
+    tag_pool = []
+    for t in tags:
+        value = t["canonical"].split(":", 1)[1] if ":" in t["canonical"] else t["canonical"]
+        aliases = json.loads(t["aliases"]) if t["aliases"] else []
+        pool = [*aliases, value.replace("-", " ")]
+        tag_pool.append((t["id"], pool))
+    if not tag_pool:
+        return 0
+    inserted = 0
+    now = today_wib()
+    for item in news_items:
+        row = conn.execute(
+            "SELECT id FROM daily_news WHERE date = ? AND headline = ?",
+            (item["date"], item["headline"]),
+        ).fetchone()
+        if not row:
+            continue
+        headline_lower = (item["headline"] or "").lower()
+        for tag_id, pool in tag_pool:
+            if not keyword_matches(headline_lower, pool):
+                continue
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO content_tags (ref_table, ref_id, tag_id, source, created_at) "
+                "VALUES ('daily_news', ?, ?, 'SUGGESTED', ?)",
+                (row["id"], tag_id, now),
+            )
+            if cur.rowcount:
+                conn.execute(
+                    "UPDATE tag_dictionary SET usage_count = usage_count + 1 WHERE id = ?", (tag_id,)
+                )
+                inserted += 1
+    return inserted
+
+
+def thread_stats(conn: sqlite3.Connection, thread_id: int) -> dict[str, Any]:
+    """1 thread: komposisi stance link CONFIRMED, jumlah SUGGESTED pending,
+    umur (hari). Dipisah dari get_thread() -- get_thread tetap murah untuk
+    polling ThreadIndexView/NewsView, ini cuma dipanggil Settings (jarang)."""
+    stance_rows = conn.execute(
+        "SELECT stance, COUNT(*) AS n FROM news_thread_links "
+        "WHERE thread_id = ? AND link_status = 'CONFIRMED' GROUP BY stance",
+        (thread_id,),
+    ).fetchall()
+    composition = {"MENDUKUNG": 0, "KONTRA": 0, "NETRAL": 0}
+    for r in stance_rows:
+        if r["stance"] in composition:
+            composition[r["stance"]] = r["n"]
+    pending = conn.execute(
+        "SELECT COUNT(*) AS n FROM news_thread_links WHERE thread_id = ? AND link_status = 'SUGGESTED'",
+        (thread_id,),
+    ).fetchone()["n"]
+    age_row = conn.execute(
+        "SELECT CAST(julianday('now') - julianday(created_at) AS INTEGER) AS age_days "
+        "FROM news_threads WHERE id = ?", (thread_id,),
+    ).fetchone()
+    return {
+        "thread_id": thread_id, "composition": composition, "pending_suggested": pending,
+        "age_days": age_row["age_days"] if age_row and age_row["age_days"] is not None else 0,
+    }
+
+
+def list_threads_with_stats(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """list_threads() + thread_stats per baris + active_count global (sama
+    di tiap baris -- cara termurah nampilkan "N/7 ACTIVE" tanpa endpoint
+    kedua) + facet tags thread sendiri (reuse attach_content_tags, ref_table
+    'news_threads' -- sudah ada di ALLOWED_CONTENT_TAG_REF_TABLES, thread rows
+    punya "id" field sama seperti daily_news rows jadi langsung kompatibel
+    tanpa fungsi baru). Dipakai Settings Tab Threads saja (mahal dibanding
+    list_threads biasa -- N+1 query kecil, tapi thread maks 7 ACTIVE jadi
+    total baris kecil, aman)."""
+    threads = list_threads(conn)
+    active_count = conn.execute(
+        "SELECT COUNT(*) AS n FROM news_threads WHERE status = 'ACTIVE'"
+    ).fetchone()["n"]
+    for t in threads:
+        stats = thread_stats(conn, t["id"])
+        t["composition"] = stats["composition"]
+        t["pending_suggested"] = stats["pending_suggested"]
+        t["age_days"] = stats["age_days"]
+        t["active_count"] = active_count
+    return attach_content_tags(conn, "news_threads", threads)
+
+
+def auto_dormant_stale_threads(conn: sqlite3.Connection, stale_days: int = STALE_THREAD_DAYS) -> int:
+    """Thread ACTIVE yang tidak di-update (patch_thread atau link baru bumps
+    updated_at) selama `stale_days` -> otomatis DORMANT (bukan hapus/CLOSED,
+    tetap bisa diaktifkan manual). Dipanggil run_daily.py, cheap, fits ritme
+    harian yang sudah ada. Return jumlah thread yang di-DORMANT-kan."""
+    cur = conn.execute(
+        "UPDATE news_threads SET status = 'DORMANT', updated_at = ? "
+        "WHERE status = 'ACTIVE' AND updated_at < date('now', ?)",
+        (today_wib(), f"-{stale_days} day"),
+    )
+    return cur.rowcount

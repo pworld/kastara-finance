@@ -665,6 +665,92 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       lewat sqlite langsung, langsung dibersihkan (`DELETE` thread id 5 +
       link id 70), dikonfirmasi state balik persis semula sebelum lanjut
       pakai DB temp yang benar. `npm run build` sukses (356 module).
+- [x] ~~Inline edit title/status/keywords/bacaan terkini langsung di `/threads`
+      index (17 Jul 2026)~~ — sebelumnya edit field ini cuma bisa lewat detail
+      page (`/threads/:id`), Giel minta bisa langsung dari daftar. Pola sama
+      `subtitleInputs`/`editingIds` di `NewsView.vue`: `editingIds` Set +
+      `editInputs` dict per baris, "Edit"→input/select muncul→"Simpan" POST ke
+      `/api/threads/<id>` (endpoint sudah ada, tidak ada perubahan backend).
+      Verdict TETAP di detail page saja (jarang dipakai, wajib cuma saat
+      CLOSED) — kalau status di-set CLOSED dari index tanpa verdict,
+      `patch_thread()` nolak dgn error toast, arahkan ke detail page.
+- [x] ~~Addendum C §21 selesai PENUH: tutup gap C-1 (Settings page) + bangun
+      C-2 (17 Jul 2026, Giel: "jalankan adendum C" → override eksplisit
+      klausul tunggu-2-minggu §21.8, "Section 21 & C-1/C-2. FINAL")~~ —
+      audit ulang nemu **1 gap nyata di C-1 sendiri**: §21.8 daftar "Settings
+      → Tag & Thread Management" (§21.11) sebagai item C-1, tapi tidak pernah
+      dibangun (NewsView cuma punya tabel tag read-only, tidak ada
+      merge/delete/edit-description, tidak ada halaman kelola thread di luar
+      per-row). Sisanya C-1 (skema, tag CRUD, command-palette, `for_reading`,
+      `display_subtitle`) genuinely selesai & teruji.
+      **Bagian 1 (tutup gap C-1)**: `web/writes.py` — `update_tag`
+      (description/facet), `delete_tag` (guard usage_count>0 tanpa force →
+      ValueError, force hapus tag+content_tags-nya), `merge_tag` (from jadi
+      alias into, content_tags re-point dedup-aware lewat INSERT OR IGNORE +
+      DELETE baris redundan, usage_count DIHITUNG ULANG dari row count aktual
+      bukan dijumlah — cegah salah hitung saat re-point collide),
+      `list_orphan_tags`, `thread_stats`/`list_threads_with_stats` (komposisi
+      stance CONFIRMED, pending SUGGESTED, umur hari, `active_count` global
+      utk "N/7 ACTIVE", plus facet tags thread lewat reuse
+      `attach_content_tags(conn, "news_threads", rows)` — tidak ada fungsi
+      baru krn `news_threads` sudah ada di `ALLOWED_CONTENT_TAG_REF_TABLES`).
+      5 endpoint baru (`/api/tags/<id>{,/delete}`, `/api/tags/merge`,
+      `/api/tags/orphans`, `/api/threads/stats`). `SettingsView.vue` baru,
+      2 tab (Tags: edit/hapus/gabung inline + form merge; Threads: tabel
+      komposisi/umur + Dialog "Kelola Thread" (status/current_read/verdict/
+      persona_tags checkbox 4-lensa/facet tags via `TagAutocomplete` reuse) —
+      route `/settings` + nav group baru "Pengaturan" (App.vue, terpisah dari
+      "Daily" krn sifatnya reflektif/kuartalan, bukan ritual harian).
+      **Bagian 2 (C-2)**: (a) `suggest_tags_for_news()` — auto-tag rule-based
+      (BUKAN LLM, §21.9), keyword pool = `aliases + value.replace('-',' ')`
+      per tag, hasil selalu `source='SUGGESTED'`, mirrors `suggest_thread_
+      links()` persis. (b) `suggest_thread_links()` diperluas TAMBAH jalur
+      tag-overlap (thread facet tags vs berita facet tags) di SAMPING keyword
+      match yang lama (kontrak eksplisit: keywords jadi "legacy/fallback",
+      BUKAN dihapus — thread tanpa facet tag otomatis fallback keyword-only,
+      union kosong tidak pernah match). (c) `pipeline/run_daily.py` hook
+      urutan: `insert_news_dedup` → `suggest_tags_for_news` → `suggest_
+      thread_links` (tag dulu baru tag-match thread, biar lihat tag yang baru
+      disarankan di run yang sama) → `auto_dormant_stale_threads` (thread
+      ACTIVE stale >30 hari otomatis DORMANT, bukan hapus — `STALE_THREAD_
+      DAYS` konstanta baru, pola sama `THREAD_CATCHUP_DAYS`). (d)
+      `compose_persona_context()` +param `extra_news_ids` (default `None`,
+      backward-compat penuh) — blok "BERITA PILIHAN GIEL" TAMBAHAN di akhir
+      konteks, guard struktural (slice SELALU dipanggil terlepas parameter
+      ini) menjamin seleksi manual TIDAK PERNAH ganti slice (§21.4).
+      `/api/persona/run` terima `news_ids` opsional. `NewsView.vue` — checkbox
+      per baris + tombol "Kirim ke Lensa →" + Dialog pilih lensa. (e)
+      `tools/backfill_tag.py` CLI baru (`--thread-id --since`, pola
+      `tools/review_signal.py`) — reuse langsung (a)+(b), TIDAK ADA logic
+      matching baru, TIDAK PERNAH tulis stance/CONFIRMED/current_read (guard
+      ditest eksplisit). LLM triase (§21.9, opsional/berpagar) SENGAJA tidak
+      dibangun — default rule-based sudah cukup, bukan scope "FINAL". Saved
+      filter Reading Page (§21.8, ditandai "bonus opsional" di kontrak
+      sendiri) juga di-skip dgn alasan sama.
+      Tag chip SUGGESTED (dari auto-suggest) beda visual dari MANUAL (border
+      dashed + "?" suffix) di `NewsView.vue` — `attach_content_tags()` sekarang
+      ikut kirim `source` per tag (dulu cuma canonical/facet/id).
+      25 test baru (`test_web_writes.py`: update/delete/merge_tag +
+      list_orphan_tags + thread_stats + suggest_tags_for_news idempoten +
+      tag-overlap match tanpa keyword + regression keyword-only-thread masih
+      jalan + auto_dormant hanya kena ACTIVE+stale; `test_compose_persona_
+      context.py`: extra_news_ids block + guard-tidak-pernah-ganti-slice;
+      `test_backfill_tag.py` baru: guard tidak pernah tulis stance/CONFIRMED).
+      388 test hijau total (tidak ada tabel/kolom baru — schema tetap 27
+      tabel, semua reuse struktur Addendum C yang sudah ada). 82 endpoint
+      `/api/*` (dari 77). **Diverifikasi**: Flask test-client round-trip ke DB
+      TEMP terisolasi (bukan produksi lagi — pelajaran dari insiden `DB_PATH`
+      typo di entri sebelumnya, `KASTARA_DB_PATH` di-set eksplisit sebelum
+      import apa pun di tiap script verifikasi ad-hoc mulai sesi ini):
+      create 2 tag → apply keduanya ke 1 berita → merge → 1 tag tersisa, tidak
+      ada UNIQUE violation. `suggest_tags_for_news`+tag-match `suggest_
+      thread_links` terhadap DB temp dgn thread ber-facet-tag tanpa keyword
+      overlap → SUGGESTED link muncul murni dari tag-match. `npm run build`
+      bersih, `SettingsView` masuk chunk list (bukti lazy route ke-compile,
+      bukan cuma console-check halaman login yang jadi blind spot sesi lalu).
+      Sama seperti biasa: tidak bisa browser-verify visual di balik login
+      (Giel sempat kasih password langsung, tetap ditolak — aturan kredensial
+      tidak ada pengecualian "punya sendiri").
 - [x] ~~Auto-isi `actual` HIGH-importance dari investing.com (pass kedua)~~
       — riset awal SEMPAT menyimpulkan skip (lihat percobaan pertama: kena
       HTTP 429 yang tidak pulih setelah ~5-6 request cepat, dan endpoint AJAX

@@ -297,7 +297,7 @@ execution/trading logic di mana pun.
 python -m web.app
 # buka http://127.0.0.1:5000
 ```
-Navigasi 9 tab: **1 Snapshot** (cards +
+Navigasi 10 tab: **1 Snapshot** (cards +
 source_flags + form Manual Backfill preview→confirm), **2 News** (list +
 filter impact + tandai for Reading + chip saran News Threads + tag facet
 command-palette (Addendum C §21, filter AND/OR) + display_subtitle inline-edit
@@ -315,8 +315,12 @@ position sizing + Prediction Log + skor prediksi + Daily Briefing), **7
 Riwayat** (arsip synthesis/prediksi/jurnal/lensa, sub-tab), **8 Universe &
 Grader** (Phase J+: universe saham, intake kandidat, uji kelayakan + grade,
 detail emiten + override kuadran, rasio bank manual, validasi lane bar-replay,
-grader log). Panel 1–6 (+ News Threads) = ritme harian TRADE lane; Panel 8 =
-ritme mingguan/kuartalan INVEST lane (lihat [SOP.md](docs/SOP.md)).
+grader log), **Settings** (Addendum C §21.11, kurasi lambat/reflektif: Tab
+Tags -- edit description/facet, hapus, gabung tag duplikat, tag yatim; Tab
+Threads -- status/verdict/current_read/persona_tags/facet tags thread,
+komposisi stance, umur, N/7 ACTIVE). Panel 1–6 (+ News Threads) = ritme
+harian TRADE lane; Panel 8 = ritme mingguan/kuartalan INVEST lane; Settings =
+sesekali/kuartalan (lihat [SOP.md](docs/SOP.md)).
 
 **Login session-based** (`DASHBOARD_PASSWORD` di `.env`, lihat §Setup —
 sejak Fase 3 migrasi Vue, BUKAN lagi tanpa autentikasi). **Tidak ada
@@ -325,7 +329,7 @@ itu kolom paste manual (kamu banding hasil tool lain sendiri), bukan Kastara
 yang manggil AI. Auto-suggest News Threads & validasi tag juga rule-based
 (keyword match / tata bahasa), BUKAN AI.
 
-API: **77 endpoint `/api/*`** (40 GET + 37 POST), semuanya `jsonify(...)` —
+API: **82 endpoint `/api/*`** (42 GET + 40 POST), semuanya `jsonify(...)` —
 `/` menyajikan build Vue (`web/frontend/dist/`), semua data client-side
 fetch. Read-only Phase 1 (`/api/latest`, `/api/daily_market`,
 `/api/asset_ohlcv`, `/api/news`, `/api/assets`, `/api/health`) tidak
@@ -333,13 +337,19 @@ berubah. Grup lain: Phase C write
 (`/api/backfill/*`, `/api/reading/save`, `/api/signals/review`,
 `/api/synthesis/save`, `/api/journal/add`, `/api/prediction/*`), Phase D
 (`/api/expectations`, `/api/positioning`, `/api/disonansi`), Phase E
-(`/api/briefing/send`), Persona (`/api/persona/{run,status}`), Phase J+
+(`/api/briefing/send`), Persona (`/api/persona/{run,status}`, `run` terima
+`news_ids` opsional -- feed manual §21.4), Phase J+
 (`/api/universe`, `/api/intake/*`, `/api/emiten/<t>{,/override,/validate_lane}`,
 `/api/sizing/suggest`, `/api/fundamentals/bank_ratios`, `/api/grader_log`,
 `/api/lane_validation_log`, `/api/earnings{,/warnings}`), News Threads
-N-1 (`/api/threads*`), dan Faceted Tagging C-1 (`/api/tags*`,
+(`/api/threads*`, incl. `/api/threads/stats`), dan Faceted Tagging Addendum C
+selesai penuh (C-1+C-2, 17 Jul 2026): `/api/tags*` (incl.
+`/api/tags/<id>{,/delete}`, `/api/tags/merge`, `/api/tags/orphans`),
 `/api/content_tags*`, `/api/news/for_reading`,
-`/api/news/<id>/display_subtitle`). Daftar otoritatif = route di `web/app.py`.
+`/api/news/<id>/display_subtitle`. Auto-suggest tag & thread-link (rule-based
+keyword/tag-match) serta auto-DORMANT thread stale jalan otomatis tiap
+`run_daily` -- tidak ada endpoint terpisah utk itu. Daftar otoritatif = route
+di `web/app.py`.
 
 ### Daily Briefing ke Telegram (Phase E)
 ```bash

@@ -68,6 +68,14 @@ from web.writes import (
     remove_tag,
     list_content_tags,
     attach_content_tags,
+    update_tag,
+    delete_tag,
+    merge_tag,
+    list_orphan_tags,
+    thread_stats,
+    list_threads_with_stats,
+    suggest_tags_for_news,
+    auto_dormant_stale_threads,
 )
 
 
@@ -1689,7 +1697,9 @@ def test_attach_content_tags_batch(tmp_path):
         attached = attach_content_tags(conn, "daily_news", rows)
         # `id` disertakan (content_tags PK) supaya UI bisa panggil remove_tag()
         # langsung -- dicek eksplisit, bukan cuma canonical/facet.
-        assert attached[0]["tags"] == [{"id": applied["id"], "canonical": "who:warsh", "facet": "who"}]
+        assert attached[0]["tags"] == [
+            {"id": applied["id"], "canonical": "who:warsh", "facet": "who", "source": "MANUAL"}
+        ]
         assert attached[1]["tags"] == []
 
 
@@ -1698,3 +1708,306 @@ def test_attach_content_tags_empty_rows(tmp_path):
     init_db(db)
     with get_connection(db) as conn:
         assert attach_content_tags(conn, "daily_news", []) == []
+
+
+# ---------- Settings -> Tag & Thread Management (Addendum C §21.11, C-1 gap ditutup 17 Jul 2026) ----------
+
+def test_update_tag_description_and_facet(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        tag = create_tag(conn, "who:warsh")
+        conn.commit()
+        updated = update_tag(conn, tag["id"], description="Fed governor", facet="org")
+        assert updated["description"] == "Fed governor"
+        assert updated["facet"] == "org"
+
+
+def test_update_tag_rejects_unknown_facet(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        tag = create_tag(conn, "who:warsh")
+        conn.commit()
+        try:
+            update_tag(conn, tag["id"], facet="bogus")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "facet" in str(exc)
+
+
+def test_update_tag_unknown_id_raises(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        try:
+            update_tag(conn, 999, description="x")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "tidak ditemukan" in str(exc)
+
+
+def test_delete_tag_blocks_when_still_used_without_force(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        tag = create_tag(conn, "who:warsh")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        apply_tag(conn, "daily_news", news_id, "who:warsh")
+        conn.commit()
+        try:
+            delete_tag(conn, tag["id"])
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "force" in str(exc)
+        # tag masih ada, belum terhapus
+        assert list_tags(conn)
+
+
+def test_delete_tag_force_cleans_content_tags(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        tag = create_tag(conn, "who:warsh")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        apply_tag(conn, "daily_news", news_id, "who:warsh")
+        conn.commit()
+        assert delete_tag(conn, tag["id"], force=True) is True
+        assert list_tags(conn) == []
+        assert list_content_tags(conn, "daily_news", news_id) == []
+
+
+def test_delete_tag_unused_no_force_needed(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        tag = create_tag(conn, "who:warsh")
+        conn.commit()
+        assert delete_tag(conn, tag["id"]) is True
+
+
+def test_delete_tag_unknown_returns_false(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        assert delete_tag(conn, 999) is False
+
+
+def test_merge_tag_repoints_content_and_merges_aliases(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        dupe = create_tag(conn, "org:us-fed", aliases=["usfed"])
+        canonical = create_tag(conn, "org:fed")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        apply_tag(conn, "daily_news", news_id, "org:us-fed")
+        conn.commit()
+        merged = merge_tag(conn, dupe["id"], canonical["id"])
+        assert merged["canonical"] == "org:fed"
+        assert "org:us-fed" in merged["aliases"]
+        assert "usfed" in merged["aliases"]
+        assert merged["usage_count"] == 1
+        # tag lama hilang dari kamus
+        assert all(t["id"] != dupe["id"] for t in list_tags(conn))
+        # konten yang dulu ditag "dupe" sekarang nunjuk "canonical"
+        tags = list_content_tags(conn, "daily_news", news_id)
+        assert len(tags) == 1
+        assert tags[0]["canonical"] == "org:fed"
+
+
+def test_merge_tag_no_unique_collision_when_both_already_tagged(tmp_path):
+    """Berita yang SUDAH ditag dgn `into` sebelum merge -- re-point `from`
+    tidak boleh duplikat baris (UNIQUE ref_table,ref_id,tag_id), dan
+    usage_count harus dihitung ulang dari row count aktual, bukan dijumlah."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        dupe = create_tag(conn, "org:us-fed")
+        canonical = create_tag(conn, "org:fed")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        apply_tag(conn, "daily_news", news_id, "org:us-fed")
+        apply_tag(conn, "daily_news", news_id, "org:fed")
+        conn.commit()
+        merged = merge_tag(conn, dupe["id"], canonical["id"])
+        assert merged["usage_count"] == 1
+        tags = list_content_tags(conn, "daily_news", news_id)
+        assert len(tags) == 1
+
+
+def test_merge_tag_rejects_self_merge(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        tag = create_tag(conn, "who:warsh")
+        conn.commit()
+        try:
+            merge_tag(conn, tag["id"], tag["id"])
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "sendiri" in str(exc)
+
+
+def test_merge_tag_unknown_id_raises(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        tag = create_tag(conn, "who:warsh")
+        conn.commit()
+        try:
+            merge_tag(conn, tag["id"], 999)
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "tidak ditemukan" in str(exc)
+
+
+def test_list_orphan_tags_only_unused(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        orphan = create_tag(conn, "who:warsh")
+        used = create_tag(conn, "org:fed")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        apply_tag(conn, "daily_news", news_id, "org:fed")
+        conn.commit()
+        orphans = list_orphan_tags(conn)
+        ids = {t["id"] for t in orphans}
+        assert orphan["id"] in ids
+        assert used["id"] not in ids
+
+
+def test_thread_stats_composition_and_pending(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Rezim Warsh")
+        n1 = _seed_news_row(conn, headline="A")
+        n2 = _seed_news_row(conn, headline="B")
+        n3 = _seed_news_row(conn, headline="C")
+        conn.commit()
+        l1 = add_thread_link_manual(conn, thread["id"], "daily_news", n1, "MENDUKUNG")
+        l2 = add_thread_link_manual(conn, thread["id"], "daily_news", n2, "KONTRA")
+        conn.commit()
+        # 1 link SUGGESTED pending (manual insert langsung, bukan lewat auto-suggest)
+        conn.execute(
+            "INSERT INTO news_thread_links (thread_id, ref_table, ref_id, link_status, linked_at) "
+            "VALUES (?, 'daily_news', ?, 'SUGGESTED', '')", (thread["id"], n3),
+        )
+        conn.commit()
+        stats = thread_stats(conn, thread["id"])
+        assert stats["composition"] == {"MENDUKUNG": 1, "KONTRA": 1, "NETRAL": 0}
+        assert stats["pending_suggested"] == 1
+        assert stats["age_days"] >= 0
+
+
+def test_list_threads_with_stats_includes_active_count_and_tags(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        t1 = save_thread(conn, title="Thread A")
+        save_thread(conn, title="Thread B")
+        conn.commit()
+        create_tag(conn, "who:warsh")
+        conn.commit()
+        apply_tag(conn, "news_threads", t1["id"], "who:warsh")
+        conn.commit()
+        rows = list_threads_with_stats(conn)
+        assert len(rows) == 2
+        assert all(r["active_count"] == 2 for r in rows)
+        row_a = next(r for r in rows if r["id"] == t1["id"])
+        assert row_a["tags"][0]["canonical"] == "who:warsh"
+
+
+# ---------- GELOMBANG C-2 (Addendum C §21.9, 17 Jul 2026 -- Giel override 2-minggu-tunggu, "FINAL") ----------
+
+def test_suggest_tags_for_news_matches_alias_and_hyphenated_value(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_tag(conn, "who:warsh", aliases=["fed-warsh"])
+        create_tag(conn, "theme:rate-policy")
+        news_id = _seed_news_row(conn, headline="Fed-Warsh signals rate policy shift")
+        conn.commit()
+        n = suggest_tags_for_news(conn, [{"date": "2026-07-15", "headline": "Fed-Warsh signals rate policy shift"}])
+        assert n == 2
+        tags = {t["canonical"] for t in list_content_tags(conn, "daily_news", news_id)}
+        assert tags == {"who:warsh", "theme:rate-policy"}
+        applied = list_content_tags(conn, "daily_news", news_id)
+        assert all(t["source"] == "SUGGESTED" for t in applied)
+
+
+def test_suggest_tags_for_news_idempotent(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_tag(conn, "who:warsh")
+        _seed_news_row(conn, headline="Warsh speaks")
+        conn.commit()
+        items = [{"date": "2026-07-15", "headline": "Warsh speaks"}]
+        first = suggest_tags_for_news(conn, items)
+        second = suggest_tags_for_news(conn, items)
+        assert first == 1
+        assert second == 0
+        tag = resolve_tag(conn, "who:warsh")
+        assert tag["usage_count"] == 1
+
+
+def test_suggest_thread_links_tag_overlap_matches_without_keyword(tmp_path):
+    """Thread yang tidak punya keywords sama sekali tapi punya facet tag ->
+    tetap dapat SUGGESTED link kalau berita match tag yang sama (§21.5)."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Rezim Warsh")  # tanpa keywords
+        conn.commit()
+        create_tag(conn, "who:warsh")
+        conn.commit()
+        apply_tag(conn, "news_threads", thread["id"], "who:warsh")
+        conn.commit()
+        news_id = _seed_news_row(conn, headline="Central bank governor speaks today")
+        conn.commit()
+        apply_tag(conn, "daily_news", news_id, "who:warsh")
+        conn.commit()
+        n = suggest_thread_links(
+            conn, [{"date": "2026-07-15", "headline": "Central bank governor speaks today"}]
+        )
+        assert n == 1
+        links = list_thread_links(conn, thread["id"])
+        assert links[0]["link_status"] == "SUGGESTED"
+
+
+def test_suggest_thread_links_keyword_only_thread_still_works(tmp_path):
+    """Regression guard: thread TANPA facet tag (kasus lama, News Threads N-1)
+    tetap match lewat keyword-only fallback, tidak rusak oleh tag-overlap pass."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Rezim Warsh", keywords=["warsh"])
+        _seed_news_row(conn, headline="Warsh signals hawkish stance")
+        conn.commit()
+        n = suggest_thread_links(conn, [{"date": "2026-07-15", "headline": "Warsh signals hawkish stance"}])
+        assert n == 1
+
+
+def test_auto_dormant_stale_threads_only_touches_active_and_stale(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        fresh = save_thread(conn, title="Fresh Thread")
+        stale = save_thread(conn, title="Stale Thread")
+        closed = save_thread(conn, title="Closed Thread")
+        conn.commit()
+        patch_thread(conn, closed["id"], status="CLOSED", verdict="selesai")
+        conn.execute(
+            "UPDATE news_threads SET updated_at = date('now', '-40 day') WHERE id = ?", (stale["id"],)
+        )
+        conn.commit()
+        n = auto_dormant_stale_threads(conn, stale_days=30)
+        assert n == 1
+        assert get_thread(conn, stale["id"])["status"] == "DORMANT"
+        assert get_thread(conn, fresh["id"])["status"] == "ACTIVE"
+        assert get_thread(conn, closed["id"])["status"] == "CLOSED"

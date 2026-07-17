@@ -436,14 +436,51 @@ _SLICE_BUILDERS = {
 }
 
 
-def compose_persona_context(conn: sqlite3.Connection, date: str, lens: str) -> str:
-    """SHARED CORE + slice `lens` (GEMA/LEON/AKELA/RIVAN). Raise ValueError
+# ---------- Feed manual berita -> persona (Addendum C §21.4, GELOMBANG C-2)
+# ----------
+
+def _manual_selection_block(conn: sqlite3.Connection, news_ids: list[int]) -> str:
+    """Blok TAMBAHAN (bukan pengganti slice, guard non-negotiable §21.4) utk
+    berita yang Giel pilih manual lewat filter tag di NewsView. Judul yang
+    dikirim = headline + display_subtitle (kalau ada) -- indikator subtitle
+    SELALU ikut supaya bias editorial Giel kelihatan & auditable, tidak
+    tersembunyi (keputusan #3 §21.2)."""
+    if not news_ids:
+        return ""
+    placeholders = ",".join("?" for _ in news_ids)
+    rows = conn.execute(
+        f"SELECT headline, source, display_subtitle FROM daily_news WHERE id IN ({placeholders})",
+        news_ids,
+    ).fetchall()
+    if not rows:
+        return ""
+    lines = ["[BERITA PILIHAN GIEL -- tambahan, BUKAN pengganti slice di atas]", ""]
+    for r in rows:
+        line = f"- {r['headline']} ({r['source']})"
+        if r["display_subtitle"]:
+            line += f" [catatan Giel: {r['display_subtitle']}]"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def compose_persona_context(
+    conn: sqlite3.Connection, date: str, lens: str, extra_news_ids: list[int] | None = None,
+) -> str:
+    """SHARED CORE + slice `lens` (GEMA/LEON/AKELA/RIVAN) + opsional blok
+    berita pilihan manual Giel (`extra_news_ids`, §21.4). Raise ValueError
     kalau lens tidak dikenal -- caller (web/app.py) yang validasi lens
-    sebelum sampai sini, sama seperti pola llm/persona_analysis.py."""
+    sebelum sampai sini, sama seperti pola llm/persona_analysis.py. Guard
+    struktural non-negotiable: slice SELALU dipanggil terlepas dari
+    `extra_news_ids` -- seleksi manual tidak pernah menggantikan slice
+    (§21.4), cuma menambah blok di akhir."""
     lens = lens.upper()
     if lens not in _SLICE_BUILDERS:
         raise ValueError(f"lens tidak dikenal: {lens}")
     history = _market_history(conn, date)
     shared = _shared_core(conn, date, history)
     slice_text = _SLICE_BUILDERS[lens](conn, date, history)
-    return f"{shared}\n\n{slice_text}"
+    context = f"{shared}\n\n{slice_text}"
+    manual_block = _manual_selection_block(conn, extra_news_ids or [])
+    if manual_block:
+        context = f"{context}\n\n{manual_block}"
+    return context

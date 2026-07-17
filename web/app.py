@@ -582,6 +582,64 @@ def content_tags_list(ref_table, ref_id):
     return jsonify(rows)
 
 
+# ---------- Settings -> Tag & Thread Management (Addendum C §21.11, C-1 gap
+# ditutup 17 Jul 2026 -- kurasi lambat/reflektif, terpisah dari command-
+# palette News/Reading di atas). ----------
+
+@app.get("/api/tags/orphans")
+def tags_orphans():
+    with get_connection() as conn:
+        rows = writes.list_orphan_tags(conn)
+    return jsonify(rows)
+
+
+@app.post("/api/tags/<int:tag_id>")
+def tags_update(tag_id):
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            row = writes.update_tag(
+                conn, tag_id, description=body.get("description"), facet=body.get("facet"),
+            )
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(row)
+
+
+@app.post("/api/tags/<int:tag_id>/delete")
+def tags_delete(tag_id):
+    body = request.get_json(force=True) or {}
+    try:
+        with get_connection() as conn:
+            ok = writes.delete_tag(conn, tag_id, force=bool(body.get("force")))
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if not ok:
+        return jsonify({"error": "tag tidak ditemukan"}), 404
+    return jsonify({"ok": True})
+
+
+@app.post("/api/tags/merge")
+def tags_merge():
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            row = writes.merge_tag(conn, body.get("from_id"), body.get("into_id"))
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(row)
+
+
+@app.get("/api/threads/stats")
+def threads_stats():
+    with get_connection() as conn:
+        rows = writes.list_threads_with_stats(conn)
+    return jsonify(rows)
+
+
 @app.post("/api/articles/add")
 def articles_add():
     body = request.get_json(force=True)
@@ -760,9 +818,14 @@ def persona_run():
     lens = (body.get("lens") or "").upper()
     if lens not in persona_analysis.PERSONA_LABELS:
         return jsonify({"error": f"lens tidak dikenal: {lens}"}), 400
+    # Addendum C §21.4 (GELOMBANG C-2): opsional, berita pilihan manual Giel
+    # (filter tag -> centang -> "Kirim ke Lensa" di NewsView) ditambahkan ke
+    # konteks -- TIDAK PERNAH menggantikan slice (guard di compose_persona_
+    # context itu sendiri, bukan di sini).
+    news_ids = body.get("news_ids") or []
     date = today_wib()
     with get_connection() as conn:
-        context_text = compose_persona_context(conn, date, lens)
+        context_text = compose_persona_context(conn, date, lens, extra_news_ids=news_ids)
     try:
         text = persona_analysis.run_persona_analysis(lens, context_text)
     except persona_analysis.PersonaPromptMissing as exc:

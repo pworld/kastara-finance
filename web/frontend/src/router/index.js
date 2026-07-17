@@ -19,6 +19,9 @@ const routes = [
   // (`:id` via useRoute().params.id, bukan props -- lihat ThreadDetailView.vue).
   { path: '/threads', name: 'threads', component: () => import('../views/ThreadIndexView.vue') },
   { path: '/threads/:id', name: 'thread-detail', component: () => import('../views/ThreadDetailView.vue') },
+  // Settings (Addendum C §21.11, C-1 gap ditutup 17 Jul 2026) -- kurasi
+  // lambat/reflektif tag & thread, terpisah dari command-palette cepat.
+  { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue') },
 ]
 
 const router = createRouter({

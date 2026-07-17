@@ -36,6 +36,14 @@ const navGroups = [
       { to: '/riwayat', label: 'Riwayat' },
     ],
   },
+  {
+    // Kurasi lambat/reflektif (Addendum C §21.11) -- BEDA sifat dari Daily,
+    // grup sendiri biar tidak tercampur ritual harian.
+    title: 'Pengaturan',
+    items: [
+      { to: '/settings', label: 'Settings' },
+    ],
+  },
 ]
 
 async function logout() {

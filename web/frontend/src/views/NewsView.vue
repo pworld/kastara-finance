@@ -5,7 +5,7 @@ import Dialog from 'primevue/dialog'
 import DataTable from '../components/DataTable.vue'
 import TagAutocomplete from '../components/TagAutocomplete.vue'
 import { get, post } from '../lib/api'
-import { today, daysAgo, LINK_STATUS_CLASS, FACET_COLOR } from '../lib/format'
+import { today, daysAgo, LINK_STATUS_CLASS, FACET_COLOR, LENS_LABELS } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
 
 // Port dari web/static/js/panel2.js (lihat docs/migrationFE.md Fase 2).
@@ -55,6 +55,26 @@ const filteredRows = computed(() => {
       : filterTags.value.some((c) => have.includes(c))
   })
 })
+
+// ---------- Kirim ke Lensa (Addendum C §21.4, GELOMBANG C-2) -- jalur
+// ke-3 konteks persona (di luar slice otomatis harian + thread digest):
+// filter tag -> centang berita -> kirim TAMBAHAN ke satu lensa. Guard
+// non-negotiable (tidak pernah ganti slice) hidup di compose_persona_context
+// itu sendiri, bukan di sini -- checkbox ini murni kumpulkan id. ----------
+const selectedNewsIds = ref(new Set())
+function toggleSelectNews(row) {
+  if (selectedNewsIds.value.has(row.id)) selectedNewsIds.value.delete(row.id)
+  else selectedNewsIds.value.add(row.id)
+}
+const lensDialogOpen = ref(false)
+const selectedLens = ref('GEMA')
+async function sendToLens() {
+  const result = await post('/api/persona/run', { lens: selectedLens.value, news_ids: [...selectedNewsIds.value] })
+  if (result.error) { toast(result.error); return }
+  toast(`${selectedNewsIds.value.size} berita dikirim ke lensa ${selectedLens.value} (tambahan, bukan pengganti slice)`)
+  lensDialogOpen.value = false
+  selectedNewsIds.value = new Set()
+}
 
 async function toggleForReading(row) {
   const now = !!row.for_reading
@@ -216,12 +236,22 @@ async function saveArticle() {
           <option value="OR">OR (salah satu)</option>
         </select>
       </div>
+      <div class="chart-head" style="margin-bottom:12px" v-if="selectedNewsIds.size">
+        <span class="src">{{ selectedNewsIds.size }} berita dipilih</span>
+        <button class="btn small" @click="lensDialogOpen = true">Kirim ke Lensa →</button>
+        <button class="btn small secondary" @click="selectedNewsIds = new Set()">Batal pilih</button>
+      </div>
       <p v-if="loading" class="src">Memuat...</p>
       <DataTable
         v-else :rows="filteredRows" :dataKey="'id'"
         :searchFields="['headline', 'source']"
         emptyMessage="tidak ada berita untuk tanggal/filter ini"
       >
+        <Column header="">
+          <template #body="{ data }">
+            <input type="checkbox" :checked="selectedNewsIds.has(data.id)" @change="toggleSelectNews(data)">
+          </template>
+        </Column>
         <Column field="date" header="Tanggal" sortable>
           <template #body="{ data }"><span class="src">{{ data.date }}</span></template>
         </Column>
@@ -281,8 +311,12 @@ async function saveArticle() {
         </Column>
         <Column header="Tag">
           <template #body="{ data }">
-            <span v-for="t in data.tags" :key="t.id" class="badge" :class="FACET_COLOR[t.facet]" style="margin-right:4px">
-              {{ t.canonical }} <a href="#" style="color:inherit" @click.prevent="removeTag(t.id)">&times;</a>
+            <span
+              v-for="t in data.tags" :key="t.id" class="badge" :class="FACET_COLOR[t.facet]"
+              :style="{ marginRight: '4px', ...(t.source === 'SUGGESTED' ? { border: '1px dashed currentColor', opacity: 0.75 } : {}) }"
+              :title="t.source === 'SUGGESTED' ? 'auto-suggest, belum dikonfirmasi manual' : 'dipasang manual'"
+            >
+              {{ t.canonical }}<span v-if="t.source === 'SUGGESTED'">?</span> <a href="#" style="color:inherit" @click.prevent="removeTag(t.id)">&times;</a>
             </span>
             <TagAutocomplete
               :excludeCanonicals="(data.tags || []).map(t => t.canonical)"
@@ -321,6 +355,22 @@ async function saveArticle() {
     </div>
     <div class="form-row" style="margin-top:12px">
       <button class="btn" @click="confirmThreadLink">Konfirmasi</button>
+    </div>
+  </Dialog>
+
+  <Dialog v-model:visible="lensDialogOpen" modal header="Kirim ke Lensa" style="width:420px; max-width:90vw">
+    <p class="src">
+      {{ selectedNewsIds.size }} berita akan ditambahkan sebagai konteks TAMBAHAN
+      (bukan pengganti slice otomatis) utk lensa terpilih -- Addendum C §21.4.
+    </p>
+    <div class="form-row">
+      <label class="field">Lensa</label>
+      <select v-model="selectedLens">
+        <option v-for="code in ['GEMA', 'LEON', 'AKELA', 'RIVAN']" :key="code" :value="code">{{ code }} -- {{ LENS_LABELS[code] }}</option>
+      </select>
+    </div>
+    <div class="form-row" style="margin-top:12px">
+      <button class="btn" @click="sendToLens">Kirim</button>
     </div>
   </Dialog>
 
