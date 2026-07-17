@@ -590,6 +590,81 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       hapus-dari-kamus di C-1 (memang bukan fitur C-1; pembersihan kamus
       lewat review kuartalan §21.7, bukan tombol ad-hoc) — harmless, akan
       kena saring natural saat review kuartalan pertama.
+- [x] ~~Bug: DXY/US10Y/VIX kelihatan "kosong" padahal tidak ada gap tanggal
+      (17 Jul 2026)~~ — Giel lapor 3 field ini beku beberapa hari, sudah
+      cek sendiri tidak ada baris tanggal yang hilang. **Root cause bukan
+      gagal fetch** — `source_flags` `fred_dxy`/`fred_us10y`/`fred_vix`
+      semuanya `ok` (API call sukses tiap hari). Masalahnya:
+      `scrapers/macro_fred.py::_fetch_series()` selalu ambil observasi
+      TERBARU yang tersedia dari FRED, lalu dilabeli tanggal target `run_daily`
+      TANPA cek apakah observasi itu memang untuk hari itu. FRED sendiri
+      publish DXY/US10Y/VIX dengan jeda (bukan real-time) — dicek langsung:
+      DXY (`DTWEXBGS`) 7 hari basi, US10Y/VIX 2 hari basi saat bug ditemukan.
+      Kalau FRED belum update sejak fetch terakhir, hasilnya angka IDENTIK
+      berhari-hari berturut-turut (dikonfirmasi: 120.5046/4.55/15.67 sama
+      persis di `daily_market` 14–17 Jul) — bukan bug scraping, tapi
+      `source_flags` lama tidak bisa bedakan "fresh" vs "basi tapi sukses fetch".
+      **Fix**: `MAX_LAG_DAYS` per series (DXY/US10Y/VIX/RRP/TGA/HY=4 hari,
+      WALCL=10 hari — rilis mingguan H.4.1 tiap Kamis) + cek lag di
+      `fetch_macro_fred()`, timpa flag jadi `'stale'` (bukan `'ok'`) kalau
+      observasi lebih tua dari batasnya — **value TETAP ditulis** (angka
+      basi masih lebih berguna drpd NULL), cuma sekarang kelihatan bedanya
+      di dashboard. Sempat salah kalibrasi DXY threshold ke 10 hari
+      (dikira mingguan) — histori observasi DXY sendiri (5 hari kalender
+      berturut-turut) membuktikan itu business-daily juga, diturunkan ke 4
+      biar bug yang baru ditemukan beneran ke-flag. Frontend: `.dot.stale`
+      (warna `--med`, beda dari fail/ok/skip) + `SnapshotView.vue` sort
+      order `fail→skip→stale→ok`. 2 test baru pakai monkeypatch
+      (`tests/test_macro.py` — live-test tidak bisa kontrol seberapa basi
+      data FRED beneran hari itu secara deterministik, pola sama
+      pengecualian `test_notify_telegram.py`). 356 test hijau total.
+      **Diverifikasi live** ke DB asli: `fred_dxy` sekarang `stale`,
+      `fred_us10y`/`fred_vix` tetap `ok` (lag 2 hari masih dalam batas
+      wajar weekend) — dikonfirmasi lewat `/api/latest` beneran, bukan cuma
+      unit test.
+- [x] ~~News Threads: catch-up scan otomatis + edit title/keyword + multi-link
+      di News page (17 Jul 2026, 3 permintaan Giel sekaligus setelah cek
+      halaman `/threads`)~~ — Giel lapor thread yang baru dibuat siang hari
+      kosong link-nya (thread ACTIVE nyata, tapi 0 SUGGESTED) meski headline
+      relevan sudah ada di `daily_news`. **Root cause**: `suggest_thread_links()`
+      cuma pernah dipanggil `run_daily` dgn headline yang BARU DI-FETCH hari
+      itu — tidak pernah scan ulang histori yang sudah ada di DB. Thread dibuat
+      setelah cron pagi = ketinggalan semua berita pagi sampai cron besok.
+      Ditambal manual dulu (68 link real ditemukan lewat scan retroaktif),
+      lalu Giel minta 3 hal:
+      **1) Catch-up scan otomatis** — `THREAD_CATCHUP_DAYS = 7`,
+      `save_thread()` & `patch_thread()` (saat `keywords` berubah, thread
+      ACTIVE) sekarang scan `daily_news` 7 hari ke belakang & jalankan
+      `suggest_thread_links()` langsung, bukan nunggu cron besok. Idempoten
+      via UNIQUE index dedup yang sudah ada (aman di-re-run/overlap window).
+      **2) Edit title/keywords di `/threads/:id`** — `patch_thread()`
+      diperluas terima `title` (guard non-kosong) & `keywords` (JSON-encode
+      pola sama `persona_tags`); endpoint `/api/threads/<id>` extend field
+      whitelist; `ThreadDetailView.vue` tambah 2 input di form edit yang
+      sudah ada.
+      **3) Multi-thread-link di `/news`** — sebelumnya `attach_thread_
+      suggestions()` cuma kirim 1 `thread_link` 'pemenang' (CONFIRMED menang
+      atas SUGGESTED) per berita, jadi kalau 1 headline match >2 thread
+      Giel tidak bisa lihat/ubah/lepas yang lain. Diganti kirim array
+      `thread_links` (semua link non-REJECTED, CONFIRMED duluan).
+      `NewsView.vue` kolom Thread sekarang render banyak chip sekaligus
+      (tiap chip ada aksi sendiri — Konfirmasi/Tolak utk SUGGESTED, Lepas
+      utk CONFIRMED, reuse `POST /api/threads/link/<id>/reject` yang sudah
+      terima link status apa pun) + affordance baru "+ Tautkan Thread"
+      (dropdown thread ACTIVE + stance, reuse `POST /api/threads/<id>/links`
+      `add_thread_link_manual` yang sudah ada utk `ThreadDetailView`, tidak
+      ada endpoint baru).
+      9 test baru (`test_web_writes.py` — catch-up scan idempoten & respect
+      window, guard title kosong, catch-up trigger saat keyword diubah,
+      `attach_thread_suggestions` array shape termasuk exclude-REJECTED).
+      364 test hijau total. **Diverifikasi**: Flask test-client round-trip ke
+      DB temp terisolasi (create thread → link manual ke berita → muncul di
+      `/api/news` sbg `thread_links` → reject → hilang lagi) — sempat KELIRU
+      pakai env var `DB_PATH` (bukan `KASTARA_DB_PATH`) di percobaan pertama
+      shg tanpa sengaja nulis thread+link test ke DB PRODUKSI asli; ketahuan
+      lewat sqlite langsung, langsung dibersihkan (`DELETE` thread id 5 +
+      link id 70), dikonfirmasi state balik persis semula sebelum lanjut
+      pakai DB temp yang benar. `npm run build` sukses (356 module).
 - [x] ~~Auto-isi `actual` HIGH-importance dari investing.com (pass kedua)~~
       — riset awal SEMPAT menyimpulkan skip (lihat percobaan pertama: kena
       HTTP 429 yang tidak pulih setelah ~5-6 request cepat, dan endpoint AJAX

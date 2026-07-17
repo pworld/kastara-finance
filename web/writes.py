@@ -768,6 +768,13 @@ MAX_ACTIVE_THREADS = 7
 ALLOWED_THREAD_STATUS = {"ACTIVE", "DORMANT", "CLOSED"}
 ALLOWED_STANCE = {"MENDUKUNG", "KONTRA", "NETRAL"}
 ALLOWED_REF_TABLES = {"daily_news", "manual_articles", "policy_tracker"}
+# Ketemu 17 Jul 2026: thread baru mulai KOSONG krn suggest_thread_links()
+# cuma dipanggil run_daily dgn headline yg BARU DI-FETCH hari itu -- tidak
+# pernah scan ulang histori daily_news yang sudah ada. Thread yang dibuat
+# siang hari ketinggalan semua berita pagi. save_thread() sekarang jalankan
+# catch-up SEKALI saat dibuat (scan N hari ke belakang), biar tidak nunggu
+# cron besok buat suggestion pertama muncul.
+THREAD_CATCHUP_DAYS = 7
 
 
 def _decode_thread(row: dict[str, Any]) -> dict[str, Any]:
@@ -783,7 +790,9 @@ def save_thread(
 ) -> dict[str, Any]:
     """Buat thread baru, status ACTIVE. Guard: title wajib, maks
     MAX_ACTIVE_THREADS thread ACTIVE bersamaan (keputusan #5) -- ditegakkan
-    di sini, bukan cuma UI."""
+    di sini, bukan cuma UI. Kalau ada keywords, langsung catch-up scan
+    THREAD_CATCHUP_DAYS hari ke belakang (lihat catatan di atas) -- thread
+    tidak mulai dari nol kalau beritanya sudah ada di DB sebelum thread dibuat."""
     if not title or not title.strip():
         raise ValueError("title wajib diisi")
     active_count = conn.execute(
@@ -805,13 +814,22 @@ def save_thread(
         ":current_read, :persona_tags, :status, :verdict, :created_at, :updated_at)",
         row,
     )
+    if keywords:
+        recent_news = conn.execute(
+            "SELECT date, headline FROM daily_news WHERE date >= date(?, ?)",
+            (now, f"-{THREAD_CATCHUP_DAYS} day"),
+        ).fetchall()
+        suggest_thread_links(conn, [dict(r) for r in recent_news])
     return get_thread(conn, cur.lastrowid)
 
 
 def patch_thread(conn: sqlite3.Connection, thread_id: int, **fields: Any) -> dict[str, Any] | None:
-    """Update subset field thread (current_read/status/persona_tags/verdict).
-    Guard: status='CLOSED' wajib verdict non-kosong (vonis auditable, §20.1).
-    Return None kalau thread_id tidak ada."""
+    """Update subset field thread (title/current_read/status/keywords/
+    persona_tags/verdict). Guard: status='CLOSED' wajib verdict non-kosong
+    (vonis auditable, §20.1), title (kalau diubah) wajib non-kosong. Kalau
+    keywords diubah, catch-up scan ulang (pola sama save_thread -- kata
+    kunci baru mungkin cocok berita yang sudah ada di DB). Return None kalau
+    thread_id tidak ada."""
     current = get_thread(conn, thread_id)
     if current is None:
         return None
@@ -819,16 +837,29 @@ def patch_thread(conn: sqlite3.Connection, thread_id: int, **fields: Any) -> dic
         raise ValueError(
             f"status '{fields['status']}' tidak dikenal -- pilihan: {'/'.join(ALLOWED_THREAD_STATUS)}"
         )
+    if "title" in fields and not (fields["title"] and fields["title"].strip()):
+        raise ValueError("title wajib diisi")
     new_status = fields.get("status", current["status"])
     new_verdict = fields.get("verdict", current["verdict"])
     if new_status == "CLOSED" and not (new_verdict and new_verdict.strip()):
         raise ValueError("verdict wajib diisi saat menutup thread (status=CLOSED)")
     updates = dict(fields)
+    if "title" in updates:
+        updates["title"] = updates["title"].strip()
     if "persona_tags" in updates:
         updates["persona_tags"] = json.dumps(updates["persona_tags"])
+    if "keywords" in updates:
+        new_keywords = updates["keywords"]
+        updates["keywords"] = json.dumps(new_keywords)
     updates["updated_at"] = today_wib()
     cols = ", ".join(f"{k} = :{k}" for k in updates)
     conn.execute(f"UPDATE news_threads SET {cols} WHERE id = :id", {**updates, "id": thread_id})
+    if "keywords" in fields and fields["keywords"] and new_status == "ACTIVE":
+        recent_news = conn.execute(
+            "SELECT date, headline FROM daily_news WHERE date >= date(?, ?)",
+            (today_wib(), f"-{THREAD_CATCHUP_DAYS} day"),
+        ).fetchall()
+        suggest_thread_links(conn, [dict(r) for r in recent_news])
     return get_thread(conn, thread_id)
 
 
@@ -1016,12 +1047,13 @@ def list_thread_links(
 
 
 def attach_thread_suggestions(conn: sqlite3.Connection, news_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Tempel info news_thread_links (SUGGESTED/CONFIRMED, REJECTED
-    diabaikan) ke tiap row daily_news yang SUDAH di-fetch -- dipakai
-    GET /api/news biar NewsView bisa render chip 'Saran: <thread>?' tanpa
-    endpoint terpisah. Kalau 1 headline match >1 thread, CONFIRMED menang
-    atas SUGGESTED (ORDER BY di query), sisanya diabaikan -- UI cuma
-    nampilkan 1 chip per berita di N-1."""
+    """Tempel SEMUA news_thread_links non-REJECTED ke tiap row daily_news yang
+    SUDAH di-fetch -- dipakai GET /api/news biar NewsView bisa render chip
+    'Saran: <thread>?' tanpa endpoint terpisah. Ketemu 17 Jul 2026: dulu cuma
+    1 link 'pemenang' per berita (CONFIRMED > SUGGESTED) ditempel -- Giel
+    tidak bisa lihat/ubah/lepas thread lain yang juga match berita yang sama.
+    Sekarang tempel array `thread_links` (semua link non-REJECTED, CONFIRMED
+    duluan), UI yang render banyak chip sekaligus."""
     if not news_rows:
         return news_rows
     ids = [r["id"] for r in news_rows]
@@ -1035,16 +1067,18 @@ def attach_thread_suggestions(conn: sqlite3.Connection, news_rows: list[dict[str
         f"ORDER BY l.ref_id, CASE l.link_status WHEN 'CONFIRMED' THEN 0 ELSE 1 END, l.id",
         ids,
     ).fetchall()
-    by_ref: dict[int, dict[str, Any]] = {}
+    by_ref: dict[int, list[dict[str, Any]]] = {}
     for r in links:
-        by_ref.setdefault(r["ref_id"], dict(r))
+        by_ref.setdefault(r["ref_id"], []).append(dict(r))
     for row in news_rows:
-        link = by_ref.get(row["id"])
-        row["thread_link"] = {
-            "link_id": link["link_id"], "thread_id": link["thread_id"],
-            "thread_title": link["thread_title"], "stance": link["stance"],
-            "link_status": link["link_status"],
-        } if link else None
+        row["thread_links"] = [
+            {
+                "link_id": link["link_id"], "thread_id": link["thread_id"],
+                "thread_title": link["thread_title"], "stance": link["stance"],
+                "link_status": link["link_status"],
+            }
+            for link in by_ref.get(row["id"], [])
+        ]
     return news_rows
 
 

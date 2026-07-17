@@ -7,10 +7,24 @@ Output:
   daily_market: dxy_close, dxy_change_pct, us10y_yield, us10y_change_bps,
                 vix_close, walcl, rrp, tga, hy_credit_spread
   (net_liquidity dihitung di indicators/calc.py, bukan di sini)
+
+PENTING -- staleness vs fail (ketemu saat Giel tanya "kenapa DXY/US10Y/VIX
+kosong padahal tidak ada gap tanggal"): FRED sendiri publish series ini
+dengan JEDA beberapa hari (bukan real-time) -- observasi TERBARU yang
+tersedia dari API bisa jauh lebih tua dari tanggal target `run_daily`.
+`_fetch_series` selalu ambil observasi terbaru yang ADA, lalu di-stempel ke
+tanggal target -- kalau FRED belum update sejak fetch terakhir, hasilnya
+angka identik berhari-hari berturut-turut (BUKAN bug fetch -- API call-nya
+sukses, makanya flag lama selalu 'ok'). Fix: `MAX_LAG_DAYS` di bawah + cek
+di `fetch_macro_fred()` -- kalau observasi lebih tua dari threshold, flag
+di-set 'stale' (bukan 'ok') supaya kelihatan di dashboard, TAPI value tetap
+ditulis (angka basi masih lebih berguna drpd NULL, cuma Giel perlu tahu itu
+bukan angka hari ini).
 """
 from __future__ import annotations
 
 import os
+from datetime import date as _date
 from typing import Any
 
 from scrapers.base import SourceFlags, http_get_json, safe_call, today_wib
@@ -27,6 +41,26 @@ SERIES = {
     "rrp": "RRPONTSYD",     # Reverse repo
     "tga": "WTREGEN",       # Treasury general account
     "hy_spread": "BAMLH0A0HYM2",  # HY credit spread (optional)
+}
+
+# Batas lag "wajar" per series (hari kalender) sebelum ditandai 'stale'.
+# ESTIMASI, bukan angka pasti dari dokumentasi FRED -- dikalibrasi dari
+# observasi LANGSUNG saat bug ini ditemukan (17 Jul 2026). DXY (DTWEXBGS)
+# awalnya dikira mungkin rilis mingguan (makanya threshold longgar), TAPI
+# histori observasinya sendiri (5 hari kalender berturut-turut, 06-10 Jul)
+# membuktikan ini SEBENARNYA business-daily juga -- lag 7 hari yang
+# ditemukan hari itu memang anomali, BUKAN cadence normal. Threshold di
+# bawah dikasih margin ekstra (weekend/holiday) supaya lag NORMAL tidak
+# salah ke-flag -- kalau ternyata masih sering false-positive/negative,
+# sesuaikan angkanya, ini bukan science eksak.
+MAX_LAG_DAYS = {
+    "dxy": 4,         # H.10 broad dollar index -- business-daily (dikonfirmasi dari histori observasi)
+    "us10y": 4,       # yield harian, tapi bisa lag lewat weekend+1 hari
+    "vix": 4,         # CBOE VIX harian, pola sama
+    "walcl": 10,      # Fed balance sheet -- rilis MINGGUAN (H.4.1, tiap Kamis)
+    "rrp": 4,
+    "tga": 4,
+    "hy_spread": 4,
 }
 
 
@@ -85,6 +119,18 @@ def fetch_macro_fred(date: str | None = None) -> dict[str, Any]:
         )
         if obs:
             fetched[label] = obs
+
+    # Staleness check (lihat docstring modul): fetch sukses ('ok') TIDAK
+    # berarti datanya untuk hari ini -- FRED punya jeda publikasi sendiri.
+    # Timpa flag jadi 'stale' kalau observasi terbaru lebih tua dari
+    # MAX_LAG_DAYS -- value tetap ditulis (angka basi > NULL), tapi Giel
+    # bisa lihat bedanya di dashboard.
+    target = _date.fromisoformat(date)
+    for label in fetched:
+        obs_date = _date.fromisoformat(fetched[label][0]["date"])
+        lag = (target - obs_date).days
+        if lag > MAX_LAG_DAYS.get(label, 5):
+            flags.set(f"fred_{label}", "stale")
 
     # Map ke kolom daily_market + hitung perubahan
     if "dxy" in fetched:

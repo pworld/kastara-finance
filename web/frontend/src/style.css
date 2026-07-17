@@ -65,6 +65,9 @@ section h3 { font-size: 13px; color: var(--muted); margin: 0 0 10px;
 .dot { width: 8px; height: 8px; border-radius: 50%; }
 .dot.ok { background: var(--ok); } .dot.fail { background: var(--fail); }
 .dot.skip { background: var(--skip); }
+/* fetch sukses TAPI observasi lebih tua dari batas wajar (scrapers/macro_fred.py
+   MAX_LAG_DAYS) -- beda dari 'fail' (API error) & 'ok' (data fresh). */
+.dot.stale { background: var(--med); }
 
 .chart-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 

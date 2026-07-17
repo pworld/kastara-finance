@@ -30,6 +30,39 @@ function openThread(row) {
   router.push(`/threads/${row.id}`)
 }
 
+// ---------- Inline edit title/status/keywords/bacaan terkini langsung dari
+// index (Giel tidak mau selalu buka detail page cuma utk ubah field basic).
+// Verdict TETAP di detail page saja (jarang dipakai, cuma wajib saat CLOSED)
+// -- kalau Giel set status=CLOSED di sini tanpa verdict, patch_thread()
+// nolak (ValueError), toast arahkan ke detail page. Pola sama subtitleInputs
+// di NewsView.vue (Set id -> editing, dict id -> draft value). ----------
+const editingIds = ref(new Set())
+const editInputs = ref({})
+
+function startEdit(row) {
+  editingIds.value.add(row.id)
+  editInputs.value[row.id] = {
+    title: row.title, status: row.status,
+    keywordsCsv: (row.keywords || []).join(', '), currentRead: row.current_read || '',
+  }
+}
+function cancelEdit(row) {
+  editingIds.value.delete(row.id)
+}
+async function saveEdit(row) {
+  const input = editInputs.value[row.id]
+  if (!input.title.trim()) { toast('Title wajib diisi'); return }
+  const body = {
+    title: input.title, status: input.status, current_read: input.currentRead,
+    keywords: input.keywordsCsv.split(',').map((k) => k.trim().toLowerCase()).filter(Boolean),
+  }
+  const result = await post(`/api/threads/${row.id}`, body)
+  if (result.error) { toast(result.error); return }
+  toast('Thread diperbarui')
+  editingIds.value.delete(row.id)
+  loadThreads()
+}
+
 // + Thread baru
 const form = ref({ title: '', description: '', keywordsCsv: '', currentRead: '' })
 
@@ -72,19 +105,44 @@ async function createThread() {
         :searchFields="['title', 'current_read']" emptyMessage="belum ada thread"
       >
         <Column field="title" header="Title" sortable>
-          <template #body="{ data }"><a href="#" @click.prevent="openThread(data)">{{ data.title }}</a></template>
+          <template #body="{ data }">
+            <input v-if="editingIds.has(data.id)" v-model="editInputs[data.id].title" type="text" style="width:160px">
+            <a v-else href="#" @click.prevent="openThread(data)">{{ data.title }}</a>
+          </template>
         </Column>
         <Column field="status" header="Status" sortable>
-          <template #body="{ data }"><span class="badge" :class="THREAD_STATUS_CLASS[data.status]">{{ data.status }}</span></template>
+          <template #body="{ data }">
+            <select v-if="editingIds.has(data.id)" v-model="editInputs[data.id].status" style="width:auto">
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="DORMANT">DORMANT</option>
+              <option value="CLOSED">CLOSED</option>
+            </select>
+            <span v-else class="badge" :class="THREAD_STATUS_CLASS[data.status]">{{ data.status }}</span>
+          </template>
         </Column>
         <Column field="current_read" header="Bacaan Terkini">
-          <template #body="{ data }"><span class="src">{{ data.current_read || '-' }}</span></template>
+          <template #body="{ data }">
+            <input v-if="editingIds.has(data.id)" v-model="editInputs[data.id].currentRead" type="text" style="width:160px">
+            <span v-else class="src">{{ data.current_read || '-' }}</span>
+          </template>
         </Column>
         <Column header="Keywords">
-          <template #body="{ data }"><span class="src">{{ (data.keywords || []).join(', ') || '-' }}</span></template>
+          <template #body="{ data }">
+            <input v-if="editingIds.has(data.id)" v-model="editInputs[data.id].keywordsCsv" type="text" style="width:160px">
+            <span v-else class="src">{{ (data.keywords || []).join(', ') || '-' }}</span>
+          </template>
         </Column>
         <Column header="">
-          <template #body="{ data }"><button class="btn small secondary" @click="openThread(data)">Buka</button></template>
+          <template #body="{ data }">
+            <template v-if="editingIds.has(data.id)">
+              <button class="btn small" @click="saveEdit(data)">Simpan</button>
+              <button class="btn small secondary" @click="cancelEdit(data)">Batal</button>
+            </template>
+            <template v-else>
+              <button class="btn small secondary" @click="startEdit(data)">Edit</button>
+              <button class="btn small secondary" @click="openThread(data)">Buka</button>
+            </template>
+          </template>
         </Column>
       </DataTable>
     </div>

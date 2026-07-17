@@ -1139,6 +1139,48 @@ def test_save_thread_stores_keywords_as_json(tmp_path):
         assert fetched["keywords"] == ["warsh", "fed"]
 
 
+def test_save_thread_runs_catchup_scan_against_existing_news(tmp_path):
+    """Ketemu 17 Jul 2026: thread baru mulai kosong krn suggest_thread_links
+    cuma dipanggil run_daily dgn headline yang BARU di-fetch -- berita lama
+    yang sudah ada di DB terlewat. save_thread() sekarang catch-up sekali
+    saat dibuat."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        _seed_news_row(conn, headline="Warsh speaks on rates", date="2026-07-15")
+        _seed_news_row(conn, headline="Unrelated tech news", date="2026-07-16")
+        conn.commit()
+        thread = save_thread(conn, title="Rezim Warsh", keywords=["warsh"])
+        conn.commit()
+        links = list_thread_links(conn, thread["id"])
+        assert len(links) == 1
+        assert links[0]["source_info"]["headline"] == "Warsh speaks on rates"
+        assert links[0]["link_status"] == "SUGGESTED"
+
+
+def test_save_thread_catchup_respects_window(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        # di luar THREAD_CATCHUP_DAYS (7 hari) dari hari ini -- tidak ke-scan
+        _seed_news_row(conn, headline="Warsh old news", date="2020-01-01")
+        conn.commit()
+        thread = save_thread(conn, title="Rezim Warsh", keywords=["warsh"])
+        conn.commit()
+        assert list_thread_links(conn, thread["id"]) == []
+
+
+def test_save_thread_no_catchup_without_keywords(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        _seed_news_row(conn, headline="Warsh speaks on rates")
+        conn.commit()
+        thread = save_thread(conn, title="Thread Tanpa Keyword")
+        conn.commit()
+        assert list_thread_links(conn, thread["id"]) == []
+
+
 def test_patch_thread_requires_verdict_when_closing(tmp_path):
     db = tmp_path / "t.db"
     init_db(db)
@@ -1169,6 +1211,48 @@ def test_patch_thread_unknown_id_returns_none(tmp_path):
     init_db(db)
     with get_connection(db) as conn:
         assert patch_thread(conn, 9999, current_read="x") is None
+
+
+def test_patch_thread_updates_title_and_keywords(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        row = save_thread(conn, title="Thread A", keywords=["warsh"])
+        conn.commit()
+        updated = patch_thread(conn, row["id"], title="Thread A Renamed", keywords=["warsh", "powell"])
+        conn.commit()
+        assert updated["title"] == "Thread A Renamed"
+        assert updated["keywords"] == ["warsh", "powell"]
+
+
+def test_patch_thread_rejects_empty_title(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        row = save_thread(conn, title="Thread A")
+        conn.commit()
+        try:
+            patch_thread(conn, row["id"], title="")
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "title" in str(exc)
+
+
+def test_patch_thread_keyword_change_triggers_catchup(tmp_path):
+    """Ketemu 17 Jul 2026: kata kunci baru harus langsung catch-up scan
+    berita yang sudah ada, bukan nunggu cron besok (pola sama save_thread)."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        row = save_thread(conn, title="Thread A")  # tanpa keywords -> tidak ada catch-up awal
+        _seed_news_row(conn, headline="Powell testifies before Congress")
+        conn.commit()
+        assert list_thread_links(conn, row["id"]) == []
+        patch_thread(conn, row["id"], keywords=["powell"])
+        conn.commit()
+        links = list_thread_links(conn, row["id"])
+        assert len(links) == 1
+        assert links[0]["source_info"]["headline"] == "Powell testifies before Congress"
 
 
 def test_list_threads_filters_by_status(tmp_path):
@@ -1357,9 +1441,11 @@ def test_list_thread_links_joins_daily_news_and_manual_articles(tmp_path):
         assert links["manual_articles"]["source_info"]["headline"] == "Manual article headline"
 
 
-def test_attach_thread_suggestions_prefers_confirmed_over_suggested(tmp_path):
-    """Kalau 1 headline match >1 thread (1 SUGGESTED, 1 CONFIRMED), yang
-    ditampilkan CONFIRMED -- deterministik, bukan urutan sisipan acak."""
+def test_attach_thread_suggestions_returns_all_non_rejected_confirmed_first(tmp_path):
+    """1 headline bisa match >1 thread sekaligus (mis. berita relevan ke 2
+    narasi berbeda) -- Giel harus bisa lihat/ubah/lepas SEMUANYA, bukan cuma
+    1 'pemenang'. Array thread_links kembalikan semua link non-REJECTED,
+    CONFIRMED duluan (deterministik, bukan urutan sisipan acak)."""
     db = tmp_path / "t.db"
     init_db(db)
     with get_connection(db) as conn:
@@ -1375,11 +1461,32 @@ def test_attach_thread_suggestions_prefers_confirmed_over_suggested(tmp_path):
         conn.commit()
         rows = [{"id": news_id, "headline": "Warsh signals hawkish stance"}]
         attached = attach_thread_suggestions(conn, rows)
-        assert attached[0]["thread_link"]["thread_title"] == "Thread Confirmed"
-        assert attached[0]["thread_link"]["link_status"] == "CONFIRMED"
+        links = attached[0]["thread_links"]
+        assert len(links) == 2
+        assert links[0]["thread_title"] == "Thread Confirmed"
+        assert links[0]["link_status"] == "CONFIRMED"
+        assert links[1]["thread_title"] == "Thread Suggested Only"
+        assert links[1]["link_status"] == "SUGGESTED"
 
 
-def test_attach_thread_suggestions_none_when_no_link(tmp_path):
+def test_attach_thread_suggestions_excludes_rejected(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        t1 = save_thread(conn, title="Thread Rejected")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        cur = conn.execute(
+            "INSERT INTO news_thread_links (thread_id, ref_table, ref_id, link_status, linked_at) "
+            "VALUES (?, 'daily_news', ?, 'REJECTED', '')", (t1["id"], news_id),
+        )
+        conn.commit()
+        rows = [{"id": news_id, "headline": "Warsh signals hawkish stance"}]
+        attached = attach_thread_suggestions(conn, rows)
+        assert attached[0]["thread_links"] == []
+
+
+def test_attach_thread_suggestions_empty_list_when_no_link(tmp_path):
     db = tmp_path / "t.db"
     init_db(db)
     with get_connection(db) as conn:
@@ -1387,7 +1494,7 @@ def test_attach_thread_suggestions_none_when_no_link(tmp_path):
         conn.commit()
         rows = [{"id": news_id, "headline": "Warsh signals hawkish stance"}]
         attached = attach_thread_suggestions(conn, rows)
-        assert attached[0]["thread_link"] is None
+        assert attached[0]["thread_links"] == []
 
 
 # ---------- Faceted Tagging (Addendum C §21, GELOMBANG C-1 fondasi) ----------

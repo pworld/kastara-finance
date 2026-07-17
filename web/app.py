@@ -1233,7 +1233,7 @@ def thread_patch(thread_id):
     # lihat POST /api/emiten/<ticker>/override, /api/grader_log/<id>/outcome,
     # dll), meski secara REST-purist ini "update", bukan "create".
     body = request.get_json(force=True)
-    fields = {k: v for k, v in body.items() if k in {"current_read", "status", "persona_tags", "verdict"}}
+    fields = {k: v for k, v in body.items() if k in {"title", "current_read", "status", "keywords", "persona_tags", "verdict"}}
     try:
         with get_connection() as conn:
             row = writes.patch_thread(conn, thread_id, **fields)

@@ -16,11 +16,13 @@ const threadId = route.params.id
 const thread = ref(null)
 const loading = ref(true)
 
-// Header editable (current_read/status/verdict) -- refs di-sinkron ulang
-// tiap loadThread() (bukan trigger event DOM) supaya selalu cocok dgn data
-// server terbaru, termasuk setelah save.
+// Header editable (title/current_read/status/keywords/verdict) -- refs
+// di-sinkron ulang tiap loadThread() (bukan trigger event DOM) supaya
+// selalu cocok dgn data server terbaru, termasuk setelah save.
+const editTitle = ref('')
 const editCurrentRead = ref('')
 const editStatus = ref('')
+const editKeywordsCsv = ref('')
 const editVerdict = ref('')
 
 async function loadThread() {
@@ -28,8 +30,10 @@ async function loadThread() {
   const result = await get(`/api/threads/${threadId}`)
   if (result.error) { toast(result.error); router.push('/threads'); return }
   thread.value = result
+  editTitle.value = result.title
   editCurrentRead.value = result.current_read || ''
   editStatus.value = result.status
+  editKeywordsCsv.value = (result.keywords || []).join(', ')
   editVerdict.value = result.verdict || ''
   loading.value = false
 }
@@ -39,11 +43,14 @@ const confirmedLinks = computed(() => (thread.value?.links || []).filter((l) => 
 const suggestedLinks = computed(() => (thread.value?.links || []).filter((l) => l.link_status === 'SUGGESTED'))
 
 async function saveThreadEdit() {
-  const body = { current_read: editCurrentRead.value, status: editStatus.value }
+  const body = {
+    title: editTitle.value, current_read: editCurrentRead.value, status: editStatus.value,
+    keywords: editKeywordsCsv.value.split(',').map((k) => k.trim().toLowerCase()).filter(Boolean),
+  }
   if (editStatus.value === 'CLOSED') body.verdict = editVerdict.value
   const result = await post(`/api/threads/${threadId}`, body)
   if (result.error) { toast(result.error); return }
-  toast('Thread diperbarui')
+  toast('Thread diperbarui — kata kunci baru langsung di-catch-up scan ke berita 7 hari terakhir')
   loadThread()
 }
 
@@ -108,6 +115,14 @@ async function addManualLink() {
         <details class="collapsible" style="margin-top:12px">
           <summary>Edit thread</summary>
           <div class="form-row" style="margin-top:8px">
+            <label class="field">Title</label>
+            <input v-model="editTitle" type="text">
+          </div>
+          <div class="form-row">
+            <label class="field">Keywords (comma-separated, dipakai auto-suggest)</label>
+            <input v-model="editKeywordsCsv" type="text" placeholder="mis. warsh, fed, powell">
+          </div>
+          <div class="form-row">
             <label class="field">Bacaan Terkini</label>
             <input v-model="editCurrentRead" type="text">
           </div>

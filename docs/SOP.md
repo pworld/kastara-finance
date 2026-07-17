@@ -200,9 +200,14 @@ penting, bukan angka absolutnya.
 | **Gold** | Emas | Naik saat DXY & yield turun = klasik. Naik BERSAMA dolar kuat = sinyal stress/permintaan safe-haven (baca §Saham Emas SOP). |
 
 **Status Sumber Data (source_flags):** buka bagian collapsible di bawah kartu.
-🟢 ok / 🟡 skip / 🔴 fail per sumber. Field yang kamu butuhkan hari ini merah →
-analisa yang bergantung padanya LOW_CONFIDENCE / ditunda (§0 poin 3), bukan
-ditebak.
+🟢 ok / 🟡 skip / 🟠 stale / 🔴 fail per sumber. **`stale`** (khusus
+`fred_dxy`/`fred_us10y`/`fred_vix`/dll) = fetch-nya SUKSES tapi observasi
+FRED yang didapat lebih tua dari batas wajar (`MAX_LAG_DAYS`,
+`scrapers/macro_fred.py`) — beda dari `fail`. Angka di kartu tetap tampil
+(basi masih lebih berguna drpd kosong), tapi jangan dibaca sebagai "hari
+ini" — cek tanggal observasi aslinya kalau ragu. Field yang kamu butuhkan
+hari ini merah (fail) ATAU oranye (stale) dan krusial → analisa yang
+bergantung padanya LOW_CONFIDENCE / ditunda (§0 poin 3), bukan ditebak.
 
 > **Manual Backfill** di panel ini = alat isi lubang data historis, BUKAN bacaan
 > harian. Info gap tampil per instrument saat ganti dropdown; "Cek & Preview

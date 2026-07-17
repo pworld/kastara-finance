@@ -109,7 +109,12 @@ onMounted(loadAllTags)
 
 // ---------- News Threads N-1: chip "Saran: <thread>?" + konfirmasi stance ----------
 // (Addendum B §20.5). SUGGESTED -> Konfirmasi (buka dialog pilih stance) /
-// Tolak. CONFIRMED -> chip solid + stance, tidak ada aksi lagi di sini.
+// Tolak. CONFIRMED -> chip solid + stance + Lepas. Ketemu 17 Jul 2026: dulu
+// backend cuma kirim 1 thread_link 'pemenang' per berita -- Giel tidak bisa
+// lihat/ubah/lepas thread LAIN yang juga match berita yang sama. Sekarang
+// `data.thread_links` array, tiap chip punya aksi sendiri; reject endpoint
+// dipakai baik utk "Tolak" (SUGGESTED) maupun "Lepas" (CONFIRMED) -- sama-sama
+// set link_status=REJECTED, endpoint sudah terima link status apa pun.
 const stanceDialogOpen = ref(false)
 const stanceDialogLink = ref(null)
 const selectedStance = ref('MENDUKUNG')
@@ -133,7 +138,37 @@ async function confirmThreadLink() {
 
 async function rejectThreadLink(threadLink) {
   await post(`/api/threads/link/${threadLink.link_id}/reject`, {})
-  toast('Saran thread ditolak')
+  toast('Tautan thread dilepas')
+  loadNews()
+}
+
+// ---------- + Tautkan Thread manual: pasang link CONFIRMED langsung (Giel
+// sudah tahu stance-nya), tidak lewat SUGGESTED. Reuse POST /api/threads/
+// <id>/links (add_thread_link_manual, sudah ada utk ThreadDetailView). ----------
+const activeThreads = ref([])
+async function loadActiveThreads() {
+  activeThreads.value = await get('/api/threads', { status: 'ACTIVE' })
+}
+onMounted(loadActiveThreads)
+
+const linkPickerIds = ref(new Set())
+const linkPickerInputs = ref({})
+function startAddThreadLink(row) {
+  linkPickerIds.value.add(row.id)
+  linkPickerInputs.value[row.id] = { threadId: '', stance: 'MENDUKUNG' }
+}
+function cancelAddThreadLink(row) {
+  linkPickerIds.value.delete(row.id)
+}
+async function addThreadLink(row) {
+  const input = linkPickerInputs.value[row.id]
+  if (!input?.threadId) { toast('Pilih thread dulu'); return }
+  const result = await post(`/api/threads/${input.threadId}/links`, {
+    ref_table: 'daily_news', ref_id: row.id, stance: input.stance,
+  })
+  if (result.error) { toast(result.error); return }
+  toast('Ditautkan ke thread')
+  linkPickerIds.value.delete(row.id)
   loadNews()
 }
 
@@ -215,16 +250,33 @@ async function saveArticle() {
         </Column>
         <Column header="Thread">
           <template #body="{ data }">
-            <template v-if="!data.thread_link"><span class="src">—</span></template>
-            <template v-else-if="data.thread_link.link_status === 'SUGGESTED'">
-              <span class="badge" :class="LINK_STATUS_CLASS.SUGGESTED">Saran: {{ data.thread_link.thread_title }}?</span>
-              <button class="btn small secondary" @click="openStanceDialog(data.thread_link)">Konfirmasi</button>
-              <button class="btn small danger" @click="rejectThreadLink(data.thread_link)">Tolak</button>
-            </template>
-            <template v-else>
-              <span class="badge" :class="LINK_STATUS_CLASS.CONFIRMED">{{ data.thread_link.thread_title }}</span>
-              <span class="src">({{ data.thread_link.stance }})</span>
-            </template>
+            <p v-if="!data.thread_links || !data.thread_links.length" class="src" style="margin:0 0 4px">—</p>
+            <div v-for="tl in data.thread_links" :key="tl.link_id" style="margin-bottom:4px">
+              <template v-if="tl.link_status === 'SUGGESTED'">
+                <span class="badge" :class="LINK_STATUS_CLASS.SUGGESTED">Saran: {{ tl.thread_title }}?</span>
+                <button class="btn small secondary" @click="openStanceDialog(tl)">Konfirmasi</button>
+                <button class="btn small danger" @click="rejectThreadLink(tl)">Tolak</button>
+              </template>
+              <template v-else>
+                <span class="badge" :class="LINK_STATUS_CLASS.CONFIRMED">{{ tl.thread_title }}</span>
+                <span class="src">({{ tl.stance }})</span>
+                <button class="btn small danger" @click="rejectThreadLink(tl)">Lepas</button>
+              </template>
+            </div>
+            <div v-if="linkPickerIds.has(data.id)">
+              <select v-model="linkPickerInputs[data.id].threadId" style="width:auto">
+                <option value="">pilih thread...</option>
+                <option v-for="t in activeThreads" :key="t.id" :value="t.id">{{ t.title }}</option>
+              </select>
+              <select v-model="linkPickerInputs[data.id].stance" style="width:auto">
+                <option value="MENDUKUNG">MENDUKUNG</option>
+                <option value="KONTRA">KONTRA</option>
+                <option value="NETRAL">NETRAL</option>
+              </select>
+              <button class="btn small" @click="addThreadLink(data)">Tautkan</button>
+              <button class="btn small secondary" @click="cancelAddThreadLink(data)">Batal</button>
+            </div>
+            <a v-else href="#" @click.prevent="startAddThreadLink(data)">+ Tautkan Thread</a>
           </template>
         </Column>
         <Column header="Tag">

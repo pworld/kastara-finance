@@ -43,7 +43,10 @@ function cardDelta(s) {
 
 const sortedFlags = computed(() => {
   if (!data.value?.source_flags) return []
-  const order = { fail: 0, skip: 1, ok: 2 }
+  // 'stale' = fetch sukses tapi observasi lebih tua dari batas wajar
+  // (scrapers/macro_fred.py) -- ranking di antara skip & ok, biar kelihatan
+  // tapi tidak sepanik 'fail'.
+  const order = { fail: 0, skip: 1, stale: 2, ok: 3 }
   return Object.entries(data.value.source_flags)
     .sort((a, b) => (order[a[1]] - order[b[1]]) || a[0].localeCompare(b[0]))
 })
