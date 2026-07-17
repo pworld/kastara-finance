@@ -12,7 +12,6 @@ const navGroups = [
     items: [
       { to: '/snapshot', label: 'Snapshot' },
       { to: '/news', label: 'News' },
-      { to: '/threads', label: 'Threads' },
       { to: '/forward', label: 'Forward' },
       { to: '/reading', label: 'Reading' },
       { to: '/chart', label: 'Chart' },
@@ -38,10 +37,13 @@ const navGroups = [
   },
   {
     // Kurasi lambat/reflektif (Addendum C §21.11) -- BEDA sifat dari Daily,
-    // grup sendiri biar tidak tercampur ritual harian.
+    // grup sendiri biar tidak tercampur ritual harian. Threads dipindah ke
+    // sini juga (bukan cuma Tags) -- sama-sama kelola/kurasi, bukan ritual
+    // baca harian (itu di News/Reading lewat chip & strip).
     title: 'Pengaturan',
     items: [
-      { to: '/settings', label: 'Settings' },
+      { to: '/tags', label: 'Tags' },
+      { to: '/threads', label: 'Threads' },
     ],
   },
 ]

@@ -1122,15 +1122,25 @@ def attach_thread_suggestions(conn: sqlite3.Connection, news_rows: list[dict[str
 ALLOWED_FACETS = {"geo", "org", "who", "sym", "theme", "sec"}
 ALLOWED_CONTENT_TAG_REF_TABLES = {"daily_news", "manual_articles", "news_threads"}
 _TAG_VALUE_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+# Simbol global/makro yang TIDAK ambigu lintas market (tidak butuh region-
+# prefix) -- ketemu 17 Jul 2026 saat seed_tags.py jalan: kontrak §21.1 sendiri
+# mencontohkan "sym:btc"/"sym:xau" TANPA prefix di daftar vocabulary-nya,
+# padahal kalimat aturan di baris yang sama bilang "wajib region-prefix" --
+# kontradiksi kecil di teks kontrak. Resolusi: WAJIB region-prefix cuma utk
+# TICKER SAHAM (ambigu antar-bursa, itu tujuan asli aturan -- "BBCA" bisa
+# banyak arti), simbol makro/indeks/kripto global di allowlist ini dikecualikan.
+_GLOBAL_SYM_EXEMPT = {"btc", "eth", "xau", "dxy", "us10y", "vix", "sp500", "idx"}
 
 
 def _validate_tag_grammar(canonical: str) -> str:
     """Tata bahasa tag (§21.1): "facet:value", facet dari ALLOWED_FACETS,
     value lowercase+hyphen (tanpa spasi/karakter lain), `sym:` WAJIB
-    region-prefix (mis. "id-bbca" -- dideteksi lewat keberadaan hyphen,
-    membedakan dari ticker polos tanpa region spt "bbca"). Return facet
-    (dipakai caller, single source of truth -- bukan param terpisah yang
-    bisa mismatch dgn canonical). Raise ValueError kalau melanggar."""
+    region-prefix KECUALI simbol global/makro di `_GLOBAL_SYM_EXEMPT` (mis.
+    "id-bbca" -- dideteksi lewat keberadaan hyphen, membedakan dari ticker
+    polos tanpa region spt "bbca"; tapi "sym:btc"/"sym:dxy"/dst TIDAK butuh
+    prefix, tidak ambigu lintas market). Return facet (dipakai caller, single
+    source of truth -- bukan param terpisah yang bisa mismatch dgn canonical).
+    Raise ValueError kalau melanggar."""
     canonical = (canonical or "").strip()
     if ":" not in canonical:
         raise ValueError(f"tag '{canonical}' harus format facet:value (mis. 'who:warsh')")
@@ -1142,10 +1152,11 @@ def _validate_tag_grammar(canonical: str) -> str:
             f"value tag '{value}' tidak valid -- lowercase, hyphen (bukan spasi), "
             "tanpa karakter lain (mis. 'rate-policy', bukan 'Rate Policy'/'rate_policy')"
         )
-    if facet == "sym" and "-" not in value:
+    if facet == "sym" and "-" not in value and value not in _GLOBAL_SYM_EXEMPT:
         raise ValueError(
             f"sym:{value} wajib region-prefix (mis. 'sym:id-bbca'/'sym:us-tsla'), "
-            "bukan ticker polos tanpa region"
+            "bukan ticker polos tanpa region -- kecuali simbol global/makro "
+            f"({'/'.join(sorted(_GLOBAL_SYM_EXEMPT))})"
         )
     return facet
 

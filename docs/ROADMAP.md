@@ -751,7 +751,65 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       Sama seperti biasa: tidak bisa browser-verify visual di balik login
       (Giel sempat kasih password langsung, tetap ditolak — aturan kredensial
       tidak ada pengecualian "punya sendiri").
-- [x] ~~Auto-isi `actual` HIGH-importance dari investing.com (pass kedua)~~
+- [x] ~~Konsolidasi `/threads` index ke Settings > Tab Threads (17 Jul 2026,
+      langsung setelah Settings selesai dibangun)~~ — Giel: halaman
+      `/threads` (dulu: daftar thread + form buat baru) jadi kosong/redundan
+      begitu Settings > Tab Threads ada (2 tempat kelola daftar thread yang
+      sama). Konten `ThreadIndexView.vue` (status filter, inline-edit title/
+      status/bacaan-terkini/keywords, form "+ Thread Baru") DIPINDAH SELURUHNYA
+      ke `SettingsView.vue` Tab Threads, digabung dgn kolom komposisi/umur/
+      facet-tags yang sudah ada di sana — file `ThreadIndexView.vue` DIHAPUS
+      (bukan dibiarkan mati, tidak ada referensi tersisa). `/threads/:id`
+      (timeline link CONFIRMED, konfirmasi/tolak SUGGESTED, tautkan manual)
+      TETAP terpisah -- fungsi beda (baca hasil harian, bukan kurasi
+      reflektif) -- tapi dilepas dari nav sidebar, cuma dituju via tombol
+      "Timeline" di Settings atau chip thread di `/news`. `ThreadDetailView.vue`
+      tombol "Indeks Thread" & redirect error diarahkan ke `/settings?tab=threads`
+      (bukan `/threads` yang sudah tidak ada) — `SettingsView.vue` baca
+      `route.query.tab` saat mount supaya deep-link langsung buka Tab Threads.
+      Nav sidebar: item "Threads" dihapus dari grup Daily (News + Forward +
+      Reading + Chart + Synthesis + Snapshot = 6 item, Threads tidak lagi
+      di antaranya). Sekalian menutup 1 gap kecil yang belum ada: **buat tag
+      baru langsung dari Settings** (`+ Tag Baru`, form canonical+aliases+
+      description sekaligus — beda dari `TagAutocomplete`'s "+ buat tag baru"
+      yang canonical-only/jalur cepat News, di Settings Giel biasanya sudah
+      tahu alias/deskripsi dari awal). Tidak ada perubahan backend/skema —
+      murni pemindahan & reorganisasi UI, endpoint yang dipakai semua sudah
+      ada. 389 test hijau (backend Python sama sekali tidak disentuh).
+      `npm run build` bersih: 356 module (turun dari 357 — `ThreadIndexView`
+      hilang dari chunk list, bukti file benar-benar tidak lagi ter-bundle).
+- [x] ~~Seed `tag_dictionary` + kandidat thread awal (Addendum C §21.12,
+      17 Jul 2026, Giel kirim `seed_tags_threads.md`)~~ — saved ke
+      `docs/seed_tags_threads.md`, diimport lewat `pipeline/seed_tags.py`
+      (`python -m pipeline.seed_tags`, pola sama `seed_context_weight.py`:
+      idempotent, no-arg, `init_db()` + `get_connection()` + commit sekali).
+      **Cek dulu sebelum jalan**: DB produksi sudah punya 5 thread ACTIVE
+      dgn judul & arah tesis SENDIRI ("Rezim Warsh Dovish", "IHSG Menguat,
+      Saham Bullish", dll) yang tidak cocok 1:1 dgn kandidat generik di doc
+      (mis. Kandidat A menulis "Hawkish" — arah BERLAWANAN dgn thread real
+      "Rezim Warsh Dovish"). Ditanyakan ke Giel: seed SEMUA 8 kandidat sbg
+      **DORMANT** (bukan ACTIVE) — skrip TIDAK PERNAH menyentuh/menutup
+      thread existing, cuma nambah tag + 8 kandidat baru berstatus DORMANT
+      siap diaktifkan manual dari Settings kapan pun narasinya benar-benar
+      dilacak. `who:purbaya` SENGAJA di-skip (jabatan/ejaan belum
+      diverifikasi, sesuai Aturan Pakai #3 di doc sendiri).
+      **Bug ditemukan+diperbaiki saat testing**: 8 dari 71 tag (`sym:btc`,
+      `sym:eth`, `sym:xau`, `sym:dxy`, `sym:us10y`, `sym:vix`, `sym:sp500`,
+      `sym:idx`) gagal lolos `_validate_tag_grammar`'s aturan "sym: wajib
+      region-prefix" — padahal kontrak §21.1 sendiri mencontohkan
+      `sym:btc`/`sym:xau` TANPA prefix di vocabulary-nya (kontradiksi kecil
+      di teks kontrak: kalimat aturan bilang "wajib" tapi contoh
+      melanggarnya). Diperbaiki: `_GLOBAL_SYM_EXEMPT` allowlist baru
+      (`web/writes.py`) — simbol global/makro yang tidak ambigu lintas
+      market dikecualikan dari wajib-region-prefix; ticker saham individual
+      (`bbca`, dll) TETAP wajib prefix (test lama `test_create_tag_sym_
+      requires_region_prefix` tidak berubah, tes baru `..._global_symbols_
+      exempt...` menambahkan cakupan). 1 test baru, 390 test hijau total.
+      **Hasil di DB produksi**: 71 tag baru + 8 kandidat thread DORMANT (id
+      7–14) — dikonfirmasi via query langsung: 5 thread ACTIVE asli (id 1,2,
+      3,4,6) SAMA SEKALI TIDAK BERUBAH, `tag_dictionary` 1→72 baris.
+      Diverifikasi dulu terhadap DB temp terisolasi (idempotensi: re-run 2x
+      tidak duplikat apa pun) sebelum dijalankan ke produksi.
       — riset awal SEMPAT menyimpulkan skip (lihat percobaan pertama: kena
       HTTP 429 yang tidak pulih setelah ~5-6 request cepat, dan endpoint AJAX
       utk navigasi tanggal "Yesterday" tidak ketemu). Tapi masalah itu murni

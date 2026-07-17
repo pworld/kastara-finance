@@ -1564,6 +1564,19 @@ def test_create_tag_sym_requires_region_prefix(tmp_path):
         assert ok["canonical"] == "sym:id-bbca"
 
 
+def test_create_tag_sym_global_symbols_exempt_from_region_prefix(tmp_path):
+    """Ketemu 17 Jul 2026 (seed_tags.py): kontrak §21.1 sendiri mencontohkan
+    'sym:btc'/'sym:xau' TANPA region-prefix -- simbol global/makro yang tidak
+    ambigu lintas market dikecualikan dari aturan region-prefix (beda dari
+    ticker saham spt 'bbca' yang tetap wajib, lihat test di atas)."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        for canonical in ["sym:btc", "sym:eth", "sym:xau", "sym:dxy", "sym:us10y", "sym:vix", "sym:sp500", "sym:idx"]:
+            ok = create_tag(conn, canonical)
+            assert ok["canonical"] == canonical
+
+
 def test_create_tag_rejects_duplicate_canonical(tmp_path):
     db = tmp_path / "t.db"
     init_db(db)

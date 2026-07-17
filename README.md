@@ -297,12 +297,12 @@ execution/trading logic di mana pun.
 python -m web.app
 # buka http://127.0.0.1:5000
 ```
-Navigasi 10 tab: **1 Snapshot** (cards +
+Navigasi 9 tab: **1 Snapshot** (cards +
 source_flags + form Manual Backfill preview→confirm), **2 News** (list +
-filter impact + tandai for Reading + chip saran News Threads + tag facet
-command-palette (Addendum C §21, filter AND/OR) + display_subtitle inline-edit
-+ Add Manual Article), **News Threads** (Addendum B §20, N-1: indeks + halaman
-timeline per thread, buat thread baru), **3 Forward**
+filter impact + tandai for Reading + chip saran News Threads (multi-link,
+konfirmasi/tolak/tautkan manual) + tag facet command-palette (Addendum C §21,
+filter AND/OR, "Kirim ke Lensa →" feed manual ke persona) + display_subtitle
+inline-edit + Add Manual Article), **3 Forward**
 (Economic Calendar data asli + forecast/previous/actual otomatis/manual,
 Earnings Emiten + warning posisi terbuka, Expectations manual FedWatch/Dot
 Plot, Positioning COT+ETF otomatis & SBN manual, Policy Tracker manual,
@@ -315,10 +315,14 @@ position sizing + Prediction Log + skor prediksi + Daily Briefing), **7
 Riwayat** (arsip synthesis/prediksi/jurnal/lensa, sub-tab), **8 Universe &
 Grader** (Phase J+: universe saham, intake kandidat, uji kelayakan + grade,
 detail emiten + override kuadran, rasio bank manual, validasi lane bar-replay,
-grader log), **Settings** (Addendum C §21.11, kurasi lambat/reflektif: Tab
-Tags -- edit description/facet, hapus, gabung tag duplikat, tag yatim; Tab
-Threads -- status/verdict/current_read/persona_tags/facet tags thread,
-komposisi stance, umur, N/7 ACTIVE). Panel 1–6 (+ News Threads) = ritme
+grader log), **9 Settings** (Addendum C §21.11, kurasi lambat/reflektif: Tab
+Tags -- buat/edit description/facet, hapus, gabung tag duplikat, tag yatim;
+Tab Threads -- eks halaman indeks `/threads` DIPINDAH ke sini 17 Jul 2026
+(redundan setelah Settings ada): buat thread baru, inline-edit title/status/
+bacaan-terkini/keywords, Dialog "Kelola" utk verdict/persona_tags/facet tags,
+komposisi stance, umur, N/7 ACTIVE, tombol "Timeline" ke `/threads/:id` --
+halaman timeline itu SENDIRI TIDAK ada di nav, cuma dituju dari sini/chip News).
+Panel 1–6 = ritme
 harian TRADE lane; Panel 8 = ritme mingguan/kuartalan INVEST lane; Settings =
 sesekali/kuartalan (lihat [SOP.md](docs/SOP.md)).
 

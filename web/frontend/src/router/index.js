@@ -15,13 +15,18 @@ const routes = [
   { path: '/synthesis', name: 'synthesis', component: () => import('../views/SynthesisView.vue') },
   { path: '/riwayat', name: 'riwayat', component: () => import('../views/RiwayatView.vue') },
   { path: '/universe', name: 'universe', component: () => import('../views/UniverseView.vue') },
-  // News Threads N-1 (Addendum B §20) -- route dinamis PERTAMA di app ini
+  // News Threads (Addendum B §20 + Addendum C §21.11 komposisi/umur/tags).
+  // 17 Jul 2026: sempat digabung jadi "Settings" dgn tab Tags/Threads, Giel
+  // minta dipecah lagi jadi 2 menu berdiri sendiri (bukan tab).
+  // `/threads` = index/kelola (ThreadsView.vue), `/threads/:id` = timeline
+  // per-thread (konfirmasi/tolak SUGGESTED, TETAP terpisah -- fungsi beda,
+  // baca hasil bukan kurasi) -- route dinamis PERTAMA di app ini
   // (`:id` via useRoute().params.id, bukan props -- lihat ThreadDetailView.vue).
-  { path: '/threads', name: 'threads', component: () => import('../views/ThreadIndexView.vue') },
+  { path: '/threads', name: 'threads', component: () => import('../views/ThreadsView.vue') },
   { path: '/threads/:id', name: 'thread-detail', component: () => import('../views/ThreadDetailView.vue') },
-  // Settings (Addendum C §21.11, C-1 gap ditutup 17 Jul 2026) -- kurasi
-  // lambat/reflektif tag & thread, terpisah dari command-palette cepat.
-  { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue') },
+  // Tags (Addendum C §21.11, C-1 gap ditutup 17 Jul 2026) -- kurasi
+  // lambat/reflektif kamus tag, terpisah dari command-palette cepat.
+  { path: '/tags', name: 'tags', component: () => import('../views/TagsView.vue') },
 ]
 
 const router = createRouter({
