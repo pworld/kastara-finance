@@ -77,3 +77,32 @@ def test_fetch_all_news_continues_when_one_feed_dead(monkeypatch):
     assert "Disabled" not in health_report
     assert len(articles) > 0
     assert all(a["source"] == "Good" for a in articles)
+
+
+# ---------- rss_summary (Addendum D §22.3, D-1) ----------
+
+def test_fetch_all_news_includes_rss_summary_key():
+    """Live feed -- tiap artikel WAJIB punya key rss_summary (None wajar
+    kalau feed tak sertakan summary, tapi key-nya sendiri harus selalu ada)."""
+    articles, _ = news.fetch_all_news()
+    assert articles, "harusnya ada artikel dari feed live"
+    for a in articles:
+        assert "rss_summary" in a
+        assert a["rss_summary"] is None or isinstance(a["rss_summary"], str)
+
+
+def test_clean_rss_summary_none_and_empty():
+    assert news._clean_rss_summary(None) is None
+    assert news._clean_rss_summary("") is None
+    assert news._clean_rss_summary("   ") is None
+
+
+def test_clean_rss_summary_strips_html_and_whitespace():
+    assert news._clean_rss_summary("<p>Hello  <b>world</b></p>\n\n") == "Hello world"
+
+
+def test_clean_rss_summary_truncates_long_text():
+    long_text = "x" * 500
+    result = news._clean_rss_summary(long_text)
+    assert len(result) == news.RSS_SUMMARY_MAX_LEN + 1  # +1 utk karakter "…"
+    assert result.endswith("…")

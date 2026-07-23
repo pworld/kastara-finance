@@ -166,12 +166,14 @@ def insert_news_dedup(conn: sqlite3.Connection, items: list[dict[str, Any]]) -> 
             # Addendum C §21.2: for_reading gantikan is_key_trigger secara
             # fungsional -- baris baru cuma set for_reading=0 (is_key_trigger
             # beku sejak migrasi, biarkan DEFAULT 0 bawaan schema, jangan
-            # di-set lagi di sini).
+            # di-set lagi di sini). Addendum D §22.3 (D-1): rss_summary --
+            # `.get` krn item dari sumber selain scrapers/news.py (mis.
+            # pipeline/add_article.py) tidak selalu sertakan field ini.
             "INSERT OR IGNORE INTO daily_news "
-            "(date, source, headline, raw_url, impact_level, for_reading, created_at) "
-            "VALUES (?, ?, ?, ?, ?, 0, ?)",
+            "(date, source, headline, raw_url, impact_level, rss_summary, for_reading, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
             (it["date"], it["source"], it["headline"], it["raw_url"],
-             it["impact_level"], created_at()),
+             it["impact_level"], it.get("rss_summary"), created_at()),
         )
         inserted += cur.rowcount
     return inserted

@@ -1,9 +1,11 @@
 """News scraper: RSS feeds (registry di scrapers/feeds_config.py) + rule-based
 impact scoring (BUKAN AI/LLM).
 
-Output ke daily_news: source, headline, raw_url, impact_level (HIGH/MED/LOW).
-for_reading DEFAULT 0 (Giel flag manual nanti -- rename fungsional dari
-is_key_trigger, Addendum C §21.2).
+Output ke daily_news: source, headline, raw_url, impact_level (HIGH/MED/LOW),
+rss_summary (Addendum D §22.3 D-1 -- summary/description bawaan feed apa
+adanya, HTML di-strip, NULL kalau feed tak sertakan). for_reading DEFAULT 0
+(Giel flag manual nanti -- rename fungsional dari is_key_trigger, Addendum C
+§21.2).
 
 Health check per feed tiap run (`check_feed_health`) — pola sama dengan
 `source_flags` API di Phase A: feed mati harus KELIHATAN tiap run lewat
@@ -18,16 +20,39 @@ Acceptance:
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import feedparser
 import requests
+from bs4 import BeautifulSoup
 
 from scrapers.base import keyword_matches, today_wib
 from scrapers.feeds_config import FEEDS, IMPACT_KEYWORDS
 
 DEFAULT_TIMEOUT = 10
 HEADERS = {"User-Agent": "kastara-finance/0.1 (news feed health check)"}
+
+# Addendum D §22.3 (D-1) -- simpan summary/description bawaan feed APA ADANYA
+# (nol LLM, nol fetch tambahan), cuma strip HTML markup + rapikan whitespace +
+# batasi panjang biar tidak membengkak di UI/prompt persona. Batas 400 char
+# cukup utk 2-3 baris ringkas (§22.3 UI: "teks abu 2-3 baris").
+RSS_SUMMARY_MAX_LEN = 400
+
+
+def _clean_rss_summary(raw: str | None) -> str | None:
+    """Strip HTML (banyak feed embed <p>/<a> di description), rapikan
+    whitespace, potong ke RSS_SUMMARY_MAX_LEN. Return None kalau kosong
+    setelah dibersihkan -- NULL wajar utk feed yang tak sertakan summary."""
+    if not raw:
+        return None
+    text = BeautifulSoup(raw, "html.parser").get_text(" ", strip=True)
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return None
+    if len(text) > RSS_SUMMARY_MAX_LEN:
+        text = text[:RSS_SUMMARY_MAX_LEN].rstrip() + "…"
+    return text
 
 
 def score_impact(headline: str) -> str:
@@ -98,6 +123,9 @@ def fetch_all_news(target_date: str | None = None) -> tuple[list[dict[str, Any]]
                 "headline": headline,
                 "raw_url": getattr(entry, "link", "") or "",
                 "impact_level": score_impact(headline),
+                # Addendum D §22.3 (D-1): feedparser alias `description`->`summary`,
+                # cek keduanya defensif. Tidak semua feed punya -> None wajar.
+                "rss_summary": _clean_rss_summary(getattr(entry, "summary", None) or getattr(entry, "description", None)),
             })
 
     return articles, health_report

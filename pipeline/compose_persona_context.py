@@ -111,13 +111,24 @@ def _value_line(history: list[dict[str, Any]], column: str, label: str, decimals
 
 
 def _key_news_lines(conn: sqlite3.Connection, date: str) -> list[str]:
+    """Addendum D §22.5: headline asli TETAP jangkar faktual, display_subtitle
+    (kalau ada) & rss_summary (D-1, label WAJIB) ikut sebagai baris tambahan
+    -- BUKAN pengganti headline, sama guard yang berlaku di 3 jalur konteks
+    (slice otomatis di sini, thread digest §20.4, feed manual §21.4)."""
     rows = conn.execute(
-        "SELECT headline, source, impact_level FROM daily_news "
-        "WHERE date = ? AND for_reading = 1 ORDER BY id", (date,),
+        "SELECT headline, source, impact_level, display_subtitle, rss_summary "
+        "FROM daily_news WHERE date = ? AND for_reading = 1 ORDER BY id", (date,),
     ).fetchall()
     if not rows:
         return ["(belum ada berita yang ditandai for_reading hari ini)"]
-    return [f"- [{r['impact_level']}] {r['headline']} ({r['source']})" for r in rows]
+    lines = []
+    for r in rows:
+        lines.append(f"- [{r['impact_level']}] {r['headline']} ({r['source']})")
+        if r["display_subtitle"]:
+            lines.append(f"  catatan Giel: {r['display_subtitle']}")
+        if r["rss_summary"]:
+            lines.append(f"  [ringkasan RSS]: {r['rss_summary']}")
+    return lines
 
 
 def _ihsg_foreign_flow_lines(conn: sqlite3.Connection, date: str, days: int = 10) -> list[str]:
@@ -444,12 +455,13 @@ def _manual_selection_block(conn: sqlite3.Connection, news_ids: list[int]) -> st
     berita yang Giel pilih manual lewat filter tag di NewsView. Judul yang
     dikirim = headline + display_subtitle (kalau ada) -- indikator subtitle
     SELALU ikut supaya bias editorial Giel kelihatan & auditable, tidak
-    tersembunyi (keputusan #3 §21.2)."""
+    tersembunyi (keputusan #3 §21.2). + rss_summary (Addendum D §22.5) --
+    format sama §22.5, berlaku di ketiga jalur konteks."""
     if not news_ids:
         return ""
     placeholders = ",".join("?" for _ in news_ids)
     rows = conn.execute(
-        f"SELECT headline, source, display_subtitle FROM daily_news WHERE id IN ({placeholders})",
+        f"SELECT headline, source, display_subtitle, rss_summary FROM daily_news WHERE id IN ({placeholders})",
         news_ids,
     ).fetchall()
     if not rows:
@@ -460,6 +472,8 @@ def _manual_selection_block(conn: sqlite3.Connection, news_ids: list[int]) -> st
         if r["display_subtitle"]:
             line += f" [catatan Giel: {r['display_subtitle']}]"
         lines.append(line)
+        if r["rss_summary"]:
+            lines.append(f"  [ringkasan RSS]: {r['rss_summary']}")
     return "\n".join(lines)
 
 

@@ -378,7 +378,7 @@ def news():
     # is_key_trigger -- kurasi "penting utk dibaca", beda dari tag klasifikasi).
     reading_only = request.args.get("for_reading")
     sql = ("SELECT id, date, source, headline, raw_url, impact_level, "
-           "display_subtitle, for_reading FROM daily_news")
+           "display_subtitle, for_reading, rss_summary FROM daily_news")
     where, params = [], []
     if impact:
         where.append("impact_level = ?")

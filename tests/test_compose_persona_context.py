@@ -66,6 +66,36 @@ def test_key_news_shown_and_filtered(tmp_path):
     assert "Berita biasa" not in text
 
 
+def test_key_news_includes_rss_summary_and_subtitle(tmp_path):
+    """Addendum D §22.5: rss_summary & display_subtitle ikut sbg baris
+    tambahan di bawah headline asli -- headline TETAP jangkar faktual,
+    tidak pernah diganti."""
+    conn = _seed_db(tmp_path)
+    conn.execute(
+        "INSERT INTO daily_news (date, source, headline, raw_url, impact_level, "
+        "for_reading, display_subtitle, rss_summary, created_at) VALUES ('2026-07-08', 'CNBC', "
+        "'Fed signals rate cut', 'https://x.test', 'HIGH', 1, 'relevan ke rezim Warsh', "
+        "'The Fed hinted at a possible rate cut in the coming meeting.', '')"
+    )
+    conn.commit()
+    text = compose_persona_context(conn, "2026-07-08", "GEMA")
+    assert "- [HIGH] Fed signals rate cut (CNBC)" in text
+    assert "catatan Giel: relevan ke rezim Warsh" in text
+    assert "[ringkasan RSS]: The Fed hinted at a possible rate cut in the coming meeting." in text
+
+
+def test_key_news_no_rss_summary_line_when_absent(tmp_path):
+    conn = _seed_db(tmp_path)
+    conn.execute(
+        "INSERT INTO daily_news (date, source, headline, raw_url, impact_level, "
+        "for_reading, created_at) VALUES ('2026-07-08', 'CNBC', "
+        "'Fed signals rate cut', 'https://x.test', 'HIGH', 1, '')"
+    )
+    conn.commit()
+    text = compose_persona_context(conn, "2026-07-08", "GEMA")
+    assert "ringkasan RSS" not in text
+
+
 def test_gema_slice_has_global_fields_not_rivan_fields(tmp_path):
     conn = _seed_db(tmp_path)
     text = compose_persona_context(conn, "2026-07-08", "GEMA")
@@ -177,6 +207,19 @@ def test_extra_news_ids_appends_additional_block(tmp_path):
     assert "[BERITA PILIHAN GIEL -- tambahan, BUKAN pengganti slice di atas]" in text
     assert "Obscure regional bank note" in text
     assert "[catatan Giel: Giel: relevan ke rezim Warsh]" in text
+
+
+def test_extra_news_ids_includes_rss_summary(tmp_path):
+    conn = _seed_db(tmp_path)
+    cur = conn.execute(
+        "INSERT INTO daily_news (date, source, headline, raw_url, impact_level, "
+        "for_reading, rss_summary, created_at) VALUES ('2026-07-08', 'CNBC', "
+        "'Obscure regional bank note', 'https://x.test', 'LOW', 0, "
+        "'Regional bank reports unexpected deposit outflows.', '')"
+    )
+    conn.commit()
+    text = compose_persona_context(conn, "2026-07-08", "GEMA", extra_news_ids=[cur.lastrowid])
+    assert "[ringkasan RSS]: Regional bank reports unexpected deposit outflows." in text
 
 
 def test_extra_news_ids_never_replaces_slice(tmp_path):

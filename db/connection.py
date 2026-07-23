@@ -150,6 +150,8 @@ _COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
     "daily_news": [
         ("display_subtitle", "TEXT"),
         ("for_reading", "INTEGER"),
+        ("rss_summary", "TEXT"),  # Addendum D §22.2 (D-1) -- summary/description
+                                  # bawaan feed, apa adanya, tanpa backfill (NULL wajar).
     ],
 }
 

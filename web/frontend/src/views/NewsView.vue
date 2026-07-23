@@ -273,6 +273,10 @@ async function saveArticle() {
               >
               <button class="btn small secondary" @click="saveSubtitle(data)">Simpan</button>
             </div>
+            <details v-if="data.rss_summary" class="collapsible" style="margin-top:2px">
+              <summary class="src">ringkasan RSS</summary>
+              <p class="src" style="margin:4px 0 0; max-width:320px">{{ data.rss_summary }}</p>
+            </details>
           </template>
         </Column>
         <Column field="source" header="Sumber" sortable>

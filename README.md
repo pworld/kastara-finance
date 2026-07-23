@@ -302,7 +302,8 @@ source_flags + form Manual Backfill preview→confirm), **2 News** (list +
 filter impact + tandai for Reading + chip saran News Threads (multi-link,
 konfirmasi/tolak/tautkan manual) + tag facet command-palette (Addendum C §21,
 filter AND/OR, "Kirim ke Lensa →" feed manual ke persona) + display_subtitle
-inline-edit + Add Manual Article), **3 Forward**
+inline-edit + ringkasan RSS collapsible (Addendum D §22 D-1, apa adanya dari
+feed, bukan AI) + Add Manual Article), **3 Forward**
 (Economic Calendar data asli + forecast/previous/actual otomatis/manual,
 Earnings Emiten + warning posisi terbuka, Expectations manual FedWatch/Dot
 Plot, Positioning COT+ETF otomatis & SBN manual, Policy Tracker manual,

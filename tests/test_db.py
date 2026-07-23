@@ -60,3 +60,23 @@ def test_for_reading_migration_backfills_from_is_key_trigger(tmp_path):
         row = conn.execute("SELECT is_key_trigger, for_reading FROM daily_news").fetchone()
         assert row["is_key_trigger"] == 1  # kolom lama beku, tidak disentuh lagi
         assert row["for_reading"] == 0  # TIDAK di-backfill ulang (re-run idempotent)
+
+
+def test_daily_news_has_rss_summary_column(tmp_path):
+    """Addendum D §22.2 (D-1) -- rss_summary kolom baru, NULL wajar (tanpa
+    backfill, beda dari for_reading yang perlu copy nilai lama)."""
+    from db.connection import get_connection
+
+    db_file = tmp_path / "test_kastara-finance.db"
+    init_db(db_file)
+    with get_connection(db_file) as conn:
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(daily_news)")]
+        assert "rss_summary" in cols
+        conn.execute(
+            "INSERT INTO daily_news (date, source, headline, raw_url, "
+            "impact_level, created_at) VALUES "
+            "('2026-01-01','CNBC','Test','https://x','HIGH','')"
+        )
+        conn.commit()
+        row = conn.execute("SELECT rss_summary FROM daily_news").fetchone()
+        assert row["rss_summary"] is None

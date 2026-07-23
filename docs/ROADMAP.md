@@ -810,6 +810,57 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       3,4,6) SAMA SEKALI TIDAK BERUBAH, `tag_dictionary` 1→72 baris.
       Diverifikasi dulu terhadap DB temp terisolasi (idempotensi: re-run 2x
       tidak duplikat apa pun) sebelum dijalankan ke produksi.
+- [x] ~~Article Digest D-1: ringkasan RSS apa adanya (Addendum D §22, 23 Jul
+      2026, Giel tambah 2 adendum baru sekaligus -- D §22 & E §23)~~ — Giel
+      minta salah satu dibangun ("yers" -- ambigu, tidak spesifik D atau E).
+      Dicek dulu: `prediction_log` produksi 0 baris, sementara Addendum E
+      (Meta-Layer) sendiri mensyaratkan "≥1-2 bulan berisi" sebelum M-1 boleh
+      dibangun -- jadi E BELUM bisa dikerjakan apa pun sekarang, keputusan
+      jatuh ke D-1 (kontrak sendiri bilang "bangun sekarang, murah", tidak
+      ada prasyarat). E didokumentasikan sebagai ditunda, bukan diabaikan.
+      **Dibangun (D-1 saja, D-2 BERSYARAT/belum)**: `db/connection.py` --
+      `rss_summary TEXT` baru di `daily_news` via `_COLUMN_MIGRATIONS`
+      (kolom baru, tanpa backfill -- beda dari `for_reading` yang perlu copy
+      nilai lama). `scrapers/news.py` -- `_clean_rss_summary()`: strip HTML
+      pakai `BeautifulSoup` (dependency sudah ada, dipakai `investing_
+      calendar.py`/`positioning.py`), rapikan whitespace, potong 400 char +
+      "…". `fetch_all_news()` isi `rss_summary` dari feedparser
+      `.summary`/`.description` (alias feedparser sendiri), None kalau feed
+      tak sertakan -- NULL wajar, bukan error. `pipeline/run_daily.py`::
+      `insert_news_dedup` tulis kolom baru (`.get()` defensif krn sumber
+      lain spt `add_article.py` tak selalu punya field ini -- beda tabel,
+      `manual_articles`, jadi sebenarnya tidak pernah kena, tapi defensif
+      tetap dipasang). `web/app.py`: `/api/news` SELECT tambah kolom.
+      `NewsView.vue`: `<details>` collapsible "ringkasan RSS" di bawah
+      headline/subtitle, tertutup default (bukan selalu tampil -- 200 baris
+      x 2-3 baris ringkasan tiap saat bikin tabel terlalu panjang).
+      `compose_persona_context.py`: `_key_news_lines` (slice otomatis) &
+      `_manual_selection_block` (feed manual §21.4) keduanya tambah baris
+      `[ringkasan RSS]: ...` di bawah headline/catatan Giel -- headline TETAP
+      baris pertama/jangkar faktual, tidak pernah diganti (guard §22.5).
+      Thread digest (§20.4) TIDAK disentuh -- jalur itu sendiri belum
+      dibangun (N-2 News Threads belum ada). `pipeline/compose_briefing.py`
+      (Telegram) SENGAJA tidak disentuh -- bukan salah satu dari "3 jalur
+      konteks ke lensa" yang disebut §22.5, pesan Telegram harus tetap ringkas.
+      8 test baru (`test_news.py`: `_clean_rss_summary` None/HTML/truncate +
+      live-fetch pastikan key `rss_summary` selalu ada; `test_db.py`: kolom
+      baru NULL-safe; `test_compose_persona_context.py`: baris muncul saat
+      ada, TIDAK muncul saat kosong, di kedua jalur slice+manual).
+      **Ketemu sekalian saat run**: 2 test lama (`test_save_thread_runs_
+      catchup_scan_against_existing_news`, `test_patch_thread_keyword_
+      change_triggers_catchup`) GAGAL bukan krn kerjaan ini -- tanggal seed
+      hardcode `"2026-07-15"` sudah basi 8 hari lewat window rolling
+      `THREAD_CATCHUP_DAYS=7` (real `today_wib()` sekarang 2026-07-23, bukti
+      waktu beneran berjalan di sesi panjang ini). Diperbaiki: tanggal seed
+      jadi RELATIF ke `today_wib()` (bukan string hardcode), sekali perbaiki
+      tidak basi lagi ke depannya. 1 test live (`test_earnings_yf.py::test_
+      has_future_earnings_with_null_actual`) juga gagal krn alasan sama
+      (earnings TSLA 22 Jul yang tadinya "future" sudah rilis actual-nya) --
+      DIBIARKAN, itu sifat inheren test data-live (bukan bug, bukan disentuh).
+      396 test hijau total (di luar 1 live test yang sensitif tanggal
+      kalender di atas). `npm run build` bersih. **Belum dievaluasi**: D-1
+      perlu dipakai beberapa hari dulu sebelum keputusan lanjut D-2 atau
+      cukup di sini (kontrak sendiri, §22.3).
       — riset awal SEMPAT menyimpulkan skip (lihat percobaan pertama: kena
       HTTP 429 yang tidak pulih setelah ~5-6 request cepat, dan endpoint AJAX
       utk navigasi tanggal "Yesterday" tidak ketemu). Tapi masalah itu murni

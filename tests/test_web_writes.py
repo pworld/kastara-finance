@@ -1155,8 +1155,11 @@ def test_save_thread_runs_catchup_scan_against_existing_news(tmp_path):
     db = tmp_path / "t.db"
     init_db(db)
     with get_connection(db) as conn:
-        _seed_news_row(conn, headline="Warsh speaks on rates", date="2026-07-15")
-        _seed_news_row(conn, headline="Unrelated tech news", date="2026-07-16")
+        # Tanggal RELATIF ke hari ini (bukan hardcode) -- window catch-up
+        # (THREAD_CATCHUP_DAYS=7) berputar terhadap today_wib() beneran,
+        # tanggal hardcode akan basi & keluar window seiring waktu berjalan.
+        _seed_news_row(conn, headline="Warsh speaks on rates", date=_date_shift(today_wib(), -1))
+        _seed_news_row(conn, headline="Unrelated tech news", date=today_wib())
         conn.commit()
         thread = save_thread(conn, title="Rezim Warsh", keywords=["warsh"])
         conn.commit()
@@ -1253,7 +1256,8 @@ def test_patch_thread_keyword_change_triggers_catchup(tmp_path):
     init_db(db)
     with get_connection(db) as conn:
         row = save_thread(conn, title="Thread A")  # tanpa keywords -> tidak ada catch-up awal
-        _seed_news_row(conn, headline="Powell testifies before Congress")
+        # Tanggal RELATIF ke hari ini, sama alasan test di atas.
+        _seed_news_row(conn, headline="Powell testifies before Congress", date=today_wib())
         conn.commit()
         assert list_thread_links(conn, row["id"]) == []
         patch_thread(conn, row["id"], keywords=["powell"])
