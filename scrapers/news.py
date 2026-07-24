@@ -3,9 +3,11 @@ impact scoring (BUKAN AI/LLM).
 
 Output ke daily_news: source, headline, raw_url, impact_level (HIGH/MED/LOW),
 rss_summary (Addendum D §22.3 D-1 -- summary/description bawaan feed apa
-adanya, HTML di-strip, NULL kalau feed tak sertakan). for_reading DEFAULT 0
-(Giel flag manual nanti -- rename fungsional dari is_key_trigger, Addendum C
-§21.2).
+adanya, HTML di-strip. HANYA utk impact_level=HIGH -- Giel minta prinsip
+"HIGH saja" §22.1 D3 dipakai juga di D-1, bukan cuma D-2/LLM Digest seperti
+ditulis kontrak awalnya. MED/LOW SELALU NULL, bukan cuma disembunyikan di
+UI). for_reading DEFAULT 0 (Giel flag manual nanti -- rename fungsional dari
+is_key_trigger, Addendum C §21.2).
 
 Health check per feed tiap run (`check_feed_health`) — pola sama dengan
 `source_flags` API di Phase A: feed mati harus KELIHATAN tiap run lewat
@@ -117,15 +119,23 @@ def fetch_all_news(target_date: str | None = None) -> tuple[list[dict[str, Any]]
             if key in seen:
                 continue
             seen.add(key)
+            impact_level = score_impact(headline)
+            # Addendum D §22.3 (D-1) -- ringkasan cuma utk impact_level=HIGH
+            # (Giel: "ringkasan berita only for news with high"). Kontrak §22.1
+            # D3 aslinya menulis batasan ini utk D-2/LLM Digest (alasan biaya),
+            # tapi Giel eksplisit minta prinsip yang sama dipakai juga di D-1 --
+            # MED/LOW tidak pernah ke-parse/simpan rss_summary sama sekali
+            # (bukan cuma disembunyikan di UI), NULL wajar utk keduanya.
+            rss_summary = None
+            if impact_level == "HIGH":
+                rss_summary = _clean_rss_summary(getattr(entry, "summary", None) or getattr(entry, "description", None))
             articles.append({
                 "date": target_date,
                 "source": name,
                 "headline": headline,
                 "raw_url": getattr(entry, "link", "") or "",
-                "impact_level": score_impact(headline),
-                # Addendum D §22.3 (D-1): feedparser alias `description`->`summary`,
-                # cek keduanya defensif. Tidak semua feed punya -> None wajar.
-                "rss_summary": _clean_rss_summary(getattr(entry, "summary", None) or getattr(entry, "description", None)),
+                "impact_level": impact_level,
+                "rss_summary": rss_summary,
             })
 
     return articles, health_report

@@ -106,3 +106,31 @@ def test_clean_rss_summary_truncates_long_text():
     result = news._clean_rss_summary(long_text)
     assert len(result) == news.RSS_SUMMARY_MAX_LEN + 1  # +1 utk karakter "…"
     assert result.endswith("…")
+
+
+class _FakeEntry:
+    def __init__(self, title, summary):
+        self.title = title
+        self.link = "https://x.test"
+        self.summary = summary
+
+
+def test_rss_summary_only_populated_for_high_impact(monkeypatch):
+    """Giel: "ringkasan berita only for news with high" -- MED/LOW tidak
+    pernah dapat rss_summary sama sekali, meski feed-nya sendiri sertakan
+    summary (bukan cuma disembunyikan di UI, benar-benar tidak disimpan)."""
+    fake_entries = [
+        _FakeEntry("Fed cuts rates 25bps", "Ringkasan berita HIGH ini harus muncul."),
+        _FakeEntry("Random tech gadget review", "Ringkasan berita LOW ini TIDAK boleh muncul."),
+    ]
+    monkeypatch.setattr(news, "FEEDS", [{"name": "Fake", "url": "https://fake.test", "category": "TEST", "enabled": True}])
+    monkeypatch.setattr(news, "check_feed_health", lambda url: ("ok", "", fake_entries))
+
+    articles, _ = news.fetch_all_news()
+    by_headline = {a["headline"]: a for a in articles}
+
+    assert by_headline["Fed cuts rates 25bps"]["impact_level"] == "HIGH"
+    assert by_headline["Fed cuts rates 25bps"]["rss_summary"] == "Ringkasan berita HIGH ini harus muncul."
+
+    assert by_headline["Random tech gadget review"]["impact_level"] == "LOW"
+    assert by_headline["Random tech gadget review"]["rss_summary"] is None

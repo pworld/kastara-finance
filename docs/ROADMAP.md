@@ -861,6 +861,36 @@ dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
       kalender di atas). `npm run build` bersih. **Belum dievaluasi**: D-1
       perlu dipakai beberapa hari dulu sebelum keputusan lanjut D-2 atau
       cukup di sini (kontrak sendiri, §22.3).
+- [x] ~~Cron WSL mati 6 hari + scope refinement rss_summary jadi HIGH-only
+      (24 Jul 2026)~~ — Giel lapor via Manual Backfill "tidak semua masuk" +
+      tanya apakah News juga bermasalah. **Root cause**: `service cron`
+      di WSL ini TIDAK JALAN (dicek `service cron status`) -- `run_daily`
+      belum jalan sejak 2026-07-17, 6 hari basi (data pasar DAN berita
+      sama-sama kena, bukan cuma satu sisi). Dijelaskan ke Giel: Backfill
+      cuma cover `asset_ohlcv`+FRED macro fields per-instrumen (yfinance/
+      FRED punya API historis) -- News TIDAK PERNAH bisa di-backfill (RSS
+      cuma sajikan entry LIVE saat ini, tak ada API "headline minggu lalu").
+      Gap News 07-18..07-22 permanen tak bisa dipulihkan, itu keterbatasan
+      inheren sumber data, bukan bug. **Tindakan**: `python -m pipeline.
+      run_daily` dijalankan manual (bukan tunggu cron) -- 222 berita masuk,
+      82 tag baru, 57 link thread baru (tag-match jalan beneran pertama
+      kali dgn data produksi asli), semua asset_ohlcv balik current.
+      Giel diberi tahu jalankan `sudo service cron start` sendiri (butuh
+      password sudo, tidak bisa kubantu). **Sekalian**: Giel minta
+      `rss_summary` (D-1 di atas) dibatasi HANYA `impact_level=HIGH` --
+      kontrak §22.1 D3 aslinya nulis batasan ini utk D-2/LLM Digest
+      (alasan biaya), tapi Giel eksplisit minta prinsip sama dipakai di
+      D-1 juga (`scrapers/news.py::fetch_all_news` sekarang skip parse
+      summary sama sekali kalau MED/LOW, bukan cuma sembunyi di UI). 188
+      baris MED/LOW yang keburu ke-isi rss_summary dari run manual di atas
+      (sebelum scoping ini ada) dibersihkan langsung ke DB produksi
+      (`UPDATE ... SET rss_summary = NULL WHERE impact_level != 'HIGH'`)
+      supaya konsisten dgn aturan baru -- dikonfirmasi 24/24 baris rss_summary
+      tersisa semuanya HIGH. 1 test baru (`test_rss_summary_only_populated_
+      for_high_impact`, monkeypatch entry+feed health spy krn butuh kontrol
+      deterministik HIGH vs LOW pada 1 fetch yang sama -- pengecualian
+      langka dari filosofi live-test, pola sama `test_notify_telegram.py`).
+      397 test hijau total.
       — riset awal SEMPAT menyimpulkan skip (lihat percobaan pertama: kena
       HTTP 429 yang tidak pulih setelah ~5-6 request cepat, dan endpoint AJAX
       utk navigasi tanggal "Yesterday" tidak ketemu). Tapi masalah itu murni
