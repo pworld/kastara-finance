@@ -119,6 +119,28 @@ async function createThread() {
   newThreadForm.value = { title: '', description: '', keywordsCsv: '', currentRead: '' }
   loadThreads()
 }
+
+// Gabung thread duplikat (24 Jul 2026) -- Giel: dua thread ternyata narasi
+// sama (mis. kandidat seed vs thread real), TIDAK mau cuma close/dormant-kan
+// salah satu (itu diam-diam buang data) -- gabung beneran: link+facet tags
+// dari "from" pindah ke "into", keywords/persona_tags di-union. "from" hilang
+// setelahnya. current_read TIDAK auto-digabung (bisa berlawanan arah, mis.
+// Hawkish vs Dovish) -- toast tampilkan current_read lama "from" biar Giel
+// bisa copy manual kalau perlu.
+const mergeFrom = ref('')
+const mergeInto = ref('')
+async function mergeThreads() {
+  if (!mergeFrom.value || !mergeInto.value) { toast('Pilih thread from dan into'); return }
+  if (mergeFrom.value === mergeInto.value) { toast('Tidak bisa merge thread ke dirinya sendiri'); return }
+  const result = await post('/api/threads/merge', { from_id: Number(mergeFrom.value), into_id: Number(mergeInto.value) })
+  if (result.error) { toast(result.error); return }
+  let msg = `Digabung ke "${result.title}"`
+  if (result.merged_from_current_read) msg += ` -- bacaan lama thread yang digabung: "${result.merged_from_current_read}"`
+  toast(msg)
+  mergeFrom.value = ''
+  mergeInto.value = ''
+  loadThreads()
+}
 </script>
 
 <template>
@@ -220,6 +242,38 @@ async function createThread() {
       </div>
       <div class="form-row" style="margin-top:12px">
         <button class="btn" @click="createThread">Buat Thread</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Gabung Thread Duplikat</h2>
+    <div class="panel">
+      <p class="src">
+        Untuk thread yang ternyata narasi sama/tumpang tindih (mis. kandidat
+        seed vs thread real). "From" hilang, semua link + facet tags pindah
+        ke "into", keywords digabung (union). Bacaan Terkini TIDAK
+        auto-digabung (bisa berlawanan arah) -- toast tampilkan punya "from"
+        biar bisa disalin manual kalau perlu.
+      </p>
+      <div class="form-grid">
+        <div>
+          <label class="field">From (hilang setelah digabung)</label>
+          <select v-model="mergeFrom" style="width:100%">
+            <option value="">pilih thread...</option>
+            <option v-for="t in allThreads" :key="t.id" :value="t.id">{{ t.title }} ({{ t.status }})</option>
+          </select>
+        </div>
+        <div>
+          <label class="field">Into (tetap)</label>
+          <select v-model="mergeInto" style="width:100%">
+            <option value="">pilih thread...</option>
+            <option v-for="t in allThreads" :key="t.id" :value="t.id">{{ t.title }} ({{ t.status }})</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:8px">
+        <button class="btn small" @click="mergeThreads">Gabung</button>
       </div>
     </div>
   </section>

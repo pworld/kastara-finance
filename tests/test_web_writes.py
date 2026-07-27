@@ -61,6 +61,7 @@ from web.writes import (
     add_thread_link_manual,
     list_thread_links,
     attach_thread_suggestions,
+    merge_thread,
     create_tag,
     list_tags,
     resolve_tag,
@@ -2028,3 +2029,81 @@ def test_auto_dormant_stale_threads_only_touches_active_and_stale(tmp_path):
         assert get_thread(conn, stale["id"])["status"] == "DORMANT"
         assert get_thread(conn, fresh["id"])["status"] == "ACTIVE"
         assert get_thread(conn, closed["id"])["status"] == "CLOSED"
+
+
+# ---------- merge_thread (24 Jul 2026 -- Giel: thread seed vs thread real tumpang tindih, "jangan merge close, buat jadi satu") ----------
+
+def test_merge_thread_repoints_links_and_tags_union_keywords(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        seed = save_thread(conn, title="Rezim Warsh Hawkish", current_read="hike masih di meja")
+        real = save_thread(conn, title="Rezim Warsh Dovish", keywords=["warsh", "fed"])
+        news_id = _seed_news_row(conn, headline="Warsh speaks")
+        conn.commit()
+        create_tag(conn, "who:warsh")
+        apply_tag(conn, "news_threads", seed["id"], "who:warsh")
+        add_thread_link_manual(conn, seed["id"], "daily_news", news_id, "MENDUKUNG")
+        conn.commit()
+
+        merged = merge_thread(conn, seed["id"], real["id"])
+
+        assert merged["id"] == real["id"]
+        assert merged["title"] == "Rezim Warsh Dovish"  # into_id punya identitas sendiri tidak disentuh
+        assert set(merged["keywords"]) == {"warsh", "fed"}  # union (seed tidak punya keywords sendiri)
+        assert merged["merged_from_current_read"] == "hike masih di meja"  # dikembalikan, TIDAK auto-ditulis ke into
+
+        # thread lama benar-benar hilang, bukan cuma di-DORMANT-kan
+        assert get_thread(conn, seed["id"]) is None
+        # link & tag pindah ke into_id
+        links = list_thread_links(conn, real["id"])
+        assert len(links) == 1
+        assert links[0]["source_info"]["headline"] == "Warsh speaks"
+        tags = list_content_tags(conn, "news_threads", real["id"])
+        assert tags[0]["canonical"] == "who:warsh"
+
+
+def test_merge_thread_dedup_avoids_unique_collision(tmp_path):
+    """Kalau berita yang sama SUDAH tertaut ke into_id juga (mis. dari
+    auto-suggest keduanya), re-point tidak boleh melanggar UNIQUE index."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        seed = save_thread(conn, title="Seed")
+        real = save_thread(conn, title="Real")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        add_thread_link_manual(conn, seed["id"], "daily_news", news_id, "MENDUKUNG")
+        add_thread_link_manual(conn, real["id"], "daily_news", news_id, "KONTRA")
+        conn.commit()
+
+        merge_thread(conn, seed["id"], real["id"])
+        links = list_thread_links(conn, real["id"])
+        assert len(links) == 1  # tidak dobel
+        assert links[0]["stance"] == "KONTRA"  # punya into_id yang menang
+
+
+def test_merge_thread_rejects_self_merge(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        t = save_thread(conn, title="Solo")
+        conn.commit()
+        try:
+            merge_thread(conn, t["id"], t["id"])
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "sendiri" in str(exc)
+
+
+def test_merge_thread_unknown_id_raises(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        t = save_thread(conn, title="Solo")
+        conn.commit()
+        try:
+            merge_thread(conn, t["id"], 999)
+            assert False, "harusnya raise ValueError"
+        except ValueError as exc:
+            assert "tidak ditemukan" in str(exc)

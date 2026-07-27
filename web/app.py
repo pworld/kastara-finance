@@ -1308,6 +1308,18 @@ def thread_patch(thread_id):
     return jsonify(row)
 
 
+@app.post("/api/threads/merge")
+def thread_merge():
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            row = writes.merge_thread(conn, body.get("from_id"), body.get("into_id"))
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(row)
+
+
 @app.post("/api/threads/<int:thread_id>/links")
 def thread_link_add_manual(thread_id):
     body = request.get_json(force=True)

@@ -1075,6 +1075,76 @@ def list_thread_links(
     return links
 
 
+def merge_thread(conn: sqlite3.Connection, from_id: int, into_id: int) -> dict[str, Any]:
+    """Gabung 2 thread yang ternyata narasi sama/tumpang tindih (ketemu 24
+    Jul 2026 -- kandidat seed §21.12 vs thread real punya topik sama, mis.
+    "Rezim Warsh Hawkish" (seed, cuma punya facet tags) vs "Rezim Warsh
+    Dovish" (real, punya link+riwayat). Giel eksplisit: JANGAN cuma
+    close/dormant-kan salah satu (itu DIAM-DIAM buang datanya) -- gabung
+    beneran, `from_id` hilang, semua `news_thread_links` DAN `content_tags`
+    (facet tags thread, ref_table='news_threads') milik `from_id` pindah ke
+    `into_id`. `keywords`/`persona_tags` di-UNION (bukan ditimpa) supaya
+    auto-suggest tetap jalan dari kedua sisi. `title`/`description`/
+    `current_read`/`status`/`verdict` milik `into_id` TIDAK disentuh --
+    dua thread bisa punya `current_read` yang malah BERLAWANAN (persis
+    kasus Warsh Hawkish vs Dovish), auto-gabung teks editorial itu akan
+    menyuntik bias tanpa sepengetahuan Giel; caller tampilkan `from`'s
+    current_read di response biar Giel bisa copy-paste manual kalau perlu.
+    Return thread `into_id` setelah digabung (decoded)."""
+    if from_id == into_id:
+        raise ValueError("tidak bisa merge thread ke dirinya sendiri")
+    src = get_thread(conn, from_id)
+    dst = get_thread(conn, into_id)
+    if src is None or dst is None:
+        raise ValueError("thread from_id/into_id tidak ditemukan")
+
+    # 1) news_thread_links -- re-point, dedup-aware (UNIQUE(thread_id,
+    # ref_table, ref_id) idx_news_thread_links_dedup). Kalau tabrakan
+    # (pasangan ref_table+ref_id yang sama sudah tertaut ke into_id juga),
+    # punya into_id yang menang -- baris from_id yang jadi redundan dihapus.
+    from_links = conn.execute(
+        "SELECT ref_table, ref_id, stance, link_status, note, linked_at "
+        "FROM news_thread_links WHERE thread_id = ?", (from_id,),
+    ).fetchall()
+    for r in from_links:
+        conn.execute(
+            "INSERT OR IGNORE INTO news_thread_links "
+            "(thread_id, ref_table, ref_id, stance, link_status, note, linked_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (into_id, r["ref_table"], r["ref_id"], r["stance"], r["link_status"], r["note"], r["linked_at"]),
+        )
+    conn.execute("DELETE FROM news_thread_links WHERE thread_id = ?", (from_id,))
+
+    # 2) content_tags (facet tags thread sendiri, ref_table='news_threads')
+    # -- pola sama merge_tag(): INSERT OR IGNORE dulu (idx_content_tags_dedup),
+    # baris from_id yang jadi redundan dihapus setelahnya.
+    from_tags = conn.execute(
+        "SELECT tag_id, source, created_at FROM content_tags "
+        "WHERE ref_table = 'news_threads' AND ref_id = ?", (from_id,),
+    ).fetchall()
+    for r in from_tags:
+        conn.execute(
+            "INSERT OR IGNORE INTO content_tags (ref_table, ref_id, tag_id, source, created_at) "
+            "VALUES ('news_threads', ?, ?, ?, ?)",
+            (into_id, r["tag_id"], r["source"], r["created_at"]),
+        )
+    conn.execute("DELETE FROM content_tags WHERE ref_table = 'news_threads' AND ref_id = ?", (from_id,))
+
+    # 3) keywords/persona_tags -- UNION, bukan ditimpa (auto-suggest tetap
+    # jalan dari kata kunci KEDUA thread, bukan cuma salah satu).
+    merged_keywords = list(dict.fromkeys([*dst["keywords"], *src["keywords"]]))
+    merged_persona_tags = list(dict.fromkeys([*dst["persona_tags"], *src["persona_tags"]]))
+    conn.execute(
+        "UPDATE news_threads SET keywords = ?, persona_tags = ?, updated_at = ? WHERE id = ?",
+        (json.dumps(merged_keywords), json.dumps(merged_persona_tags), today_wib(), into_id),
+    )
+
+    conn.execute("DELETE FROM news_threads WHERE id = ?", (from_id,))
+    merged = get_thread(conn, into_id)
+    merged["merged_from_current_read"] = src["current_read"]
+    return merged
+
+
 def attach_thread_suggestions(conn: sqlite3.Connection, news_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Tempel SEMUA news_thread_links non-REJECTED ke tiap row daily_news yang
     SUDAH di-fetch -- dipakai GET /api/news biar NewsView bisa render chip
