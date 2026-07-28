@@ -43,6 +43,7 @@ from flask import Flask, jsonify, request, send_from_directory, session
 import llm.persona_analysis as persona_analysis
 import pipeline.add_article as add_article
 import pipeline.backfill as backfill_mod
+import pipeline.run_daily as run_daily_mod
 import tools.review_signal as review_signal
 import web.writes as writes
 from analysis.sizing import suggest_position_size
@@ -411,57 +412,20 @@ def news():
 
 # ---------- PHASE C: Panel 1 — Manual Backfill ----------
 
-@app.get("/api/data_gaps")
-def data_gaps():
-    """Cek data bolong utk 1 instrument (dipanggil dashboard Manual Backfill
-    tiap instrument dropdown berubah) — biar kelihatan ada gap SEBELUM
-    Giel harus tebak sendiri lewat trial-and-error backfill."""
-    instrument = request.args.get("instrument", "BTC").upper()
-    if instrument not in INSTRUMENT_SOURCE:
-        return jsonify({"error": f"instrument tidak dikenal: {instrument}"}), 400
-    source, col, calendar = INSTRUMENT_SOURCE[instrument]
-    with get_connection() as conn:
-        if source == "asset_ohlcv":
-            rows = conn.execute(
-                "SELECT date FROM asset_ohlcv WHERE instrument = ? ORDER BY date", (instrument,)
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                f"SELECT date FROM daily_market WHERE {col} IS NOT NULL ORDER BY date"
-            ).fetchall()
-    dates = [r["date"] for r in rows]
-
-    if not dates:
-        return jsonify({
-            "instrument": instrument, "calendar": calendar, "total_rows": 0,
-            "date_from": None, "date_to": None, "gaps": [], "gaps_total_count": 0,
-        })
-
-    gaps = _detect_gaps(dates, calendar)
-    gaps.sort(key=lambda g: g["days"], reverse=True)
-    return jsonify({
-        "instrument": instrument, "calendar": calendar, "total_rows": len(dates),
-        "date_from": dates[0], "date_to": dates[-1],
-        "gaps": gaps[:20], "gaps_total_count": len(gaps),
-    })
-
-
-@app.post("/api/backfill/preview")
-def backfill_preview():
-    body = request.get_json(force=True)
-    result = backfill_mod.backfill(
-        body["instrument"], body["from"], body["to"], preview_only=True,
-    )
-    return jsonify(result)
-
-
-@app.post("/api/backfill/commit")
-def backfill_commit():
-    body = request.get_json(force=True)
-    result = backfill_mod.backfill(
-        body["instrument"], body["from"], body["to"], assume_yes=True,
-    )
-    return jsonify(result)
+@app.post("/api/run_daily_now")
+def run_daily_now():
+    """Trigger pipeline.run_daily() utk tanggal HARI INI (WIB) langsung dari
+    Snapshot -- Giel sebelumnya harus minta run manual lewat terminal tiap
+    kali cron WSL tidak jalan (lihat ROADMAP, kejadian berulang). News TIDAK
+    bisa di-backfill utk tanggal lampau (RSS cuma sajikan yang live), jadi
+    ini trigger terpisah dari Backfill (yang mengisi gap tanggal lampau utk
+    data market) -- "2 trigger" yang beda tujuan, bukan duplikat. Sinkron
+    (blocking selama semua sumber di-fetch), sama seperti run lewat terminal."""
+    try:
+        summary = run_daily_mod.run_daily()
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": str(exc)}), 500
+    return jsonify(summary)
 
 
 @app.post("/api/backfill/all/preview")
@@ -580,6 +544,16 @@ def content_tags_list(ref_table, ref_id):
     with get_connection() as conn:
         rows = writes.list_content_tags(conn, ref_table, ref_id)
     return jsonify(rows)
+
+
+@app.post("/api/content_tags/<int:content_tag_id>/confirm")
+def content_tags_confirm(content_tag_id):
+    with get_connection() as conn:
+        ok = writes.confirm_tag(conn, content_tag_id)
+        conn.commit()
+    if not ok:
+        return jsonify({"error": "tag pada konten ini tidak ditemukan"}), 404
+    return jsonify({"ok": True})
 
 
 # ---------- Settings -> Tag & Thread Management (Addendum C §21.11, C-1 gap

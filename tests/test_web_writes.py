@@ -67,6 +67,7 @@ from web.writes import (
     resolve_tag,
     apply_tag,
     remove_tag,
+    confirm_tag,
     list_content_tags,
     attach_content_tags,
     update_tag,
@@ -1120,20 +1121,20 @@ def test_save_thread_requires_title(tmp_path):
             assert "title" in str(exc)
 
 
-def test_save_thread_enforces_max_active(tmp_path):
-    """Kontrak §20.1 keputusan #5: maks 7 thread ACTIVE bersamaan, ditegakkan
-    di write function -- bukan cuma UI."""
+def test_save_thread_no_longer_caps_active_count(tmp_path):
+    """Keputusan #5 (maks 7 thread ACTIVE) dicabut 28 Jul 2026 -- Giel minta
+    tidak ada batas, dia sendiri yang tentukan lewat status field. Bikin 8
+    thread ACTIVE sekaligus harus sukses semua, tidak ada ValueError."""
     db = tmp_path / "t.db"
     init_db(db)
     with get_connection(db) as conn:
-        for i in range(7):
+        for i in range(8):
             save_thread(conn, title=f"Thread {i}")
         conn.commit()
-        try:
-            save_thread(conn, title="Thread ke-8")
-            assert False, "harusnya raise ValueError"
-        except ValueError as exc:
-            assert "7" in str(exc)
+        active_count = conn.execute(
+            "SELECT COUNT(*) c FROM news_threads WHERE status = 'ACTIVE'"
+        ).fetchone()["c"]
+        assert active_count == 8
 
 
 def test_save_thread_stores_keywords_as_json(tmp_path):
@@ -1684,6 +1685,22 @@ def test_remove_tag_and_unknown_id(tmp_path):
         assert remove_tag(conn, applied["id"]) is True
         assert list_content_tags(conn, "daily_news", news_id) == []
         assert remove_tag(conn, 9999) is False
+
+
+def test_confirm_tag_promotes_suggested_to_manual(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_tag(conn, "who:warsh")
+        news_id = _seed_news_row(conn)
+        conn.commit()
+        applied = apply_tag(conn, "daily_news", news_id, "who:warsh", source="SUGGESTED")
+        conn.commit()
+        assert applied["source"] == "SUGGESTED"
+        assert confirm_tag(conn, applied["id"]) is True
+        row = list_content_tags(conn, "daily_news", news_id)[0]
+        assert row["source"] == "MANUAL"
+        assert confirm_tag(conn, 9999) is False
 
 
 def test_list_content_tags_for_one_item(tmp_path):

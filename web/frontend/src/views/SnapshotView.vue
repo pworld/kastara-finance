@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { get, post } from '../lib/api'
 import { fmt } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
@@ -59,56 +59,29 @@ async function loadLatest() {
 }
 onMounted(loadLatest)
 
-// ---------- Manual Backfill (1 instrument) ----------
-const MACRO_INSTRUMENTS = ['BTC', 'SP500', 'IHSG', 'GOLD', 'USDIDR', 'USDJPY', 'DXY', 'US10Y', 'VIX', 'WALCL', 'RRP', 'TGA', 'HY']
-const bfInstrument = ref('BTC')
-const bfFrom = ref('')
-const bfTo = ref('')
-const bfGapInfo = ref('Memuat info data...')
-const bfResult = ref('')
-const bfPreviewData = ref(null)
-const bfShowCommit = ref(false)
-
-async function loadDataGaps() {
-  bfGapInfo.value = 'Memuat info data...'
-  const g = await get('/api/data_gaps', { instrument: bfInstrument.value })
-  if (!g.total_rows) { bfGapInfo.value = 'Belum ada data untuk instrument ini.'; return }
-  const range = `${g.total_rows.toLocaleString('id-ID')} baris · ${g.date_from} s.d. ${g.date_to}`
-  if (g.calendar === 'WEEKLY_WED') {
-    bfGapInfo.value = `${range} (rilis mingguan tiap Rabu — jeda antar-Rabu wajar, bukan gap)`
-    return
-  }
-  if (g.gaps_total_count === 0) {
-    bfGapInfo.value = `${range} · tidak ada gap terdeteksi`
-    return
-  }
-  const shown = g.gaps.slice(0, 5).map((gap) => `${gap.from} s.d. ${gap.to} (${gap.days} hari)`).join(', ')
-  const more = g.gaps_total_count > 5 ? ` · +${g.gaps_total_count - 5} gap lain` : ''
-  bfGapInfo.value = `${range} · ${g.gaps_total_count} gap terdeteksi: ${shown}${more}`
-}
-onMounted(loadDataGaps)
-watch(bfInstrument, loadDataGaps)
-
-async function bfPreview() {
-  if (!bfFrom.value || !bfTo.value) { toast('Isi rentang tanggal dulu'); return }
-  const body = { instrument: bfInstrument.value, from: bfFrom.value, to: bfTo.value }
-  const r = await post('/api/backfill/preview', body)
-  bfPreviewData.value = body
-  bfResult.value = `Fetched ${r.fetched}, baru ${r.new}, duplikat ${r.dup}` + (r.sample_from ? ` (contoh ${r.sample_from} .. ${r.sample_to})` : '')
-  bfShowCommit.value = r.new > 0
-}
-async function bfCommit() {
-  if (!bfPreviewData.value) return
-  const r = await post('/api/backfill/commit', bfPreviewData.value)
-  bfResult.value = `OK — ${r.new} baris baru ditulis (${r.dup} duplikat di-skip).`
-  bfShowCommit.value = false
-  toast('Backfill selesai')
+// ---------- Trigger Berita (jalankan pipeline hari ini sekarang) ----------
+// Terpisah dari Backfill di bawah: News tidak bisa diisi utk tanggal lampau
+// (RSS cuma sajikan yang live), jadi ini trigger ke-1 (hari ini, sekarang),
+// Backfill trigger ke-2 (rentang tanggal lampau, data market saja).
+const newsRunning = ref(false)
+const newsResult = ref('')
+async function triggerNewsRun() {
+  newsRunning.value = true
+  newsResult.value = ''
+  const r = await post('/api/run_daily_now', {})
+  newsRunning.value = false
+  if (r.error) { toast(`Gagal: ${r.error}`); newsResult.value = `Error: ${r.error}`; return }
+  const deadStr = r.rss_dead && r.rss_dead.length ? `, feed mati: ${r.rss_dead.join(', ')}` : ''
+  newsResult.value = `Selesai (${r.date}) — ${r.news_inserted} berita baru, ${r.asset_rows} baris market, RSS ${r.rss_ok} ok${deadStr}.`
+  toast(`Trigger Berita selesai — ${r.news_inserted} berita baru`)
+  loadLatest()
 }
 
 // ---------- Backfill semua instrument sekaligus ----------
 const bfAllChecking = ref(false)
 const bfAllResults = ref(null)
 const bfAllDone = ref('')
+const bfAllSelected = ref(new Set())
 
 async function bfAllPreview() {
   bfAllChecking.value = true
@@ -117,16 +90,26 @@ async function bfAllPreview() {
   const { results } = await post('/api/backfill/all/preview', {})
   bfAllChecking.value = false
   bfAllResults.value = results
+  // Default: semua instrument tanpa error tercentang -- Giel tinggal
+  // uncheck yang tidak mau di-commit, bukan mulai dari kosong.
+  bfAllSelected.value = new Set(results.filter((x) => !x.error).map((x) => x.instrument))
+}
+
+function toggleBfAllSelected(instrument) {
+  if (bfAllSelected.value.has(instrument)) bfAllSelected.value.delete(instrument)
+  else bfAllSelected.value.add(instrument)
 }
 
 async function bfAllCommit() {
-  const items = bfAllResults.value.filter((x) => !x.error).map((x) => ({ instrument: x.instrument, from: x.from, to: x.to }))
+  const items = bfAllResults.value
+    .filter((x) => !x.error && bfAllSelected.value.has(x.instrument))
+    .map((x) => ({ instrument: x.instrument, from: x.from, to: x.to }))
+  if (!items.length) { toast('Tidak ada instrument yang dicentang'); return }
   const cr = await post('/api/backfill/all/commit', { items })
   const totalNew = cr.results.reduce((s, x) => s + (x.new || 0), 0)
   bfAllDone.value = `Selesai — ${totalNew} baris baru ditulis di ${cr.results.length} instrument.`
-  toast(`Backfill semua selesai — ${totalNew} baris baru`)
+  toast(`Backfill selesai — ${totalNew} baris baru`)
   bfAllResults.value = null
-  loadDataGaps()
 }
 </script>
 
@@ -170,30 +153,27 @@ async function bfAllCommit() {
   </section>
 
   <section>
+    <h2>Trigger Data</h2>
+    <div class="panel">
+      <p class="src">2 trigger terpisah, tujuan beda: <b>Berita</b> jalankan
+        HARI INI sekarang (dipakai kalau cron WSL tidak jalan — berita tidak
+        bisa diisi utk tanggal lampau, RSS cuma sajikan yang live).
+        <b>Backfill</b> di bawah isi gap data MARKET utk rentang tanggal lampau.</p>
+      <div class="form-row" style="margin-top:8px">
+        <button class="btn" :disabled="newsRunning" @click="triggerNewsRun">
+          {{ newsRunning ? 'Menjalankan...' : '▶ Trigger Berita (Sekarang)' }}
+        </button>
+      </div>
+      <div v-if="newsResult" class="src" style="margin-top:6px">{{ newsResult }}</div>
+    </div>
+  </section>
+
+  <section>
     <h2>Manual Backfill</h2>
     <div class="panel">
-      <div class="form-grid">
-        <div>
-          <label class="field">Instrument</label>
-          <select v-model="bfInstrument">
-            <option v-for="i in MACRO_INSTRUMENTS" :key="i">{{ i }}</option>
-          </select>
-        </div>
-        <div><label class="field">Dari tanggal</label><input v-model="bfFrom" type="date"></div>
-        <div><label class="field">Sampai tanggal</label><input v-model="bfTo" type="date"></div>
-      </div>
-      <div class="src" style="margin-top:8px">{{ bfGapInfo }}</div>
-      <div class="form-row" style="margin-top:12px">
-        <button class="btn secondary" @click="bfPreview">Preview</button>
-        <button v-if="bfShowCommit" class="btn" @click="bfCommit">Confirm &amp; Commit</button>
-      </div>
-      <div class="src">{{ bfResult }}</div>
-
-      <hr style="margin:16px 0;border-color:var(--border)">
-      <p class="src">Sistem sudah tahu gap tiap instrument (lihat info di atas
-        tiap kali ganti dropdown) — tombol ini cek SEMUA instrument sekaligus
-        dan langsung fetch range gap-nya masing-masing, tanpa perlu pilih satu
-        per satu.</p>
+      <p class="src">Cek semua instrument sekaligus, sistem cari gap-nya
+        masing-masing otomatis. Centang/uncentang baris utk pilih instrument
+        mana yang mau di-commit.</p>
       <div class="form-row">
         <button class="btn secondary" @click="bfAllPreview">Cek &amp; Preview Semua Gap</button>
       </div>
@@ -204,9 +184,15 @@ async function bfAllCommit() {
           <p v-if="!bfAllResults.length" class="src">Tidak ada gap dgn data baru ditemukan di semua instrument.</p>
           <template v-else>
             <table style="margin-top:8px">
-              <thead><tr><th>Instrument</th><th>Range Gap</th><th>Baru</th><th>Duplikat</th></tr></thead>
+              <thead><tr><th></th><th>Instrument</th><th>Range Gap</th><th>Baru</th><th>Duplikat</th></tr></thead>
               <tbody>
                 <tr v-for="x in bfAllResults" :key="x.instrument">
+                  <td>
+                    <input
+                      v-if="!x.error" type="checkbox" :checked="bfAllSelected.has(x.instrument)"
+                      @change="toggleBfAllSelected(x.instrument)"
+                    >
+                  </td>
                   <td>{{ x.instrument }}</td>
                   <td v-if="x.error" colspan="3" style="color:var(--fail)">Error: {{ x.error }}</td>
                   <template v-else>
@@ -218,7 +204,7 @@ async function bfAllCommit() {
               </tbody>
             </table>
             <div class="form-row" style="margin-top:8px">
-              <button class="btn" @click="bfAllCommit">Commit Semua ({{ bfAllResults.filter(x => !x.error).length }} instrument)</button>
+              <button class="btn" @click="bfAllCommit">Commit Terpilih ({{ bfAllSelected.size }} instrument)</button>
             </div>
           </template>
         </template>

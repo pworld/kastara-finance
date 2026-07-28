@@ -760,11 +760,15 @@ def save_grader_outcome(
 # Unit penautan = THREAD, BUKAN artikel-ke-artikel (keputusan #2). Auto-suggest
 # rule-based (BUKAN LLM, §20.0) TIDAK PERNAH langsung CONFIRMED -- selalu
 # lewat Giel (human gate). Stance WAJIB saat CONFIRMED (anti-confirmation-
-# funnel, keputusan #3). Maks 7 thread ACTIVE, ditegakkan di sini (bukan cuma
-# UI, keputusan #5). N-2 (strip Reading, injeksi persona, auto-DORMANT)
+# funnel, keputusan #3). N-2 (strip Reading, injeksi persona, auto-DORMANT)
 # SENGAJA belum dibangun -- lihat docs/ROADMAP.md.
+#
+# Keputusan #5 (maks 7 thread ACTIVE) DICABUT 28 Jul 2026 -- Giel eksplisit
+# minta batasan dihapus, dia sendiri yang tentukan berapa banyak & mana yang
+# ACTIVE/DORMANT (lewat status field yang sudah ada, bukan sistem yang
+# memblokir). Lihat docs/ROADMAP.md & docs/phase_j_build_contract_v1_3_LOCKED.md
+# §20 utk catatan override.
 
-MAX_ACTIVE_THREADS = 7
 ALLOWED_THREAD_STATUS = {"ACTIVE", "DORMANT", "CLOSED"}
 ALLOWED_STANCE = {"MENDUKUNG", "KONTRA", "NETRAL"}
 ALLOWED_REF_TABLES = {"daily_news", "manual_articles", "policy_tracker"}
@@ -793,20 +797,14 @@ def save_thread(
     keywords: list[str] | None = None, persona_tags: list[str] | None = None,
     current_read: str | None = None,
 ) -> dict[str, Any]:
-    """Buat thread baru, status ACTIVE. Guard: title wajib, maks
-    MAX_ACTIVE_THREADS thread ACTIVE bersamaan (keputusan #5) -- ditegakkan
-    di sini, bukan cuma UI. Kalau ada keywords, langsung catch-up scan
-    THREAD_CATCHUP_DAYS hari ke belakang (lihat catatan di atas) -- thread
-    tidak mulai dari nol kalau beritanya sudah ada di DB sebelum thread dibuat."""
+    """Buat thread baru, status ACTIVE. Guard: title wajib. Tidak ada batas
+    jumlah thread ACTIVE (keputusan #5 dicabut 28 Jul 2026) -- Giel sendiri
+    yang tentukan lewat status field (patch_thread). Kalau ada keywords,
+    langsung catch-up scan THREAD_CATCHUP_DAYS hari ke belakang (lihat
+    catatan di atas) -- thread tidak mulai dari nol kalau beritanya sudah
+    ada di DB sebelum thread dibuat."""
     if not title or not title.strip():
         raise ValueError("title wajib diisi")
-    active_count = conn.execute(
-        "SELECT COUNT(*) c FROM news_threads WHERE status = 'ACTIVE'"
-    ).fetchone()["c"]
-    if active_count >= MAX_ACTIVE_THREADS:
-        raise ValueError(
-            f"sudah {MAX_ACTIVE_THREADS} thread ACTIVE -- tutup/dormant-kan satu dulu (keputusan #5)"
-        )
     now = today_wib()
     row = {
         "title": title.strip(), "description": description, "current_read": current_read,
@@ -1331,6 +1329,18 @@ def remove_tag(conn: sqlite3.Connection, content_tag_id: int) -> bool:
     return True
 
 
+def confirm_tag(conn: sqlite3.Connection, content_tag_id: int) -> bool:
+    """Terima 1 tag SUGGESTED jadi MANUAL (checkbox "ceklis" di NewsView) --
+    tag auto-suggest sudah terpasang di content_tags sejak insert, ini cuma
+    ubah source supaya UI berhenti tandai '?'/dashed. Idempoten: no-op kalau
+    sudah MANUAL, tetap return True selama baris ada."""
+    exists = conn.execute("SELECT 1 FROM content_tags WHERE id = ?", (content_tag_id,)).fetchone()
+    if not exists:
+        return False
+    conn.execute("UPDATE content_tags SET source = 'MANUAL' WHERE id = ?", (content_tag_id,))
+    return True
+
+
 def list_content_tags(conn: sqlite3.Connection, ref_table: str, ref_id: int) -> list[dict[str, Any]]:
     """Semua tag terpasang di 1 konten spesifik (dipakai halaman detail)."""
     rows = conn.execute(
@@ -1554,13 +1564,13 @@ def thread_stats(conn: sqlite3.Connection, thread_id: int) -> dict[str, Any]:
 
 def list_threads_with_stats(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     """list_threads() + thread_stats per baris + active_count global (sama
-    di tiap baris -- cara termurah nampilkan "N/7 ACTIVE" tanpa endpoint
-    kedua) + facet tags thread sendiri (reuse attach_content_tags, ref_table
-    'news_threads' -- sudah ada di ALLOWED_CONTENT_TAG_REF_TABLES, thread rows
-    punya "id" field sama seperti daily_news rows jadi langsung kompatibel
-    tanpa fungsi baru). Dipakai Settings Tab Threads saja (mahal dibanding
-    list_threads biasa -- N+1 query kecil, tapi thread maks 7 ACTIVE jadi
-    total baris kecil, aman)."""
+    di tiap baris -- cara termurah nampilkan jumlah thread ACTIVE tanpa
+    endpoint kedua) + facet tags thread sendiri (reuse attach_content_tags,
+    ref_table 'news_threads' -- sudah ada di ALLOWED_CONTENT_TAG_REF_TABLES,
+    thread rows punya "id" field sama seperti daily_news rows jadi langsung
+    kompatibel tanpa fungsi baru). Dipakai Settings Tab Threads saja (mahal
+    dibanding list_threads biasa -- N+1 query kecil, tapi jumlah thread masih
+    kecil di praktiknya jadi aman)."""
     threads = list_threads(conn)
     active_count = conn.execute(
         "SELECT COUNT(*) AS n FROM news_threads WHERE status = 'ACTIVE'"

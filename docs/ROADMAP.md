@@ -2250,6 +2250,49 @@ yang sudah ter-install dipertahankan.
     Keluar+data real tampil benar dari sesi ter-autentikasi. Backend/API +
     292 test Python tetap tidak berubah sama sekali di seluruh proses ini.
 
+**Update — Snapshot: 2 trigger (Berita + Backfill) + rapikan Manual Backfill
+(28 Jul 2026):** Giel minta "2 trigger" yang jalan sekarang: Berita (tidak
+bisa di-backfill tanggal lampau, RSS cuma sajikan yang live) dan Backfill
+(data market, isi gap tanggal lampau) — dipisah krn tujuan beda, bukan
+duplikat.
+- **`POST /api/run_daily_now`** (baru) — panggil `pipeline.run_daily.
+  run_daily()` langsung dari tombol "Trigger Berita (Sekarang)" di
+  `SnapshotView.vue`. Sebelumnya Giel harus minta run manual lewat terminal
+  tiap kali cron WSL tidak jalan (kejadian berulang, lihat entri di atas) —
+  sekarang bisa dipicu sendiri dari UI.
+- **Checkbox di "Cek & Preview Semua Gap"** — tabel hasil sekarang punya
+  kolom centang per instrument (default semua tercentang), tombol jadi
+  "Commit Terpilih (N instrument)" — bisa uncheck instrument yang tidak mau
+  di-commit, tidak lagi all-or-nothing.
+- **Form Manual Backfill per-instrument DIHAPUS** (dropdown Instrument +
+  Dari/Sampai tanggal + Preview/Commit) — Giel bilang redundan dengan "Cek &
+  Preview Semua Gap" yang sudah cek semua instrument sekaligus. Endpoint
+  backend yang jadi tidak terpakai ikut dihapus: `GET /api/data_gaps`,
+  `POST /api/backfill/preview`, `POST /api/backfill/commit` (fungsi
+  `_detect_gaps`/`INSTRUMENT_SOURCE` TETAP ada, masih dipakai
+  `_all_instruments_with_gaps` utk jalur "semua gap").
+- Diverifikasi: 404 test Python hijau, `npm run build` bersih, endpoint baru
+  diverifikasi via Flask test-client (temp DB, `run_daily` di-monkeypatch
+  supaya tidak fetch network beneran).
+
+**Update — News Threads: batas 7 ACTIVE dicabut (28 Jul 2026):** Giel coba
+aktifkan/bikin thread, kena blok batas 7 (keputusan #5, §20.1 kontrak) —
+minta eksplisit batasan dihapus, dia sendiri yang tentukan berapa banyak
+thread & mana yang ACTIVE/DORMANT lewat status field yang sudah ada.
+- `MAX_ACTIVE_THREADS` + guard COUNT-check di `save_thread()` (`web/writes.py`)
+  dihapus total. `patch_thread()` (reaktivasi DORMANT→ACTIVE) tidak pernah
+  punya guard serupa, jadi tidak ada perubahan di situ.
+- Frontend: teks "Maksimal 7 thread ACTIVE" + "{{activeCount}}/7 thread
+  ACTIVE" di `ThreadsView.vue` diubah jadi cuma nampilkan jumlah, tidak
+  nyebut batas lagi. `active_count`/`list_threads_with_stats` tetap ada
+  (masih berguna sebagai info, cuma bukan lagi angka thd batas keras).
+- Test lama `test_save_thread_enforces_max_active` diganti
+  `test_save_thread_no_longer_caps_active_count` (bikin 8 thread ACTIVE
+  sekaligus, harus sukses semua).
+- `docs/phase_j_build_contract_v1_3_LOCKED.md` §20.1: teks keputusan #5
+  di-strikethrough + dianotasi (bukan dihapus, historinya tetap kelihatan).
+- Diverifikasi: pytest full suite hijau, `npm run build` bersih.
+
 Sesuai `plan.txt`: **jangan lompat phase tanpa instruksi baru.** Kalau ada
 kebutuhan mendesak di luar urutan (seperti Phase 1 kemarin), itu boleh — tapi
 harus tercatat di sini dengan jelas kenapa keluar urutan, supaya roadmap tetap

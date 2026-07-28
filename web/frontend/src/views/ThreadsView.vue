@@ -33,9 +33,9 @@ async function loadThreads() {
   }
 }
 onMounted(loadThreads)
-// Filter client-side (dataset kecil, maks 7 ACTIVE + histori DORMANT/CLOSED)
-// -- activeCount dihitung dari allThreads (BUKAN hasil filter), supaya
-// "N/7 ACTIVE" tetap benar meski Giel lagi filter status=CLOSED mis.-nya.
+// Filter client-side (dataset kecil, tidak ada batas jumlah lagi) --
+// activeCount dihitung dari allThreads (BUKAN hasil filter), supaya
+// jumlah ACTIVE tetap benar meski Giel lagi filter status=CLOSED mis.-nya.
 const threads = computed(() => statusFilter.value ? allThreads.value.filter((t) => t.status === statusFilter.value) : allThreads.value)
 const activeCount = computed(() => allThreads.value[0]?.active_count ?? 0)
 
@@ -150,10 +150,10 @@ async function mergeThreads() {
       <p class="src" style="margin-bottom:12px">
         Benang narasi lintas waktu (Addendum B §20) -- unit penautan adalah
         THREAD, bukan artikel-ke-artikel. Auto-suggest jalan tiap run_daily
-        (keyword + tag-match), konfirmasi/tolak saran di halaman News.
-        Maksimal 7 thread ACTIVE bersamaan.
+        (keyword + tag-match), konfirmasi/tolak saran di halaman News. Tidak
+        ada batas jumlah thread ACTIVE -- kamu yang tentukan lewat status.
       </p>
-      <p class="src" style="margin-bottom:12px">{{ activeCount }}/7 thread ACTIVE.</p>
+      <p class="src" style="margin-bottom:12px">{{ activeCount }} thread ACTIVE.</p>
       <div class="chart-head" style="margin-bottom:12px">
         <label class="src">Status</label>
         <select v-model="statusFilter" style="width:auto">

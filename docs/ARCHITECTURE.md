@@ -257,8 +257,12 @@ Endpoint Phase 1 (`/api/latest`, `/api/daily_market`, `/api/asset_ohlcv`,
 sejak Phase C dikerjakan. Endpoint baru Phase C **menulis**, tapi TIDAK
 menulis logic baru langsung di route — semua reuse fungsi yang sudah ada
 & teruji:
-- Backfill (`/api/backfill/preview`, `/api/backfill/commit`) → panggil
-  `pipeline.backfill.backfill()` langsung (lihat §6.8 soal `preview_only`).
+- Backfill (`/api/backfill/all/preview`, `/api/backfill/all/commit`) →
+  panggil `pipeline.backfill.backfill()` per instrument yang punya gap
+  (lihat §6.8 soal `preview_only`). Endpoint per-instrument lama
+  (`/api/data_gaps`, `/api/backfill/preview`, `/api/backfill/commit`)
+  dihapus 28 Jul 2026 — redundan dengan "Cek & Preview Semua Gap" yang
+  sudah cek semua instrument sekaligus.
 - Manual article (`/api/articles/add`) → `pipeline.add_article.insert_article()`.
 - Approve/reject sinyal (`/api/signals/review`) → `tools.review_signal.set_review()`.
 - Reading workspace, trading journal, prediction log, policy tracker,

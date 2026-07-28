@@ -115,6 +115,12 @@ async function removeTag(contentTagId) {
   loadNews()
 }
 
+async function confirmTag(contentTagId) {
+  await post(`/api/content_tags/${contentTagId}/confirm`, {})
+  toast('Tag diterima')
+  loadNews()
+}
+
 // "Telusuri Semua Tag" -- panel sekunder, jarang dibuka (§21.3), tapi
 // dataset-nya kecil (vocab tumbuh pelan) jadi dimuat eager di mount, bukan
 // lazy on-open -- lebih simpel, tidak perlu state loading-on-toggle.
@@ -284,44 +290,56 @@ async function saveArticle() {
         </Column>
         <Column header="Thread">
           <template #body="{ data }">
-            <p v-if="!data.thread_links || !data.thread_links.length" class="src" style="margin:0 0 4px">—</p>
-            <div v-for="tl in data.thread_links" :key="tl.link_id" style="margin-bottom:4px">
-              <template v-if="tl.link_status === 'SUGGESTED'">
-                <span class="badge" :class="LINK_STATUS_CLASS.SUGGESTED">Saran: {{ tl.thread_title }}?</span>
-                <button class="btn small secondary" @click="openStanceDialog(tl)">Konfirmasi</button>
-                <button class="btn small danger" @click="rejectThreadLink(tl)">Tolak</button>
-              </template>
-              <template v-else>
-                <span class="badge" :class="LINK_STATUS_CLASS.CONFIRMED">{{ tl.thread_title }}</span>
-                <span class="src">({{ tl.stance }})</span>
-                <button class="btn small danger" @click="rejectThreadLink(tl)">Lepas</button>
-              </template>
+            <p v-if="!data.thread_links || !data.thread_links.length" class="src" style="margin:0 0 6px">—</p>
+            <div v-for="tl in data.thread_links" :key="tl.link_id" style="margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--border)">
+              <div class="src">Nama Thread</div>
+              <div>
+                <span class="badge" :class="tl.link_status === 'SUGGESTED' ? LINK_STATUS_CLASS.SUGGESTED : LINK_STATUS_CLASS.CONFIRMED">{{ tl.thread_title }}</span>
+              </div>
+              <div class="src" style="margin-top:2px">Opsi</div>
+              <div>{{ tl.link_status === 'SUGGESTED' ? '(belum dikonfirmasi)' : tl.stance }}</div>
+              <div style="margin-top:4px">
+                <template v-if="tl.link_status === 'SUGGESTED'">
+                  <button class="btn small secondary" @click="openStanceDialog(tl)">Konfirmasi</button>
+                  <button class="btn small danger" @click="rejectThreadLink(tl)">Tolak</button>
+                </template>
+                <button v-else class="btn small danger" @click="rejectThreadLink(tl)">Lepas</button>
+              </div>
             </div>
             <div v-if="linkPickerIds.has(data.id)">
-              <select v-model="linkPickerInputs[data.id].threadId" style="width:auto">
+              <div class="src">Nama Thread</div>
+              <select v-model="linkPickerInputs[data.id].threadId" style="width:100%; margin-bottom:4px">
                 <option value="">pilih thread...</option>
                 <option v-for="t in activeThreads" :key="t.id" :value="t.id">{{ t.title }}</option>
               </select>
-              <select v-model="linkPickerInputs[data.id].stance" style="width:auto">
+              <div class="src">Opsi</div>
+              <select v-model="linkPickerInputs[data.id].stance" style="width:100%; margin-bottom:4px">
                 <option value="MENDUKUNG">MENDUKUNG</option>
                 <option value="KONTRA">KONTRA</option>
                 <option value="NETRAL">NETRAL</option>
               </select>
-              <button class="btn small" @click="addThreadLink(data)">Tautkan</button>
-              <button class="btn small secondary" @click="cancelAddThreadLink(data)">Batal</button>
+              <div>
+                <button class="btn small" @click="addThreadLink(data)">Tautkan</button>
+                <button class="btn small secondary" @click="cancelAddThreadLink(data)">Batal</button>
+              </div>
             </div>
             <a v-else href="#" @click.prevent="startAddThreadLink(data)">+ Tautkan Thread</a>
           </template>
         </Column>
         <Column header="Tag">
           <template #body="{ data }">
-            <span
-              v-for="t in data.tags" :key="t.id" class="badge" :class="FACET_COLOR[t.facet]"
-              :style="{ marginRight: '4px', ...(t.source === 'SUGGESTED' ? { border: '1px dashed currentColor', opacity: 0.75 } : {}) }"
-              :title="t.source === 'SUGGESTED' ? 'auto-suggest, belum dikonfirmasi manual' : 'dipasang manual'"
-            >
-              {{ t.canonical }}<span v-if="t.source === 'SUGGESTED'">?</span> <a href="#" style="color:inherit" @click.prevent="removeTag(t.id)">&times;</a>
-            </span>
+            <div v-for="t in data.tags" :key="t.id" style="margin-bottom:4px; display:flex; align-items:center; gap:4px">
+              <input
+                v-if="t.source === 'SUGGESTED'" type="checkbox"
+                title="ceklis utk terima tag ini" @change="confirmTag(t.id)"
+              >
+              <span
+                class="badge" :class="FACET_COLOR[t.facet]"
+                :style="t.source === 'SUGGESTED' ? { border: '1px dashed currentColor', opacity: 0.75 } : {}"
+                :title="t.source === 'SUGGESTED' ? 'auto-suggest, belum dikonfirmasi -- ceklis utk terima' : 'dipasang manual'"
+              >{{ t.canonical }}<span v-if="t.source === 'SUGGESTED'">?</span></span>
+              <a href="#" style="color:inherit" @click.prevent="removeTag(t.id)">&times;</a>
+            </div>
             <TagAutocomplete
               :excludeCanonicals="(data.tags || []).map(t => t.canonical)"
               @select="(tag) => onTagSelected(data, tag)"
