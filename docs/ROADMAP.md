@@ -2293,6 +2293,54 @@ thread & mana yang ACTIVE/DORMANT lewat status field yang sudah ada.
   di-strikethrough + dianotasi (bukan dihapus, historinya tetap kelihatan).
 - Diverifikasi: pytest full suite hijau, `npm run build` bersih.
 
+**Update — Mode Ringkas & PWA Mobile v1.0 disimpan + Langkah 1 dieksekusi
+(28 Jul 2026):** Giel tulis dokumen desain penuh (`docs/mode_ringkas_pwa_
+mobile_v1.md`) — sesi habit 5-menit untuk hari sibuk (BAGIAN A) + wadah PWA
+mobile-nya (BAGIAN B), dengan urutan garapan murah-dulu (BAGIAN C, 5 langkah,
+mulai NOL kode). Prinsip pengikat: app ini habit engine, metrik sukses =
+streak harian, bukan kelengkapan fitur.
+- Langkah 1 (NOL kode) dieksekusi: section baru "Mode Ringkas — sesi 5 menit
+  (hari sibuk)" ditambahkan ke `docs/SOP.md` §1 (versi dibump 1.1→1.2) --
+  aksi WAJIB (catat/nilai 1 prediksi), INTI, BONUS, dan daftar yang TIDAK ada
+  di Mode Ringkas, sama persis strukturnya dgn dokumen sumber.
+- Langkah 2-5 (view `/m`, PWA manifest+service worker, capture ringan, APK
+  native) SENGAJA belum digarap — masing-masing menunggu bukti pemakaian
+  dari langkah sebelumnya (pola "pakai-lalu-bangun" yang Giel tulis sendiri),
+  bukan dibangun sekaligus di muka.
+
+**Update — PWA + `/m` Mode Ringkas dibangun sekaligus (31 Jul 2026):** Giel
+eksplisit minta skip Langkah 2 (pakai `/m` polos 1-2 minggu dulu) dan
+langsung Langkah 3 (PWA penuh) — override urutan "pakai-lalu-bangun" yang
+dia tulis sendiri di `docs/mode_ringkas_pwa_mobile_v1.md`.
+- **`web/frontend/src/views/MobileView.vue`** (baru, route `/m`) — layar
+  tunggal scroll vertikal sesuai wireframe §B.2: header status data
+  (source_flags 🟢/🔴), WAJIB (catat/nilai prediksi), INTI (berita HIGH +
+  for_reading + konfirmasi tag/thread SUGGESTED inline), BONUS (ringkasan
+  thread ACTIVE, klik → timeline), Posisi ONGOING (silang dgn earnings
+  warning). **100% reuse endpoint yang sudah ada** (§B.4) — `/api/latest`,
+  `/api/prediction/{due,add,score}`, `/api/news`, `/api/content_tags/*`,
+  `/api/threads/*`, `/api/journal`, `/api/earnings/warnings` — nol endpoint
+  baru. Endpoint keputusan (approve, sizing, backfill, settings, jalankan
+  persona) sengaja tidak pernah dipanggil dari view ini.
+- **`App.vue`/`router/index.js`** — `/m` render standalone tanpa sidebar
+  shell (sama seperti `/login`), bukan bagian dari 7 nav group desktop.
+- **PWA** (`vite.config.js`, plugin `vite-plugin-pwa`) — manifest
+  (`start_url: /m`, `display: standalone`, warna gelap sesuai tema),
+  service worker `registerType: autoUpdate`, `navigateFallbackDenylist`
+  utk `/api/*` (SW tidak pernah cache/serve response API — data selalu
+  fresh dari network, app ini installable bukan offline-first). Ikon
+  di-generate dari 1 source SVG (`@vite-pwa/assets-generator`, dev-only
+  tool) — huruf "K" di atas warna `--bg` gelap, set lengkap 64/192/512 +
+  maskable + apple-touch-icon.
+- Diverifikasi: `npm run build` bersih (manifest.webmanifest + sw.js +
+  workbox chunk ter-generate), pytest 404 tetap hijau (backend tidak
+  disentuh sama sekali sesi ini), dicek langsung di browser (build produksi
+  via `kastara-web`): manifest ter-serve benar, keempat ikon 200 OK, service
+  worker script terpasang, nol console error sampai halaman login. Tidak
+  bisa verifikasi konten `/m` di baliknya (aturan kredensial) atau install
+  home-screen sungguhan (butuh HTTPS asli dari HP, belum dites Tailscale) —
+  keduanya menunggu Giel coba sendiri.
+
 Sesuai `plan.txt`: **jangan lompat phase tanpa instruksi baru.** Kalau ada
 kebutuhan mendesak di luar urutan (seperti Phase 1 kemarin), itu boleh — tapi
 harus tercatat di sini dengan jelas kenapa keluar urutan, supaya roadmap tetap

@@ -1,5 +1,5 @@
 # SOP PENGGUNAAN APLIKASI — Kastara Finance
-**Versi:** 1.1 · 15 Juli 2026 · Owner: Giel
+**Versi:** 1.2 · 28 Juli 2026 · Owner: Giel
 **Posisi dokumen:** mengatur KAPAN membuka panel apa dan APA yang boleh dilakukan di sana. Aturan level aset tetap di SOP masing-masing (single source of truth):
 
 > **Struktur dokumen:** **Bagian A (§0–§7)** = ritme & aturan (kapan buka apa).
@@ -73,6 +73,41 @@ Kalau dokumen ini terasa bertentangan dengan SOP di atas: SOP aset yang menang, 
 - Membuka Tab 8 (Universe & Grader) — itu ritme mingguan/kuartalan. Kecuali satu hal: melihat badge lane/kuadran yang sudah tampil otomatis di Panel 5.
 - Backfill, intake emiten, tuning parameter, baca artikel panjang.
 - Approve sinyal yang gagal di salah satu gate "karena feeling bagus".
+
+### Mode Ringkas — sesi 5 menit (hari sibuk)
+
+> Detail penuh + rasional: `docs/mode_ringkas_pwa_mobile_v1.md`. Prinsip:
+> aplikasi ini **habit engine**, bukan pengganti tools berat — metrik
+> kesehatannya **streak harian** (dibuka kemarin, dan kemarinnya lagi), bukan
+> kelengkapan fitur. Mode Ringkas menjaga rantai harian tidak putus di hari
+> yang cuma menyisakan 5 menit — **bukan pengganti** ritual pagi penuh di atas.
+
+**[WAJIB · ~1 menit]** — cuma ini saja = "hari tidak putus":
+- [ ] Catat 1 prediksi ATAU nilai 1 prediksi yang jatuh tempo (`prediction_log`)
+  — satu-satunya hal yang TIDAK BISA di-backfill; prediksi yang tak dicatat
+  hari ini hilang permanen.
+
+**[INTI · ~2 menit]** — kalau sempat:
+- [ ] Scan data pagi 10 detik: ada anomali besar? (lihat, jangan analisa)
+- [ ] Baca berita HIGH/briefing: ada yang mengubah lane hari ini? Flag
+  `for_reading` kalau layak dibaca serius nanti.
+
+**[BONUS · ~2 menit]** — kalau benar-benar longgar:
+- [ ] Konfirmasi tag/thread SUGGESTED (klik, tak perlu mikir berat).
+- [ ] Cek posisi ONGOING: ada yang kena aturan hari ini? (earnings saham AS
+  H-1 = tutup penuh; event HIGH < 48 jam = SL breakeven.)
+
+**TIDAK di Mode Ringkas** (tunggu sesi laptop): approve/reject sinyal,
+sizing, jalankan persona (biaya LLM), synthesis panjang, backfill, settings,
+grader override.
+
+**Aturan mental (jangkar habit):** *"Hari tersibuk pun, saya catat atau
+nilai satu prediksi."* Kalau cuma itu yang sempat, hari itu tetap sukses —
+streak utuh. Semua yang lain boleh dikejar di sesi laptop berikutnya.
+
+**Batas jujur:** Mode Ringkas bukan pengganti sesi penuh, dan tidak
+menghasilkan keputusan trade (anti-impulsif, bukan bug). 5 hari berturut
+hanya Mode Ringkas = sinyal untuk jujur soal disiplin vs kesibukan (§7).
 
 ---
 

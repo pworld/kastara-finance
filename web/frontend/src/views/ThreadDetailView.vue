@@ -150,7 +150,11 @@ async function addManualLink() {
       <div class="panel">
         <div v-for="l in suggestedLinks" :key="l.id" class="empty-inline" style="margin-bottom:6px">
           <span class="badge" :class="LINK_STATUS_CLASS.SUGGESTED">SUGGESTED</span>
-          <span style="margin-left:8px">{{ l.source_info?.date }} · {{ l.source_info?.headline }}</span>
+          <span style="margin-left:8px">
+            {{ l.source_info?.date }} ·
+            <a v-if="l.source_info?.url" :href="l.source_info.url" target="_blank" rel="noopener">{{ l.source_info?.headline }}</a>
+            <span v-else>{{ l.source_info?.headline }}</span>
+          </span>
           <button class="btn small secondary" @click="openStanceDialog(l)">Konfirmasi</button>
           <button class="btn small danger" @click="rejectLink(l)">Tolak</button>
         </div>

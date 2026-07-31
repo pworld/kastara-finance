@@ -12,6 +12,10 @@ const navGroups = [
     items: [
       { to: '/snapshot', label: 'Snapshot' },
       { to: '/news', label: 'News' },
+      // Threads dipindah ke sini (di bawah News, 28 Jul 2026) -- konfirmasi/
+      // tolak saran tautan sudah jadi bagian ritual baca News harian, jadi
+      // menunya deket News, bukan di Pengaturan (yang kurasi lambat/reflektif).
+      { to: '/threads', label: 'Threads' },
       { to: '/forward', label: 'Forward' },
       { to: '/reading', label: 'Reading' },
       { to: '/chart', label: 'Chart' },
@@ -37,13 +41,10 @@ const navGroups = [
   },
   {
     // Kurasi lambat/reflektif (Addendum C §21.11) -- BEDA sifat dari Daily,
-    // grup sendiri biar tidak tercampur ritual harian. Threads dipindah ke
-    // sini juga (bukan cuma Tags) -- sama-sama kelola/kurasi, bukan ritual
-    // baca harian (itu di News/Reading lewat chip & strip).
+    // grup sendiri biar tidak tercampur ritual harian.
     title: 'Pengaturan',
     items: [
       { to: '/tags', label: 'Tags' },
-      { to: '/threads', label: 'Threads' },
     ],
   },
 ]
@@ -56,7 +57,7 @@ async function logout() {
 
 <template>
   <Toast />
-  <RouterView v-if="route.path === '/login'" />
+  <RouterView v-if="route.path === '/login' || route.path === '/m'" />
   <div v-else class="shell">
     <aside class="sidebar">
       <div class="brand">KASTARA FINANCE</div>

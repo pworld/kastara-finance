@@ -27,6 +27,11 @@ const routes = [
   // Tags (Addendum C §21.11, C-1 gap ditutup 17 Jul 2026) -- kurasi
   // lambat/reflektif kamus tag, terpisah dari command-palette cepat.
   { path: '/tags', name: 'tags', component: () => import('../views/TagsView.vue') },
+  // Mode Ringkas / PWA mobile (docs/mode_ringkas_pwa_mobile_v1.md BAGIAN B) --
+  // layar tunggal, dipisah dari sidebar 7-tab desktop (lihat App.vue: /m
+  // render standalone tanpa shell, sama seperti /login). start_url manifest
+  // PWA (vite.config.js) mengarah ke sini.
+  { path: '/m', name: 'mobile', component: () => import('../views/MobileView.vue') },
 ]
 
 const router = createRouter({
