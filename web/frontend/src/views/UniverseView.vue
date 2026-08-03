@@ -302,6 +302,49 @@ const holdingsByProvider = computed(() => {
   }
   return [...map.entries()]
 })
+
+// ---------- Langkah 6: indikator basi + flag TRADE-tanpa-jurnal (computed,
+// murni dari field yang sudah dikembalikan list_holdings -- tidak perlu
+// endpoint baru) + drawer Konversi Book (satu-satunya jalur ubah book). ----------
+const STALE_HOLDING_DAYS = 30
+function isStale(h) {
+  if (!h.last_updated) return false
+  const days = (Date.now() - new Date(h.last_updated).getTime()) / 86400000
+  return days > STALE_HOLDING_DAYS
+}
+function isTradeWithoutJournal(h) {
+  return h.book === 'TRADE' && !h.linked_journal_id
+}
+
+const convertDrawerOpen = ref(false)
+const convertTarget = ref(null)
+const convertForm = ref({ newBook: 'INVEST', reason: '' })
+function openConvertDrawer(h) {
+  convertTarget.value = h
+  convertForm.value = { newBook: h.book === 'TRADE' ? 'INVEST' : 'TRADE', reason: '' }
+  convertDrawerOpen.value = true
+}
+async function submitConvertBook() {
+  const result = await post(`/api/holdings/${convertTarget.value.id}/convert_book`, {
+    new_book: convertForm.value.newBook, reason: convertForm.value.reason,
+  })
+  if (result.error) { toast(result.error); return }
+  toast(`${result.instrument}: ${result.from_book} → ${result.to_book} (${result.pnl_check})`)
+  convertDrawerOpen.value = false
+  loadHoldings()
+  loadAllocation()
+  loadHoldingConversions()
+}
+
+// ---------- Riwayat Konversi Book (Log & Audit tab) ----------
+const holdingConversions = ref([])
+const loadingHoldingConversions = ref(true)
+async function loadHoldingConversions() {
+  loadingHoldingConversions.value = true
+  holdingConversions.value = await get('/api/holdings/conversions')
+  loadingHoldingConversions.value = false
+}
+onMounted(loadHoldingConversions)
 </script>
 
 <template>
@@ -497,27 +540,56 @@ const holdingsByProvider = computed(() => {
   <section>
     <h2>Per Provider</h2>
     <div class="panel">
+      <p class="src">🟡 baris = basi (&gt;30 hari sejak last_updated, alokasi dari data ini tidak bisa dipercaya).
+        🔴 baris = TRADE tanpa jurnal (pelanggaran SOP -- lihat trading_journal).</p>
       <p v-if="loadingHoldings" class="src">Memuat...</p>
       <p v-else-if="!holdings.length" class="src">belum ada holding tercatat</p>
       <div v-else v-for="[provider, items] in holdingsByProvider" :key="provider" class="cat-group">
         <h4 class="cat-title">{{ provider }}</h4>
         <table>
-          <thead><tr><th>Instrument</th><th>Book</th><th>Kategori SOP</th><th>Quantity</th><th>Avg Price</th><th>Currency</th><th>Notes</th></tr></thead>
+          <thead><tr><th>Instrument</th><th>Book</th><th>Kategori SOP</th><th>Quantity</th><th>Avg Price</th><th>Currency</th><th>Notes</th><th></th></tr></thead>
           <tbody>
-            <tr v-for="h in items" :key="h.id">
-              <td>{{ h.instrument }}</td>
+            <tr
+              v-for="h in items" :key="h.id"
+              :style="isTradeWithoutJournal(h) ? { background: 'rgba(220,80,80,.12)' } : isStale(h) ? { background: 'rgba(220,190,60,.12)' } : {}"
+            >
+              <td>{{ h.instrument }} <span v-if="isStale(h)" title="basi, >30 hari">🟡</span><span v-if="isTradeWithoutJournal(h)" title="TRADE tanpa jurnal">🔴</span></td>
               <td><span class="badge" :class="LANE_CLASS[h.book] || 'lane-none'">{{ h.book }}</span></td>
               <td class="src">{{ h.sop_category ? SOP_CATEGORY_LABELS[h.sop_category] : '—' }}</td>
               <td>{{ h.quantity }} {{ h.unit }}</td>
               <td class="src">{{ h.avg_price ?? '-' }}</td>
               <td class="src">{{ h.currency }}</td>
               <td class="src">{{ h.notes || '-' }}</td>
+              <td><button class="btn small secondary" @click="openConvertDrawer(h)">Konversi Book</button></td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
   </section>
+
+  <Drawer v-model:visible="convertDrawerOpen" position="right" style="width:28rem; max-width:92vw" :header="convertTarget ? `Konversi Book -- ${convertTarget.instrument}` : 'Konversi Book'">
+    <p v-if="convertTarget" class="src">{{ convertTarget.instrument }} @ {{ convertTarget.provider }} -- saat ini
+      <span class="badge" :class="LANE_CLASS[convertTarget.book] || 'lane-none'">{{ convertTarget.book }}</span></p>
+    <p class="src">Diblokir otomatis kalau posisi ini SEDANG RUGI (dicek ke
+      histori harga -- kalau instrumen tidak terlacak di sana, tidak bisa
+      diverifikasi, tetap diizinkan). Konversi TETAP tercatat permanen di
+      log, apa pun hasilnya.</p>
+    <div class="form-row">
+      <label class="field">Book Baru</label>
+      <select v-model="convertForm.newBook">
+        <option value="TRADE">TRADE</option>
+        <option value="INVEST">INVEST</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="field">Alasan (wajib)</label>
+      <textarea v-model="convertForm.reason" placeholder="Kenapa holding ini pindah book?"></textarea>
+    </div>
+    <div class="form-row" style="margin-top:12px">
+      <button class="btn" @click="submitConvertBook">Konversi</button>
+    </div>
+  </Drawer>
 
   <section>
     <h2>Alokasi vs SOP</h2>
@@ -567,17 +639,6 @@ const holdingsByProvider = computed(() => {
     </div>
   </section>
 
-  <section>
-    <details class="collapsible">
-      <summary>Yang belum dibangun (Langkah 6)</summary>
-      <div class="panel">
-        <p class="src">Guard: konversi book TRADE↔INVEST terkunci + alasan
-          wajib (dan diblokir kalau posisi rugi), indikator basi
-          (last_updated &gt; 30 hari), flag holding TRADE tanpa
-          linked_journal_id.</p>
-      </div>
-    </details>
-  </section>
   </template>
 
   <template v-if="activeTab === 'intake'">
@@ -677,6 +738,28 @@ const holdingsByProvider = computed(() => {
           </template>
         </Column>
         <Column field="evidence" header="Evidence" />
+      </DataTable>
+    </div>
+  </section>
+
+  <section>
+    <h2>Riwayat Konversi Book</h2>
+    <div class="panel">
+      <p class="src">Satu-satunya jalur ubah book (TRADE↔INVEST) -- alasan
+        wajib, dan `pnl_check` catat apakah posisi terverifikasi untung
+        atau tidak bisa diverifikasi saat konversi terjadi (§4.4).</p>
+      <p v-if="loadingHoldingConversions" class="src">Memuat...</p>
+      <DataTable v-else :rows="holdingConversions" :searchFields="['instrument', 'reason']" emptyMessage="belum ada konversi book">
+        <Column field="converted_at" header="Tanggal" sortable><template #body="{ data }"><span class="src">{{ data.converted_at }}</span></template></Column>
+        <Column field="instrument" header="Ticker" sortable />
+        <Column header="Book Lama → Baru">
+          <template #body="{ data }">
+            <span class="src">{{ data.from_book }} → </span>
+            <span class="badge" :class="LANE_CLASS[data.to_book] || 'lane-none'">{{ data.to_book }}</span>
+          </template>
+        </Column>
+        <Column field="reason" header="Alasan" />
+        <Column field="pnl_check" header="P&amp;L saat konversi"><template #body="{ data }"><span class="src">{{ data.pnl_check }}</span></template></Column>
       </DataTable>
     </div>
   </section>

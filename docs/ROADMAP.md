@@ -2498,3 +2498,39 @@ lanjutan struktur tab, ini isi TAB 2 yang sebelumnya placeholder).
   banyak data holding dulu supaya bermakna) & Langkah 6 (guard book wajib
   di UI/konversi terkunci+alasan, indikator basi >30 hari, flag TRADE
   tanpa linked_journal_id) -- menunggu instruksi lanjutan.
+
+**Update — /universe: Langkah 6, guard book conversion + indikator (3
+Agustus 2026):** Penyelesaian penuh restrukturisasi /universe + Portfolio
+Tracker (`docs/universe_portfolio_restructure_v1.md`, Langkah 1-6 semua
+selesai).
+- **`holding_book_conversion_log`** (29 tabel) -- pola sama
+  `lane_validation_log`: satu-satunya jalur ubah `book`, alasan wajib,
+  append-only, `pnl_check` mencatat hasil verifikasi P&L saat konversi
+  terjadi (bukan disembunyikan).
+- **`convert_holding_book()`** -- diblokir kalau posisi SEDANG RUGI (avg_price
+  vs close terbaru `asset_ohlcv`, §4.4 "konversi paspor saat merah selalu
+  punya motif menghindari mengakui salah"). Kalau instrumen TIDAK terlacak
+  di `asset_ohlcv` (emas fisik, cash, dll) -- P&L tidak bisa diverifikasi,
+  konversi tetap DIIZINKAN (bukan diblokir default) tapi dicatat jujur di
+  `pnl_check`, bukan diam-diam dianggap untung.
+- **Indikator basi (🟡, >30 hari) + flag TRADE-tanpa-jurnal (🔴)** -- murni
+  computed di frontend dari field yang sudah dikembalikan `list_holdings()`
+  (`last_updated`, `book`, `linked_journal_id`), nol perubahan backend
+  utk ini.
+- **"book wajib"** (poin 1 §4.4) sudah ditegakkan sejak Langkah 4 -- tidak
+  ada perubahan tambahan diperlukan, dikonfirmasi ulang saat audit Langkah 6.
+- **`POST /api/holdings/<id>/convert_book`**, **`GET /api/holdings/conversions`**
+  + section baru "Riwayat Konversi Book" di tab Log & Audit.
+- Diverifikasi LANGSUNG di browser (bukan cuma test): drawer Konversi Book
+  dibuka dari baris BTC/Cold Wallet, diisi alasan, disubmit -- book berubah
+  INVEST→TRADE, flag 🔴 langsung muncul (krn belum ada linked_journal_id),
+  dan baris log konversi muncul benar di tab Log & Audit dengan pnl_check
+  "tidak diverifikasi (instrumen tidak ada di asset_ohlcv)" -- sesuai
+  ekspektasi krn BTC memang tidak match instrument apa pun di asset_ohlcv
+  test data saat itu.
+- 5 test baru (block-saat-rugi, izinkan-saat-untung, izinkan-saat-tak-
+  terverifikasi, 4 guard error, urutan+join log) + 1 skenario tambahan di
+  test_db.py (28→29 tabel).
+- Backend perlu di-restart 2x lagi selama sesi ini (endpoint baru tiap
+  kali) -- pola yang sama berulang terus, dicatat lagi supaya tidak lupa:
+  `python -m web.app` TIDAK hot-reload.

@@ -1273,6 +1273,27 @@ def portfolio_allocation():
     return jsonify(result)
 
 
+@app.post("/api/holdings/<int:holding_id>/convert_book")
+def holdings_convert_book(holding_id):
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            row = writes.convert_holding_book(
+                conn, holding_id, body.get("new_book", ""), body.get("reason", ""),
+            )
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(row)
+
+
+@app.get("/api/holdings/conversions")
+def holdings_conversions_list():
+    with get_connection() as conn:
+        rows = writes.list_holding_conversions(conn, limit=request.args.get("limit", 200, type=int))
+    return jsonify(rows)
+
+
 # ---------- News Threads (Addendum B §20, N-1 fondasi). Auto-suggest jalan
 # di pipeline/run_daily.py (writes.suggest_thread_links) -- endpoint di sini
 # murni baca + konfirmasi/tolak/patch, tidak ada logic matching di route. ----------

@@ -81,6 +81,8 @@ from web.writes import (
     create_holding,
     list_holdings,
     compute_portfolio_allocation,
+    convert_holding_book,
+    list_holding_conversions,
 )
 
 
@@ -2258,3 +2260,105 @@ def test_compute_portfolio_allocation_excludes_sgd_and_missing_data(tmp_path):
         assert reasons["SGDCASH"] == "SGD belum ada sumber kurs"
         assert reasons["RDINDEX"] == "avg_price kosong"
         assert reasons["OLD"] == "sop_category belum diisi"
+
+
+# ---------- Holdings Langkah 6: guard konversi book (§4.4, 3 Aug 2026) ----------
+
+def test_convert_holding_book_success_unverifiable_instrument(tmp_path):
+    """Instrumen tanpa histori asset_ohlcv (mis. emas fisik) -- P&L tidak
+    bisa diverifikasi, konversi tetap DIIZINKAN (bukan diblokir default)."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        h = create_holding(conn, instrument="XAU", provider="Pegadaian", book="INVEST", quantity=10, unit="gram", avg_price=1_000_000, sop_category="EMAS")
+        conn.commit()
+        result = convert_holding_book(conn, h["id"], "TRADE", "mau dipakai trading jangka pendek")
+        conn.commit()
+        assert result["from_book"] == "INVEST"
+        assert result["to_book"] == "TRADE"
+        assert "tidak diverifikasi" in result["pnl_check"]
+        assert list_holdings(conn)[0]["book"] == "TRADE"
+
+
+def test_convert_holding_book_blocked_when_at_a_loss(tmp_path):
+    """avg_price 20000, close terbaru 15000 -> rugi -> konversi diblokir."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        conn.execute(
+            "INSERT INTO asset_ohlcv (date, instrument, close) VALUES ('2026-08-01', 'BBCA', 15000)"
+        )
+        h = create_holding(conn, instrument="BBCA", provider="Stockbit", book="TRADE", quantity=100, unit="share", avg_price=20000, sop_category="SAHAM_IHSG")
+        conn.commit()
+        try:
+            convert_holding_book(conn, h["id"], "INVEST", "biar tidak kena aturan trading")
+            assert False, "harusnya raise ValueError krn posisi rugi"
+        except ValueError as exc:
+            assert "rugi" in str(exc)
+        # tidak berubah krn diblokir
+        assert list_holdings(conn)[0]["book"] == "TRADE"
+
+
+def test_convert_holding_book_allowed_when_profitable(tmp_path):
+    """avg_price 15000, close terbaru 20000 -> untung -> konversi diizinkan,
+    pnl_check mencatat hasil verifikasinya."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        conn.execute(
+            "INSERT INTO asset_ohlcv (date, instrument, close) VALUES ('2026-08-01', 'BBCA', 20000)"
+        )
+        h = create_holding(conn, instrument="BBCA", provider="Stockbit", book="TRADE", quantity=100, unit="share", avg_price=15000, sop_category="SAHAM_IHSG")
+        conn.commit()
+        result = convert_holding_book(conn, h["id"], "INVEST", "sudah lama dipegang, jadikan investasi")
+        assert "untung" in result["pnl_check"]
+        assert list_holdings(conn)[0]["book"] == "INVEST"
+
+
+def test_convert_holding_book_guards(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        h = create_holding(conn, instrument="BTC", provider="Cold Wallet", book="INVEST", quantity=0.1, unit="coin", sop_category="CRYPTO")
+        conn.commit()
+
+        try:
+            convert_holding_book(conn, 9999, "TRADE", "alasan")
+            assert False
+        except ValueError as exc:
+            assert "tidak ditemukan" in str(exc)
+
+        try:
+            convert_holding_book(conn, h["id"], "LONG", "alasan")
+            assert False
+        except ValueError as exc:
+            assert "tidak dikenal" in str(exc)
+
+        try:
+            convert_holding_book(conn, h["id"], "INVEST", "alasan")  # sama dgn book sekarang
+            assert False
+        except ValueError as exc:
+            assert "sudah book" in str(exc)
+
+        try:
+            convert_holding_book(conn, h["id"], "TRADE", "")
+            assert False
+        except ValueError as exc:
+            assert "alasan" in str(exc)
+
+
+def test_list_holding_conversions_ordered_with_instrument_info(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        h1 = create_holding(conn, instrument="BBCA", provider="Stockbit", book="TRADE", quantity=100, unit="share", sop_category="SAHAM_IHSG")
+        h2 = create_holding(conn, instrument="TSLA", provider="IBKR", book="TRADE", quantity=2, unit="share", sop_category="GLOBAL_EQ")
+        conn.commit()
+        convert_holding_book(conn, h1["id"], "INVEST", "alasan 1")
+        convert_holding_book(conn, h2["id"], "INVEST", "alasan 2")
+        conn.commit()
+
+        log = list_holding_conversions(conn)
+        assert len(log) == 2
+        assert {r["instrument"] for r in log} == {"BBCA", "TSLA"}
+        assert all(r["reason"] for r in log)

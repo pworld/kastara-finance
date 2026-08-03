@@ -1751,3 +1751,77 @@ def compute_portfolio_allocation(conn: sqlite3.Connection) -> dict[str, Any]:
         "total_idr": round(total_idr, 2), "usd_idr_rate": usd_idr_rate,
         "by_category": categories, "by_currency": currencies, "excluded": excluded,
     }
+
+
+# ---------- Holdings Langkah 6: guard book-conversion + log (§4.4, 3 Aug 2026) ----------
+# "book wajib" (poin 1, §4.4) sudah ditegakkan sejak Langkah 4 (create_holding
+# raise ValueError kalau book bukan TRADE/INVEST) -- tidak ada perubahan
+# tambahan di sini utk itu. Indikator basi & flag TRADE-tanpa-jurnal murni
+# computed di frontend dari field yang sudah dikembalikan list_holdings()
+# (last_updated, book, linked_journal_id) -- tidak perlu logic baru di sini.
+
+STALE_HOLDING_DAYS = 30
+
+
+def convert_holding_book(
+    conn: sqlite3.Connection, holding_id: int, new_book: str, reason: str,
+) -> dict[str, Any]:
+    """SATU-SATUNYA jalur ubah `book` -- bukan lewat edit biasa (memang belum
+    ada edit field lain sama sekali di Langkah 4-6, jadi ini juga satu-
+    satunya mutasi holding selain create). Guard: holding harus ada,
+    new_book harus TRADE/INVEST DAN beda dari book sekarang, reason wajib
+    non-kosong. Diblokir kalau posisi instrumen ini SEDANG RUGI (avg_price
+    vs close terbaru di asset_ohlcv) -- §4.4: "konversi paspor saat merah
+    selalu punya satu motif: menghindari mengakui salah". Kalau instrumen
+    TIDAK ada di asset_ohlcv (emas fisik/gram, cash, dll) -- P&L tidak bisa
+    diverifikasi, konversi DIIZINKAN (data bolong = ditunda/dicatat jujur,
+    BUKAN dianggap rugi/untung diam-diam) tapi dicatat jelas di pnl_check."""
+    row = conn.execute("SELECT * FROM holdings WHERE id = ?", (holding_id,)).fetchone()
+    if not row:
+        raise ValueError("holding tidak ditemukan")
+    if new_book not in ALLOWED_BOOK:
+        raise ValueError(f"book '{new_book}' tidak dikenal -- pilihan: {'/'.join(sorted(ALLOWED_BOOK))}")
+    if new_book == row["book"]:
+        raise ValueError(f"holding ini sudah book={new_book}, tidak ada yang dikonversi")
+    if not reason or not reason.strip():
+        raise ValueError("alasan wajib diisi")
+
+    pnl_check = "tidak diverifikasi (instrumen tidak ada di asset_ohlcv)"
+    if row["avg_price"] is not None:
+        price_row = conn.execute(
+            "SELECT close FROM asset_ohlcv WHERE instrument = ? ORDER BY date DESC LIMIT 1",
+            (row["instrument"],),
+        ).fetchone()
+        if price_row and price_row["close"] is not None:
+            unrealized = (price_row["close"] - row["avg_price"]) * row["quantity"]
+            if unrealized < 0:
+                raise ValueError(
+                    f"posisi {row['instrument']} sedang rugi (unrealized {unrealized:.2f} "
+                    f"{row['currency']}) -- konversi book diblokir saat rugi (§4.4)"
+                )
+            pnl_check = f"terverifikasi untung (unrealized {unrealized:.2f} {row['currency']})"
+
+    now = today_wib()
+    conn.execute("UPDATE holdings SET book = ?, last_updated = ? WHERE id = ?", (new_book, now, holding_id))
+    conn.execute(
+        "INSERT INTO holding_book_conversion_log "
+        "(holding_id, from_book, to_book, reason, pnl_check, converted_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (holding_id, row["book"], new_book, reason.strip(), pnl_check, now),
+    )
+    return {
+        "id": holding_id, "instrument": row["instrument"], "from_book": row["book"],
+        "to_book": new_book, "pnl_check": pnl_check,
+    }
+
+
+def list_holding_conversions(conn: sqlite3.Connection, limit: int = 200) -> list[dict[str, Any]]:
+    """Riwayat konversi book, terbaru dulu -- join nama instrument dari
+    holdings biar tidak cuma nampilin holding_id mentah."""
+    rows = conn.execute(
+        "SELECT l.*, h.instrument, h.provider FROM holding_book_conversion_log l "
+        "JOIN holdings h ON h.id = l.holding_id "
+        "ORDER BY l.converted_at DESC, l.id DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]

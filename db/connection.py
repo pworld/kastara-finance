@@ -50,6 +50,7 @@ EXPECTED_TABLES = [
     "tag_dictionary",
     "content_tags",
     "holdings",
+    "holding_book_conversion_log",
 ]
 
 

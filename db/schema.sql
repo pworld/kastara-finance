@@ -409,6 +409,23 @@ CREATE TABLE IF NOT EXISTS holdings (
                                       -- holding, BUKAN ditebak dari instrument.
 );
 
+-- 29. Holding book conversion log (Langkah 6, §4.4, 3 Aug 2026) -- pola
+-- sama lane_validation_log: satu-satunya jalur ubah `book` (TRADE<->INVEST),
+-- alasan wajib + tercatat permanen (append-only, bukan diubah lewat edit
+-- biasa). `pnl_check` simpan hasil verifikasi untung/rugi SAAT konversi
+-- (dicek ke asset_ohlcv kalau instrumennya terlacak di sana; kalau tidak,
+-- tercatat sebagai "tidak diverifikasi" -- bukan dianggap untung/rugi
+-- diam-diam).
+CREATE TABLE IF NOT EXISTS holding_book_conversion_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    holding_id INTEGER NOT NULL REFERENCES holdings(id),
+    from_book TEXT NOT NULL,
+    to_book TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    pnl_check TEXT,
+    converted_at TEXT
+);
+
 -- Index untuk performa query range-tanggal saat histori membesar (5 tahun+).
 
 -- asset_ohlcv: query utama selalu "WHERE instrument = ? ORDER BY date" (chart,
