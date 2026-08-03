@@ -1235,6 +1235,44 @@ def lane_validation_log_list():
     return jsonify(rows)
 
 
+# ---------- Holdings / Portfolio tracker (docs/universe_portfolio_restructure_v1.md
+# §4, Langkah 4, 3 Aug 2026) ----------
+
+@app.post("/api/holdings")
+def holdings_create():
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            row = writes.create_holding(
+                conn, instrument=body.get("instrument", ""), provider=body.get("provider", ""),
+                book=body.get("book", ""), quantity=body.get("quantity"), unit=body.get("unit", ""),
+                sop_category=body.get("sop_category", ""), avg_price=body.get("avg_price"),
+                currency=body.get("currency", "IDR"), opened_at=body.get("opened_at"),
+                linked_journal_id=body.get("linked_journal_id"), notes=body.get("notes"),
+            )
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(row)
+
+
+@app.get("/api/holdings")
+def holdings_list():
+    with get_connection() as conn:
+        rows = writes.list_holdings(
+            conn, book=request.args.get("book"), provider=request.args.get("provider"),
+            include_closed=request.args.get("include_closed", "0") == "1",
+        )
+    return jsonify(rows)
+
+
+@app.get("/api/portfolio/allocation")
+def portfolio_allocation():
+    with get_connection() as conn:
+        result = writes.compute_portfolio_allocation(conn)
+    return jsonify(result)
+
+
 # ---------- News Threads (Addendum B §20, N-1 fondasi). Auto-suggest jalan
 # di pipeline/run_daily.py (writes.suggest_thread_links) -- endpoint di sini
 # murni baca + konfirmasi/tolak/patch, tidak ada logic matching di route. ----------

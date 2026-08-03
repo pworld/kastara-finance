@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Column from 'primevue/column'
 import Drawer from 'primevue/drawer'
 import DataTable from '../components/DataTable.vue'
@@ -102,12 +102,11 @@ async function ujiCatatKeputusan() {
 }
 
 // ---------- Detail Emiten (Komponen B) + Override ----------
-// Langkah 2 (docs/universe_portfolio_restructure_v1.md, 3 Aug 2026): jadi
-// DRAWER dibuka dari klik baris tabel Universe -- ticker terisi otomatis
-// dari row yang diklik, tidak lagi diketik manual. Override TETAP nempel di
-// section ini apa adanya (sudah begitu sebelum restrukturisasi) -- Validasi
-// Lane & Rasio Bank masih section standalone terpisah, baru pindah ke
-// drawer ini di Langkah 3.
+// Langkah 2+3 (docs/universe_portfolio_restructure_v1.md, 3 Aug 2026): jadi
+// SATU DRAWER dibuka dari klik baris tabel Universe -- ticker terisi
+// otomatis dari row yang diklik, tidak lagi diketik manual di mana pun.
+// Drawer ini sekarang berisi: Ringkasan+Fundamental+Override (Langkah 2),
+// Validasi Lane + Rasio Bank (Langkah 3, section standalone lama dihapus).
 const detailTicker = ref('')
 const detail = ref(null)
 const detailError = ref('')
@@ -117,6 +116,8 @@ const detailDrawerOpen = ref(false)
 function openDetailDrawer(row) {
   detailTicker.value = row.instrument
   detailDrawerOpen.value = true
+  bankRatios.value = null
+  lane.value.evidence = ''
   loadDetail()
 }
 
@@ -151,7 +152,10 @@ async function saveOverride() {
 }
 
 // ---------- Validasi Lane (Bar-Replay Sign-off) ----------
-const lane = ref({ ticker: '', newLane: 'TRADE', evidence: '' })
+// Langkah 3 (docs/universe_portfolio_restructure_v1.md, 3 Aug 2026): pindah
+// ke drawer yang sama dgn Detail Emiten -- ticker dari detailTicker (drawer),
+// bukan field sendiri lagi.
+const lane = ref({ newLane: 'TRADE', evidence: '' })
 const laneLog = ref([])
 const loadingLaneLog = ref(true)
 
@@ -163,9 +167,9 @@ async function loadLaneValidationLog() {
 onMounted(loadLaneValidationLog)
 
 async function validateLane() {
-  const ticker = lane.value.ticker.trim()
+  const ticker = detailTicker.value.trim()
   const evidence = lane.value.evidence.trim()
-  if (!ticker) { toast('Ticker wajib diisi'); return }
+  if (!ticker) { toast('Ticker tidak diketahui -- buka drawer dari tabel Universe dulu'); return }
   if (!evidence) { toast('Evidence wajib diisi'); return }
   const result = await post(`/api/emiten/${encodeURIComponent(ticker)}/validate_lane`, {
     new_lane: lane.value.newLane, evidence,
@@ -175,14 +179,18 @@ async function validateLane() {
   lane.value.evidence = ''
   loadUniverse()
   loadLaneValidationLog()
+  loadDetail()
 }
 
 // ---------- Rasio Bank (Manual) ----------
-const bank = ref({ ticker: '', quarterEnd: '', car: '', npl: '', nim: '', ldr: '' })
+// Langkah 3: sama seperti Validasi Lane, ticker dari detailTicker (drawer).
+// Section ini cuma tampil di drawer kalau detail.metadata.is_financial
+// (docs §3: "Rasio Bank -> form + riwayat (if bank)").
+const bank = ref({ quarterEnd: '', car: '', npl: '', nim: '', ldr: '' })
 const bankRatios = ref(null)
 
 async function saveBankRatios() {
-  const instrument = bank.value.ticker.trim()
+  const instrument = detailTicker.value.trim()
   if (!instrument || !bank.value.quarterEnd) { toast('Ticker & kuartal wajib diisi'); return }
   const num = (v) => (v === '' ? null : Number(v))
   await post('/api/fundamentals/bank_ratios', {
@@ -195,8 +203,8 @@ async function saveBankRatios() {
 }
 
 async function loadBankRatios() {
-  const instrument = bank.value.ticker.trim()
-  if (!instrument) { toast('Isi ticker dulu'); return }
+  const instrument = detailTicker.value.trim()
+  if (!instrument) { toast('Ticker tidak diketahui -- buka drawer dari tabel Universe dulu'); return }
   bankRatios.value = await get('/api/fundamentals/bank_ratios', { instrument })
 }
 
@@ -232,6 +240,68 @@ async function saveOutcome(row, field, value) {
   toast('Outcome tersimpan')
   loadGraderLog()
 }
+
+// ---------- Portofolio / Holdings (docs/universe_portfolio_restructure_v1.md
+// §4, Langkah 4, 3 Aug 2026) -- form input minimal + view Per Provider.
+// Langkah 5 (3 Aug 2026): Alokasi vs SOP + Per Mata Uang. `sopCategory` di
+// form ini EKSPLISIT dipilih Giel (bukan ditebak dari instrument/currency --
+// keputusan sadar, lihat ROADMAP) krn itu satu-satunya cara akurat 100%
+// tanpa logic tebak-tebakan yang rawan salah utk kasus tak terduga. ----------
+const SOP_CATEGORY_LABELS = {
+  SAHAM_IHSG: 'Saham IHSG', EMAS: 'Emas', CRYPTO: 'Crypto',
+  VALAS: 'Valas', GLOBAL_EQ: 'Global Eq', KAS_IDR: 'Kas IDR (idle)',
+}
+const holdings = ref([])
+const loadingHoldings = ref(true)
+const holdingForm = ref({
+  instrument: '', provider: '', book: 'INVEST', quantity: '', unit: '',
+  avgPrice: '', currency: 'IDR', openedAt: '', notes: '', sopCategory: 'SAHAM_IHSG',
+})
+
+async function loadHoldings() {
+  loadingHoldings.value = true
+  holdings.value = await get('/api/holdings')
+  loadingHoldings.value = false
+}
+onMounted(loadHoldings)
+
+async function saveHolding() {
+  const result = await post('/api/holdings', {
+    instrument: holdingForm.value.instrument, provider: holdingForm.value.provider,
+    book: holdingForm.value.book, quantity: holdingForm.value.quantity ? Number(holdingForm.value.quantity) : null,
+    unit: holdingForm.value.unit, avg_price: holdingForm.value.avgPrice ? Number(holdingForm.value.avgPrice) : null,
+    currency: holdingForm.value.currency, opened_at: holdingForm.value.openedAt || null,
+    notes: holdingForm.value.notes || null, sop_category: holdingForm.value.sopCategory,
+  })
+  if (result.error) { toast(result.error); return }
+  toast(`${result.instrument} @ ${result.provider} tersimpan`)
+  holdingForm.value = {
+    instrument: '', provider: '', book: holdingForm.value.book, quantity: '', unit: '',
+    avgPrice: '', currency: holdingForm.value.currency, openedAt: '', notes: '',
+    sopCategory: holdingForm.value.sopCategory,
+  }
+  loadHoldings()
+  loadAllocation()
+}
+
+// ---------- Alokasi vs SOP + Per Mata Uang (view, butuh Langkah 4 dulu) ----------
+const allocation = ref(null)
+const loadingAllocation = ref(true)
+async function loadAllocation() {
+  loadingAllocation.value = true
+  allocation.value = await get('/api/portfolio/allocation')
+  loadingAllocation.value = false
+}
+onMounted(loadAllocation)
+
+const holdingsByProvider = computed(() => {
+  const map = new Map()
+  for (const h of holdings.value) {
+    if (!map.has(h.provider)) map.set(h.provider, [])
+    map.get(h.provider).push(h)
+  }
+  return [...map.entries()]
+})
 </script>
 
 <template>
@@ -265,7 +335,7 @@ async function saveOutcome(row, field, value) {
         <Column field="fund_score" header="Score" sortable><template #body="{ data }"><span class="src">{{ data.fund_score ?? '-' }}</span></template></Column>
         <Column header="Flags"><template #body="{ data }"><span class="src">{{ flagCount(data) }}</span></template></Column>
       </DataTable>
-      <p class="src" style="margin-top:8px">Klik baris utk buka detail + override (drawer). Validasi Lane &amp; Rasio Bank di bawah masih section standalone -- pindah ke drawer ini di Langkah 3.</p>
+      <p class="src" style="margin-top:8px">Klik baris utk buka detail, override, validasi lane &amp; rasio bank (drawer) -- ticker tidak perlu diketik manual di mana pun lagi.</p>
     </div>
   </section>
 
@@ -319,57 +389,53 @@ async function saveOutcome(row, field, value) {
     <div class="form-row" style="margin-top:8px">
       <button class="btn small secondary" @click="saveOverride">Simpan Override</button>
     </div>
-  </Drawer>
 
-  <section>
-    <h2>Validasi Lane (Bar-Replay Sign-off)</h2>
-    <div class="panel">
-      <p class="src">Kontrak §13.1 poin 5: "Engine teruji di BTC ≠ teruji di
-        BBRI" — lane instrumen HANYA naik ke TRADE/BOTH setelah kamu
-        benar-benar mereview chart historisnya sendiri (bar-replay manual, di
-        luar dashboard ini, mis. Panel 5). Form ini CUMA MEREKAM keputusan
-        itu — tidak ada validasi otomatis apa pun di baliknya.</p>
-      <div class="form-grid">
-        <div><label class="field">Ticker</label><input v-model="lane.ticker" type="text" placeholder="mis. BBCA"></div>
-        <div>
-          <label class="field">Lane Baru</label>
-          <select v-model="lane.newLane">
-            <option value="TRADE">TRADE</option><option value="BOTH">BOTH</option>
-            <option value="INVEST">INVEST</option><option value="NONE">NONE</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <label class="field">Evidence (wajib) — apa yang dicek di bar-replay & kesimpulannya</label>
-        <textarea v-model="lane.evidence" placeholder="mis. Cek 2 tahun candle historis BBCA di Panel 5, zona S&R konsisten dgn kalibrasi fraksi harga, pola breakout/retest valid, tidak ada gap tak wajar di luar ARA/ARB normal..."></textarea>
-      </div>
-      <div class="form-row" style="margin-top:12px">
-        <button class="btn" @click="validateLane">Rekam Validasi Lane</button>
-      </div>
+    <hr style="margin:20px 0;border-color:var(--border)">
+
+    <h4 style="margin:0 0 8px">Validasi Lane (Bar-Replay Sign-off)</h4>
+    <p class="src">Kontrak §13.1 poin 5: "Engine teruji di BTC ≠ teruji di
+      BBRI" — lane instrumen HANYA naik ke TRADE/BOTH setelah kamu
+      benar-benar mereview chart historisnya sendiri (bar-replay manual, di
+      luar dashboard ini, mis. Panel 5). Form ini CUMA MEREKAM keputusan
+      itu — tidak ada validasi otomatis apa pun di baliknya.</p>
+    <div class="form-row">
+      <label class="field">Lane Baru</label>
+      <select v-model="lane.newLane">
+        <option value="TRADE">TRADE</option><option value="BOTH">BOTH</option>
+        <option value="INVEST">INVEST</option><option value="NONE">NONE</option>
+      </select>
     </div>
-  </section>
+    <div class="form-row">
+      <label class="field">Evidence (wajib) — apa yang dicek di bar-replay & kesimpulannya</label>
+      <textarea v-model="lane.evidence" placeholder="mis. Cek 2 tahun candle historis BBCA di Panel 5, zona S&R konsisten dgn kalibrasi fraksi harga, pola breakout/retest valid, tidak ada gap tak wajar di luar ARA/ARB normal..."></textarea>
+    </div>
+    <div class="form-row" style="margin-top:8px">
+      <button class="btn small secondary" @click="validateLane">Rekam Validasi Lane</button>
+    </div>
 
-  <section>
-    <h2>Rasio Bank (Manual — Khusus Emiten Finansial)</h2>
-    <div class="panel">
+    <template v-if="detail?.metadata?.is_financial">
+      <hr style="margin:20px 0;border-color:var(--border)">
+
+      <h4 style="margin:0 0 8px">Rasio Bank (Manual — Khusus Emiten Finansial)</h4>
       <p class="src">CAR/NPL/NIM/LDR TIDAK tersedia di yfinance (dikonfirmasi
         saat riset G3) — isi manual dari laporan resmi bank (OJK/laporan
         tahunan). Tidak akan pernah tertimpa oleh backfill fundamental
         otomatis.</p>
-      <div class="form-grid">
-        <div><label class="field">Ticker</label><input v-model="bank.ticker" type="text" placeholder="mis. BBCA"></div>
-        <div><label class="field">Kuartal (akhir periode)</label><input v-model="bank.quarterEnd" type="date"></div>
+      <div class="form-row">
+        <label class="field">Kuartal (akhir periode)</label>
+        <input v-model="bank.quarterEnd" type="date">
       </div>
-      <div class="form-grid" style="margin-top:12px">
+      <div class="form-grid">
         <div><label class="field">CAR (%)</label><input v-model="bank.car" type="number" step="any"></div>
         <div><label class="field">NPL Gross (%)</label><input v-model="bank.npl" type="number" step="any"></div>
         <div><label class="field">NIM (%)</label><input v-model="bank.nim" type="number" step="any"></div>
         <div><label class="field">LDR (%)</label><input v-model="bank.ldr" type="number" step="any"></div>
       </div>
-      <div class="form-row" style="margin-top:12px">
-        <button class="btn" @click="saveBankRatios">Simpan Rasio Bank</button>
+      <div class="form-row" style="margin-top:8px">
+        <button class="btn small secondary" @click="saveBankRatios">Simpan Rasio Bank</button>
         <button class="btn small secondary" @click="loadBankRatios">Lihat Riwayat Ticker Ini</button>
       </div>
+      <div style="overflow-x:auto">
       <table style="margin-top:12px">
         <thead><tr><th>Kuartal</th><th>CAR</th><th>NPL</th><th>NIM</th><th>LDR</th><th>Sumber</th></tr></thead>
         <tbody v-if="!bankRatios"><tr><td colspan="6" class="src">klik "Lihat Riwayat" utk tampilkan</td></tr></tbody>
@@ -378,25 +444,139 @@ async function saveOutcome(row, field, value) {
             <td class="src">{{ r.quarter_end }}</td><td>{{ r.car ?? '-' }}</td><td>{{ r.npl_gross ?? '-' }}</td>
             <td>{{ r.nim ?? '-' }}</td><td>{{ r.ldr ?? '-' }}</td><td class="src">{{ r.source }}</td>
           </tr>
-          <tr v-if="!bankRatios.length"><td colspan="6" class="src">belum ada rasio bank utk {{ bank.ticker }}</td></tr>
+          <tr v-if="!bankRatios.length"><td colspan="6" class="src">belum ada rasio bank utk {{ detailTicker }}</td></tr>
         </tbody>
       </table>
-    </div>
-  </section>
+      </div>
+    </template>
+  </Drawer>
   </template>
 
   <template v-if="activeTab === 'portfolio'">
   <section>
-    <h2>Portofolio / Holdings</h2>
+    <h2>+ Holding Baru</h2>
     <div class="panel">
-      <p class="src">Belum dibangun — komponen baru (docs/universe_portfolio_restructure_v1.md
-        §4), menunggu Langkah 4-6: tabel `holdings` universal (saham/emas/
-        kripto/reksadana/valas satu tabel), form input minimal, view Per
-        Provider/Per Book/Alokasi vs SOP/Per Mata Uang, + guard (book wajib,
-        konversi TRADE↔INVEST terkunci, indikator basi, flag TRADE tanpa
-        `linked_journal_id`). Tab ini disiapkan lebih dulu supaya navigasi
-        sudah siap begitu komponennya jadi.</p>
+      <p class="src">Manual entry — tidak ada API broker (kontrak §15).
+        Book adalah paspor uang: TRADE atau INVEST, wajib diisi.</p>
+      <div class="form-grid">
+        <div><label class="field">Instrument</label><input v-model="holdingForm.instrument" type="text" placeholder="mis. BBCA / BTC / XAU"></div>
+        <div><label class="field">Provider</label><input v-model="holdingForm.provider" type="text" placeholder="mis. Stockbit / IBKR / Cold Wallet"></div>
+        <div>
+          <label class="field">Book</label>
+          <select v-model="holdingForm.book"><option value="TRADE">TRADE</option><option value="INVEST">INVEST</option></select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div><label class="field">Quantity</label><input v-model="holdingForm.quantity" type="number" step="any"></div>
+        <div><label class="field">Unit</label><input v-model="holdingForm.unit" type="text" placeholder="lot / share / gram / coin / nominal"></div>
+        <div><label class="field">Avg Price (opsional)</label><input v-model="holdingForm.avgPrice" type="number" step="any"></div>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label class="field">Currency</label>
+          <select v-model="holdingForm.currency"><option value="IDR">IDR</option><option value="USD">USD</option><option value="SGD">SGD</option></select>
+        </div>
+        <div>
+          <label class="field">Kategori SOP</label>
+          <select v-model="holdingForm.sopCategory">
+            <option v-for="(label, code) in SOP_CATEGORY_LABELS" :key="code" :value="code">{{ label }}</option>
+          </select>
+        </div>
+        <div><label class="field">Opened At (opsional)</label><input v-model="holdingForm.openedAt" type="date"></div>
+      </div>
+      <div class="form-row">
+        <label class="field">Notes (opsional)</label>
+        <input v-model="holdingForm.notes" type="text">
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <button class="btn" @click="saveHolding">Simpan Holding</button>
+      </div>
     </div>
+  </section>
+
+  <section>
+    <h2>Per Provider</h2>
+    <div class="panel">
+      <p v-if="loadingHoldings" class="src">Memuat...</p>
+      <p v-else-if="!holdings.length" class="src">belum ada holding tercatat</p>
+      <div v-else v-for="[provider, items] in holdingsByProvider" :key="provider" class="cat-group">
+        <h4 class="cat-title">{{ provider }}</h4>
+        <table>
+          <thead><tr><th>Instrument</th><th>Book</th><th>Kategori SOP</th><th>Quantity</th><th>Avg Price</th><th>Currency</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr v-for="h in items" :key="h.id">
+              <td>{{ h.instrument }}</td>
+              <td><span class="badge" :class="LANE_CLASS[h.book] || 'lane-none'">{{ h.book }}</span></td>
+              <td class="src">{{ h.sop_category ? SOP_CATEGORY_LABELS[h.sop_category] : '—' }}</td>
+              <td>{{ h.quantity }} {{ h.unit }}</td>
+              <td class="src">{{ h.avg_price ?? '-' }}</td>
+              <td class="src">{{ h.currency }}</td>
+              <td class="src">{{ h.notes || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Alokasi vs SOP</h2>
+    <div class="panel">
+      <p class="src">Target dari Investment SOP v4.1 (30/20/20/15/15, Kas IDR
+        target 0% -- dry powder yang tidak ditempatkan sengaja diberi target
+        0 biar langsung kelihatan sebagai penyimpangan, bukan kategori
+        netral). Nilai dikonversi ke IDR-equivalent (USD pakai kurs
+        usd_idr terbaru<span v-if="allocation?.usd_idr_rate"> · {{ allocation.usd_idr_rate }}</span>).</p>
+      <p v-if="loadingAllocation" class="src">Memuat...</p>
+      <template v-else-if="allocation">
+        <table>
+          <thead><tr><th>Kategori</th><th>Aktual</th><th>Target</th><th>Selisih</th></tr></thead>
+          <tbody>
+            <tr v-for="c in allocation.by_category" :key="c.category">
+              <td>{{ SOP_CATEGORY_LABELS[c.category] }}</td>
+              <td>{{ c.pct }}%</td>
+              <td class="src">{{ c.target_pct }}%</td>
+              <td :class="c.delta_pct > 0 ? 'up' : c.delta_pct < 0 ? 'down' : 'flat'">
+                {{ c.delta_pct > 0 ? '▲' : c.delta_pct < 0 ? '▼' : '–' }} {{ c.delta_pct > 0 ? '+' : '' }}{{ c.delta_pct }}%
+                <span v-if="c.category === 'KAS_IDR' && c.pct > 0">⚠ dry powder menganggur</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-if="!allocation.total_idr" class="src" style="margin-top:8px">belum ada holding yang bisa dihitung nilainya (isi avg_price + kategori SOP dulu).</p>
+        <details v-if="allocation.excluded.length" class="collapsible" style="margin-top:8px">
+          <summary>{{ allocation.excluded.length }} holding dikecualikan dari hitungan</summary>
+          <ul>
+            <li v-for="(e, i) in allocation.excluded" :key="i" class="src">{{ e.instrument }} ({{ e.provider }}) -- {{ e.reason }}</li>
+          </ul>
+        </details>
+      </template>
+    </div>
+  </section>
+
+  <section>
+    <h2>Per Mata Uang</h2>
+    <div class="panel">
+      <p v-if="loadingAllocation" class="src">Memuat...</p>
+      <p v-else-if="!allocation?.by_currency?.length" class="src">belum ada holding yang bisa dihitung nilainya</p>
+      <div v-else class="chart-head">
+        <span v-for="c in allocation.by_currency" :key="c.currency" class="badge lane-none" style="margin-right:8px">
+          {{ c.currency }} {{ c.pct }}%
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <details class="collapsible">
+      <summary>Yang belum dibangun (Langkah 6)</summary>
+      <div class="panel">
+        <p class="src">Guard: konversi book TRADE↔INVEST terkunci + alasan
+          wajib (dan diblokir kalau posisi rugi), indikator basi
+          (last_updated &gt; 30 hari), flag holding TRADE tanpa
+          linked_journal_id.</p>
+      </div>
+    </details>
   </section>
   </template>
 

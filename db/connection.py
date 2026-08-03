@@ -49,6 +49,7 @@ EXPECTED_TABLES = [
     "thread_relations",
     "tag_dictionary",
     "content_tags",
+    "holdings",
 ]
 
 
@@ -152,6 +153,12 @@ _COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
         ("for_reading", "INTEGER"),
         ("rss_summary", "TEXT"),  # Addendum D §22.2 (D-1) -- summary/description
                                   # bawaan feed, apa adanya, tanpa backfill (NULL wajar).
+    ],
+    "holdings": [
+        ("sop_category", "TEXT"),  # Langkah 5 (3 Aug 2026) -- ditambah setelah
+                                    # Langkah 4 sempat jalan tanpa kolom ini;
+                                    # holding lama (kalau ada) akan NULL, tetap
+                                    # ditampilkan tapi dikecualikan dari alokasi.
     ],
 }
 

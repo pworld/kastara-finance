@@ -78,6 +78,9 @@ from web.writes import (
     list_threads_with_stats,
     suggest_tags_for_news,
     auto_dormant_stale_threads,
+    create_holding,
+    list_holdings,
+    compute_portfolio_allocation,
 )
 
 
@@ -2124,3 +2127,134 @@ def test_merge_thread_unknown_id_raises(tmp_path):
             assert False, "harusnya raise ValueError"
         except ValueError as exc:
             assert "tidak ditemukan" in str(exc)
+
+
+# ---------- Holdings / Portfolio tracker (Langkah 4, 3 Aug 2026) ----------
+
+def test_create_holding_minimal(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        row = create_holding(
+            conn, instrument="bbca", provider="Stockbit", book="TRADE",
+            quantity=5, unit="lot", sop_category="SAHAM_IHSG",
+        )
+        conn.commit()
+        assert row["instrument"] == "BBCA"
+        assert row["book"] == "TRADE"
+        assert row["currency"] == "IDR"
+        assert row["is_closed"] == 0
+        assert row["sop_category"] == "SAHAM_IHSG"
+        assert row["id"] is not None
+
+
+def test_create_holding_rejects_missing_fields(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        base = dict(instrument="BBCA", provider="Stockbit", book="TRADE", quantity=5, unit="lot", sop_category="SAHAM_IHSG")
+        for overrides, msg in [
+            (dict(instrument=""), "instrument"),
+            (dict(provider=""), "provider"),
+            (dict(book="LONG"), "book"),
+            (dict(unit=""), "unit"),
+            (dict(quantity=0), "quantity"),
+            (dict(currency="EUR"), "currency"),
+            (dict(sop_category="SAHAM_US"), "sop_category"),
+        ]:
+            try:
+                create_holding(conn, **{**base, **overrides})
+                assert False, f"harusnya raise ValueError utk kasus: {msg}"
+            except ValueError as exc:
+                assert msg in str(exc)
+
+
+def test_create_holding_allows_trade_without_linked_journal(tmp_path):
+    """Langkah 4: linked_journal_id boleh kosong sekalipun book=TRADE --
+    flag 'TRADE tanpa jurnal' itu Langkah 6, bukan guard di sini."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        row = create_holding(
+            conn, instrument="TSLA", provider="IBKR", book="TRADE",
+            quantity=2.5, unit="share", sop_category="GLOBAL_EQ",
+        )
+        assert row["linked_journal_id"] is None
+
+
+def test_list_holdings_filters_and_excludes_closed(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_holding(conn, instrument="BBCA", provider="Stockbit", book="TRADE", quantity=5, unit="lot", sop_category="SAHAM_IHSG")
+        create_holding(conn, instrument="BTC", provider="Cold Wallet", book="INVEST", quantity=0.05, unit="coin", currency="USD", sop_category="CRYPTO")
+        create_holding(conn, instrument="XAU", provider="Pegadaian", book="INVEST", quantity=10, unit="gram", sop_category="EMAS")
+        conn.commit()
+
+        all_rows = list_holdings(conn)
+        assert len(all_rows) == 3
+
+        trade_only = list_holdings(conn, book="TRADE")
+        assert [r["instrument"] for r in trade_only] == ["BBCA"]
+
+        provider_only = list_holdings(conn, provider="Pegadaian")
+        assert [r["instrument"] for r in provider_only] == ["XAU"]
+
+        conn.execute("UPDATE holdings SET is_closed = 1 WHERE instrument = 'BBCA'")
+        conn.commit()
+        assert len(list_holdings(conn)) == 2
+        assert len(list_holdings(conn, include_closed=True)) == 3
+
+
+def test_compute_portfolio_allocation_basic(tmp_path):
+    """IDR langsung, USD dikonversi pakai usd_idr terbaru dari daily_market."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        conn.execute(
+            "INSERT INTO daily_market (date, usd_idr) VALUES ('2026-08-01', 16000)"
+        )
+        # Saham IHSG: 5 lot (=500 lembar) x 10000 = 5,000,000 IDR
+        create_holding(conn, instrument="BBCA", provider="Stockbit", book="TRADE", quantity=500, unit="share", avg_price=10000, sop_category="SAHAM_IHSG")
+        # Crypto: 0.1 coin x 60000 USD x 16000 = 96,000,000 IDR
+        create_holding(conn, instrument="BTC", provider="Cold Wallet", book="INVEST", quantity=0.1, unit="coin", avg_price=60000, currency="USD", sop_category="CRYPTO")
+        conn.commit()
+
+        result = compute_portfolio_allocation(conn)
+        assert result["usd_idr_rate"] == 16000
+        assert result["total_idr"] == 5_000_000 + 96_000_000
+        assert not result["excluded"]
+
+        by_cat = {c["category"]: c for c in result["by_category"]}
+        assert by_cat["SAHAM_IHSG"]["value_idr"] == 5_000_000
+        assert by_cat["CRYPTO"]["value_idr"] == 96_000_000
+        assert by_cat["EMAS"]["value_idr"] == 0
+        assert by_cat["SAHAM_IHSG"]["target_pct"] == 30.0
+
+        by_cur = {c["currency"]: c for c in result["by_currency"]}
+        assert by_cur["IDR"]["value_idr"] == 5_000_000
+        assert by_cur["USD"]["value_idr"] == 96_000_000
+
+
+def test_compute_portfolio_allocation_excludes_sgd_and_missing_data(tmp_path):
+    """SGD tanpa sumber kurs, holding tanpa avg_price, holding tanpa
+    sop_category -- semua dikecualikan DENGAN alasan, bukan diam-diam
+    dilewati atau dipaksa masuk hitungan."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        create_holding(conn, instrument="SGDCASH", provider="Jago", book="INVEST", quantity=1000, unit="nominal", avg_price=1, currency="SGD", sop_category="VALAS")
+        create_holding(conn, instrument="RDINDEX", provider="Bibit", book="INVEST", quantity=100, unit="nominal", sop_category="GLOBAL_EQ")  # avg_price None
+        conn.execute(
+            "INSERT INTO holdings (instrument, provider, book, quantity, unit, avg_price, currency, is_closed, created_at) "
+            "VALUES ('OLD', 'Legacy', 'INVEST', 1, 'nominal', 5000, 'IDR', 0, '2026-01-01')"
+        )  # holding pra-Langkah-5, sop_category NULL (avg_price ADA, biar kena
+        # cabang sop_category, bukan ke-tangkap lebih dulu di cek avg_price)
+        conn.commit()
+
+        result = compute_portfolio_allocation(conn)
+        assert result["total_idr"] == 0
+        reasons = {e["instrument"]: e["reason"] for e in result["excluded"]}
+        assert reasons["SGDCASH"] == "SGD belum ada sumber kurs"
+        assert reasons["RDINDEX"] == "avg_price kosong"
+        assert reasons["OLD"] == "sop_category belum diisi"

@@ -379,6 +379,36 @@ CREATE TABLE IF NOT EXISTS content_tags (
     created_at TEXT
 );
 
+-- 28. Holdings / Portfolio tracker (docs/universe_portfolio_restructure_v1.md
+-- §4, Langkah 4, 3 Aug 2026) -- SATU tabel universal utk semua jenis aset
+-- (saham/emas/kripto/reksadana/valas), pola sama asset_ohlcv (nambah jenis
+-- aset = nambah baris, bukan nambah tabel). Manual entry, TIDAK ADA API
+-- broker (kontrak §15). `book` (TRADE/INVEST) adalah PASPOR uang -- wajib,
+-- tidak boleh NULL (ditegakkan juga di write function, bukan cuma di sini).
+-- `linked_journal_id` NULL diperbolehkan di Langkah 4 ini (holding INVEST
+-- memang tidak punya jurnal trading) -- flag "TRADE tanpa jurnal" & guard
+-- konversi book terkunci itu Langkah 6, belum dibangun di sini.
+CREATE TABLE IF NOT EXISTS holdings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    instrument TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    book TEXT NOT NULL,             -- TRADE / INVEST
+    quantity REAL NOT NULL,
+    unit TEXT NOT NULL,              -- lot / share / gram / coin / nominal
+    avg_price REAL,
+    currency TEXT DEFAULT 'IDR',     -- IDR / USD / SGD
+    opened_at TEXT,
+    last_updated TEXT,               -- utk indikator basi (Langkah 6)
+    linked_journal_id INTEGER REFERENCES trading_journal(id),
+    notes TEXT,
+    is_closed INTEGER DEFAULT 0,
+    created_at TEXT,
+    sop_category TEXT                -- SAHAM_IHSG/EMAS/CRYPTO/VALAS/GLOBAL_EQ/
+                                      -- KAS_IDR (Langkah 5, §4.3 "Alokasi vs
+                                      -- SOP") -- eksplisit dipilih Giel per
+                                      -- holding, BUKAN ditebak dari instrument.
+);
+
 -- Index untuk performa query range-tanggal saat histori membesar (5 tahun+).
 
 -- asset_ohlcv: query utama selalu "WHERE instrument = ? ORDER BY date" (chart,

@@ -1595,3 +1595,159 @@ def auto_dormant_stale_threads(conn: sqlite3.Connection, stale_days: int = STALE
         (today_wib(), f"-{stale_days} day"),
     )
     return cur.rowcount
+
+
+# ---------- Holdings / Portfolio tracker (docs/universe_portfolio_restructure_v1.md
+# §4, Langkah 4, 3 Aug 2026) -- manual entry, TIDAK ADA API broker (kontrak
+# §15). `book` (TRADE/INVEST) adalah paspor uang, WAJIB -- ditegakkan di sini
+# (bukan cuma constraint NOT NULL di schema, biar error-nya jelas dibaca).
+# Guard lanjutan (konversi book terkunci, indikator basi, flag TRADE tanpa
+# jurnal) SENGAJA belum di sini -- itu Langkah 6, urutan garapan sendiri. ----------
+
+ALLOWED_BOOK = {"TRADE", "INVEST"}
+ALLOWED_CURRENCY = {"IDR", "USD", "SGD"}
+
+# Langkah 5 (3 Aug 2026, §4.3 "Alokasi vs SOP"): kategori EKSPLISIT dipilih
+# Giel per holding (bukan ditebak dari instrument -- keputusan sadar Giel
+# saat diminta pilih antara guess-otomatis vs field manual, lihat ROADMAP).
+# Target % dari Investment SOP v4.1 (30/20/20/15/15); KAS_IDR target 0% --
+# dry powder yang tidak ditempatkan itu SENGAJA diberi target 0, bukan
+# "kategori lain", biar langsung kelihatan sebagai penyimpangan.
+ALLOWED_SOP_CATEGORY = {"SAHAM_IHSG", "EMAS", "CRYPTO", "VALAS", "GLOBAL_EQ", "KAS_IDR"}
+SOP_TARGET_PCT = {
+    "SAHAM_IHSG": 30.0, "EMAS": 20.0, "CRYPTO": 20.0,
+    "VALAS": 15.0, "GLOBAL_EQ": 15.0, "KAS_IDR": 0.0,
+}
+
+
+def create_holding(
+    conn: sqlite3.Connection, *, instrument: str, provider: str, book: str,
+    quantity: float, unit: str, sop_category: str, avg_price: float | None = None,
+    currency: str = "IDR", opened_at: str | None = None,
+    linked_journal_id: int | None = None, notes: str | None = None,
+) -> dict[str, Any]:
+    """Catat 1 holding baru. Guard: instrument/provider/unit wajib non-kosong,
+    book harus TRADE/INVEST (paspor uang -- kontrak §21.11 style enum
+    validation), sop_category harus salah satu dari 6 kategori Investment SOP
+    v4.1 (dipilih Giel eksplisit di form -- BUKAN ditebak dari instrument/
+    currency, keputusan sadar krn tebakan otomatis rawan salah utk kasus tak
+    terduga spt reksadana index luar negeri), currency harus IDR/USD/SGD,
+    quantity harus > 0. Form input minimal (Langkah 4) -- linked_journal_id
+    BOLEH kosong sekalipun book=TRADE (flag "TRADE tanpa jurnal" itu Langkah
+    6, bukan blocker di sini)."""
+    if not instrument or not instrument.strip():
+        raise ValueError("instrument wajib diisi")
+    if not provider or not provider.strip():
+        raise ValueError("provider wajib diisi")
+    if book not in ALLOWED_BOOK:
+        raise ValueError(f"book '{book}' tidak dikenal -- pilihan: {'/'.join(sorted(ALLOWED_BOOK))}")
+    if not unit or not unit.strip():
+        raise ValueError("unit wajib diisi")
+    if quantity is None or quantity <= 0:
+        raise ValueError("quantity harus > 0")
+    if currency not in ALLOWED_CURRENCY:
+        raise ValueError(f"currency '{currency}' tidak dikenal -- pilihan: {'/'.join(sorted(ALLOWED_CURRENCY))}")
+    if sop_category not in ALLOWED_SOP_CATEGORY:
+        raise ValueError(f"sop_category '{sop_category}' tidak dikenal -- pilihan: {'/'.join(sorted(ALLOWED_SOP_CATEGORY))}")
+    now = today_wib()
+    row = {
+        "instrument": instrument.strip().upper(), "provider": provider.strip(), "book": book,
+        "quantity": quantity, "unit": unit.strip(), "avg_price": avg_price, "currency": currency,
+        "opened_at": opened_at or now, "last_updated": now, "linked_journal_id": linked_journal_id,
+        "notes": notes, "is_closed": 0, "created_at": now, "sop_category": sop_category,
+    }
+    cur = conn.execute(
+        "INSERT INTO holdings (instrument, provider, book, quantity, unit, avg_price, "
+        "currency, opened_at, last_updated, linked_journal_id, notes, is_closed, created_at, "
+        "sop_category) "
+        "VALUES (:instrument, :provider, :book, :quantity, :unit, :avg_price, :currency, "
+        ":opened_at, :last_updated, :linked_journal_id, :notes, :is_closed, :created_at, "
+        ":sop_category)",
+        row,
+    )
+    row["id"] = cur.lastrowid
+    return row
+
+
+def list_holdings(
+    conn: sqlite3.Connection, *, book: str | None = None, provider: str | None = None,
+    include_closed: bool = False,
+) -> list[dict[str, Any]]:
+    """Semua holdings, terbaru dulu. Filter opsional by book/provider; default
+    sembunyikan yang is_closed=1 (posisi yang sudah ditutup, bukan dihapus)."""
+    sql = "SELECT * FROM holdings WHERE 1=1"
+    params: list[Any] = []
+    if not include_closed:
+        sql += " AND is_closed = 0"
+    if book:
+        sql += " AND book = ?"
+        params.append(book.upper())
+    if provider:
+        sql += " AND provider = ?"
+        params.append(provider)
+    sql += " ORDER BY provider, instrument"
+    return [dict(r) for r in conn.execute(sql, params).fetchall()]
+
+
+def compute_portfolio_allocation(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Alokasi vs SOP + Per Mata Uang (§4.3), 1 fungsi 1 basis konversi biar
+    dua breakdown ini konsisten. Nilai tiap holding = quantity * avg_price
+    dikonversi ke IDR-equivalent: IDR apa adanya, USD dikali `usd_idr`
+    TERBARU dari daily_market (reuse data yang sudah ada, bukan scraper
+    baru). SGD TIDAK dikonversi -- app ini tidak punya sumber kurs SGD sama
+    sekali -- dan holding tanpa avg_price/sop_category (mis. holding lama
+    sebelum kolom ini ada) juga tidak bisa dihitung nilainya. Keduanya
+    masuk `excluded` dgn alasan, BUKAN diam-diam dilewati -- alokasi yang
+    dihitung dari data yang diam-diam tidak lengkap adalah alokasi bohong
+    (prinsip yang sama dgn indikator basi §4.4)."""
+    rows = list_holdings(conn)
+    usd_idr_row = conn.execute(
+        "SELECT usd_idr FROM daily_market WHERE usd_idr IS NOT NULL ORDER BY date DESC LIMIT 1"
+    ).fetchone()
+    usd_idr_rate = usd_idr_row["usd_idr"] if usd_idr_row else None
+
+    by_category: dict[str, float] = {c: 0.0 for c in ALLOWED_SOP_CATEGORY}
+    by_currency: dict[str, float] = {}
+    excluded: list[dict[str, Any]] = []
+    total_idr = 0.0
+
+    for h in rows:
+        if h["avg_price"] is None:
+            excluded.append({"instrument": h["instrument"], "provider": h["provider"], "reason": "avg_price kosong"})
+            continue
+        if not h["sop_category"] or h["sop_category"] not in ALLOWED_SOP_CATEGORY:
+            excluded.append({"instrument": h["instrument"], "provider": h["provider"], "reason": "sop_category belum diisi"})
+            continue
+        value_native = h["quantity"] * h["avg_price"]
+        if h["currency"] == "IDR":
+            value_idr = value_native
+        elif h["currency"] == "USD" and usd_idr_rate:
+            value_idr = value_native * usd_idr_rate
+        else:
+            excluded.append({
+                "instrument": h["instrument"], "provider": h["provider"],
+                "reason": "SGD belum ada sumber kurs" if h["currency"] == "SGD" else "kurs USD/IDR tidak tersedia",
+            })
+            continue
+        by_category[h["sop_category"]] += value_idr
+        by_currency[h["currency"]] = by_currency.get(h["currency"], 0.0) + value_idr
+        total_idr += value_idr
+
+    def pct(v: float) -> float:
+        return round(v / total_idr * 100, 1) if total_idr > 0 else 0.0
+
+    categories = [
+        {
+            "category": c, "value_idr": round(by_category[c], 2), "pct": pct(by_category[c]),
+            "target_pct": SOP_TARGET_PCT[c], "delta_pct": round(pct(by_category[c]) - SOP_TARGET_PCT[c], 1),
+        }
+        for c in sorted(ALLOWED_SOP_CATEGORY, key=lambda c: -SOP_TARGET_PCT[c])
+    ]
+    currencies = [
+        {"currency": cur, "value_idr": round(v, 2), "pct": pct(v)}
+        for cur, v in sorted(by_currency.items(), key=lambda kv: -kv[1])
+    ]
+    return {
+        "total_idr": round(total_idr, 2), "usd_idr_rate": usd_idr_rate,
+        "by_category": categories, "by_currency": currencies, "excluded": excluded,
+    }

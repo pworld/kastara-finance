@@ -2427,3 +2427,74 @@ guard) menunggu instruksi lanjutan.
   lama meski sudah `npm run build` ulang -- diperbaiki dgn unregister SW +
   clear cache workbox via console, bukan bug kode.
 - `npm run build` bersih, pytest 403 hijau (1 skip pre-existing).
+
+**Update — /universe: Langkah 3, Validasi Lane + Rasio Bank pindah ke
+drawer (3 Agustus 2026):** Lanjutan langsung dari Langkah 2 di atas, sesi
+yang sama.
+- **`UniverseView.vue`** — section standalone "Validasi Lane" dan "Rasio
+  Bank" dihapus total; isinya pindah ke drawer yang sama dgn Detail
+  Emiten/Override (di bawah tombol Simpan Override, dipisah `<hr>` +
+  `<h4>`). Field ticker masing-masing dihapus -- `validateLane()`,
+  `saveBankRatios()`, `loadBankRatios()` sekarang pakai `detailTicker`
+  (state drawer) sebagai satu-satunya sumber ticker. `openDetailDrawer()`
+  reset `bankRatios`/`lane.evidence` tiap buka ticker baru, supaya tidak
+  ketinggalan data ticker sebelumnya.
+  Rasio Bank **cuma tampil kalau `detail.metadata.is_financial`** (docs §3:
+  "Rasio Bank -> form + riwayat (if bank)") -- guard baru yang tidak ada di
+  section standalone lama.
+  Drawer sekarang jadi satu-satunya tempat semua aksi ticker-scoped
+  (Ringkasan, Fundamental, Override, Lane, Rasio Bank) -- persis struktur
+  §3 dokumen, Langkah 2+3 selesai penuh.
+- Diverifikasi LANGSUNG di browser (bukan cuma build): klik BBCA -> drawer
+  tampilkan Override + Validasi Lane + Rasio Bank (BBCA bank, semua
+  section muncul); klik TSLA -> drawer ganti isi jadi TSLA, section Rasio
+  Bank correctly hilang (dicek via `document.querySelector` langsung,
+  bukan cuma accessibility tree yang sempat stale krn CSS transition
+  tersendat -- kemungkinan besar artefak pane browser yang tidak
+  ter-render aktif saat itu, bukan bug aplikasi).
+- `npm run build` bersih, pytest 403 hijau (1 skip pre-existing) -- tidak
+  ada perubahan backend.
+- **Sisa urutan garapan** (`docs/universe_portfolio_restructure_v1.md`
+  §5): Langkah 4 (tabel `holdings` + form + Per Provider), Langkah 5
+  (Alokasi vs SOP + Per Mata Uang), Langkah 6 (guard book/konversi/basi/
+  jurnal) -- Portfolio/Holdings tracker, belum digarap, menunggu instruksi.
+
+**Update — /universe: Langkah 4, tabel `holdings` + form + Per Provider
+(3 Agustus 2026):** Komponen baru Portfolio/Holdings tracker (bukan
+lanjutan struktur tab, ini isi TAB 2 yang sebelumnya placeholder).
+- **`db/schema.sql`** — tabel ke-28, `holdings` (universal utk semua jenis
+  aset: saham/emas/kripto/reksadana/valas, pola sama `asset_ohlcv`).
+  `book` (TRADE/INVEST) NOT NULL di level schema DAN divalidasi di write
+  function (pesan error jelas, bukan raw IntegrityError). `linked_journal_id`
+  BOLEH NULL sekalipun book=TRADE -- flag "TRADE tanpa jurnal" itu Langkah
+  6, bukan blocker di Langkah 4. `EXPECTED_TABLES` (db/connection.py) +
+  `tests/test_db.py` (27→28) diupdate.
+- **`web/writes.py`**: `create_holding()` (guard instrument/provider/unit
+  non-kosong, book ∈ {TRADE,INVEST}, currency ∈ {IDR,USD,SGD}, quantity>0)
+  + `list_holdings()` (filter book/provider, sembunyikan is_closed=1 by
+  default).
+- **`web/app.py`**: `POST /api/holdings`, `GET /api/holdings`.
+- **`UniverseView.vue`** tab Portofolio: form input minimal (instrument,
+  provider, book, quantity, unit, avg_price opsional, currency, opened_at
+  opsional, notes opsional) + view "Per Provider" (grouped, badge book
+  reuse `LANE_CLASS` krn value TRADE/INVEST sama persis dgn
+  `instrument_metadata.lane`). Panel "Yang belum dibangun (Langkah 5-6)"
+  ditinggal sebagai catatan eksplisit di UI, bukan cuma di dokumen.
+- **Bug ditemukan+diperbaiki SEBELUM sempat kena production**: 4 test baru
+  yang ditulis sempat pakai `get_connection()` tanpa path (bukan
+  `get_connection(db)`) -- artinya nyambung ke DB produksi asli, bukan
+  tmp_path. Ketahuan dari error "no such table: holdings" (test db belum
+  di-init), bukan dari eksekusi diam-diam ke prod -- tapi tetap correctness
+  bug yang harus ditutup. Diperbaiki, mtime DB produksi dicek sebelum &
+  sesudah (tidak berubah, terkonfirmasi aman).
+- Diverifikasi LANGSUNG di browser (Giel restart server-nya sendiri stale
+  sempat kena pola gunicorn/dev-reload yang sama sekali ini juga --
+  `python -m web.app` tidak hot-reload, harus restart manual tiap ubah
+  backend): submit holding nyata (BTC/Cold Wallet/INVEST/0.083 coin/USD,
+  Giel eksplisit setuju krn ini dev environment) via form, langsung muncul
+  benar di "Per Provider". `npm run build` bersih, pytest 407 hijau (1 skip
+  pre-existing).
+- **Sisa**: Langkah 5 (Alokasi vs SOP + Per Mata Uang -- butuh lebih
+  banyak data holding dulu supaya bermakna) & Langkah 6 (guard book wajib
+  di UI/konversi terkunci+alasan, indikator basi >30 hari, flag TRADE
+  tanpa linked_journal_id) -- menunggu instruksi lanjutan.

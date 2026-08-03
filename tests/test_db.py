@@ -1,4 +1,4 @@
-"""Test DB layer: init_db bikin 27 tabel sesuai schema (11 Phase A + 3 forward-layer + 7 Phase J+ equity expansion + 1 lane_validation_log + 3 News Threads Addendum B + 2 Faceted Tagging Addendum C)."""
+"""Test DB layer: init_db bikin 28 tabel sesuai schema (11 Phase A + 3 forward-layer + 7 Phase J+ equity expansion + 1 lane_validation_log + 3 News Threads Addendum B + 2 Faceted Tagging Addendum C + 1 Holdings/Portfolio tracker)."""
 from db.connection import EXPECTED_TABLES, init_db, list_tables
 
 
@@ -6,7 +6,7 @@ def test_init_db_creates_all_tables(tmp_path):
     db_file = tmp_path / "test_kastara-finance.db"
     init_db(db_file)
     tables = list_tables(db_file)
-    assert len(tables) == 27
+    assert len(tables) == 28
     for t in EXPECTED_TABLES:
         assert t in tables, f"tabel {t} tidak terbuat"
 
@@ -16,7 +16,7 @@ def test_init_db_idempotent(tmp_path):
     init_db(db_file)
     # Jalan 2x tidak boleh error / tidak duplikat tabel
     init_db(db_file)
-    assert len(list_tables(db_file)) == 27
+    assert len(list_tables(db_file)) == 28
 
 
 def test_daily_market_has_source_flags_column(tmp_path):
