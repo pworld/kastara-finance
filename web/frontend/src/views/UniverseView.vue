@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Column from 'primevue/column'
+import Drawer from 'primevue/drawer'
 import DataTable from '../components/DataTable.vue'
 import { get, post } from '../lib/api'
 import { fmt, LANE_CLASS } from '../lib/format'
@@ -8,6 +9,20 @@ import { useAppToast } from '../composables/useAppToast'
 
 // Port dari web/static/js/panel8.js (lihat docs/migrationFE.md Fase 2).
 const { toast } = useAppToast()
+
+// ---------- Restrukturisasi 4 tab (docs/universe_portfolio_restructure_v1.md
+// Langkah 1, Agustus 2026) -- pengelompokan MURNI berdasarkan frekuensi
+// pakai (harian/sesekali/kuartalan), TIDAK ADA isi section yang diubah di
+// langkah ini. Ticker-scoped (Detail Emiten/Override, Validasi Lane, Rasio
+// Bank) SEMENTARA tetap section biasa di tab Universe -- pindah ke drawer
+// per-baris tabel itu Langkah 2/3, belum di sini. ----------
+const activeTab = ref('universe')
+const TABS = [
+  { id: 'universe', label: 'Universe' },
+  { id: 'portfolio', label: 'Portofolio' },
+  { id: 'intake', label: 'Intake' },
+  { id: 'log', label: 'Log & Audit' },
+]
 
 // ---------- Universe table ----------
 const universe = ref([])
@@ -87,10 +102,23 @@ async function ujiCatatKeputusan() {
 }
 
 // ---------- Detail Emiten (Komponen B) + Override ----------
+// Langkah 2 (docs/universe_portfolio_restructure_v1.md, 3 Aug 2026): jadi
+// DRAWER dibuka dari klik baris tabel Universe -- ticker terisi otomatis
+// dari row yang diklik, tidak lagi diketik manual. Override TETAP nempel di
+// section ini apa adanya (sudah begitu sebelum restrukturisasi) -- Validasi
+// Lane & Rasio Bank masih section standalone terpisah, baru pindah ke
+// drawer ini di Langkah 3.
 const detailTicker = ref('')
 const detail = ref(null)
 const detailError = ref('')
 const override = ref({ quadrant: 'INVESTABLE', reason: '' })
+const detailDrawerOpen = ref(false)
+
+function openDetailDrawer(row) {
+  detailTicker.value = row.instrument
+  detailDrawerOpen.value = true
+  loadDetail()
+}
 
 async function loadDetail() {
   const ticker = detailTicker.value.trim()
@@ -110,7 +138,7 @@ function fundamentalsHeader() {
 async function saveOverride() {
   const ticker = detailTicker.value.trim()
   const reason = override.value.reason.trim()
-  if (!ticker) { toast('Isi ticker di field "Detail Emiten" dulu'); return }
+  if (!ticker) { toast('Ticker tidak diketahui -- buka drawer dari tabel Universe dulu'); return }
   if (!reason) { toast('Alasan wajib diisi'); return }
   const result = await post(`/api/emiten/${encodeURIComponent(ticker)}/override`, {
     quadrant: override.value.quadrant, reason,
@@ -207,6 +235,14 @@ async function saveOutcome(row, field, value) {
 </script>
 
 <template>
+  <div class="tab-bar">
+    <button
+      v-for="t in TABS" :key="t.id" class="tab-btn" :class="{ active: activeTab === t.id }"
+      @click="activeTab = t.id"
+    >{{ t.label }}</button>
+  </div>
+
+  <template v-if="activeTab === 'universe'">
   <section>
     <h2>Universe — Saham Individual</h2>
     <div class="panel">
@@ -215,6 +251,8 @@ async function saveOutcome(row, field, value) {
         v-else :rows="universe" :dataKey="'instrument'"
         :searchFields="['instrument', 'sector', 'market']"
         emptyMessage="belum ada instrumen di universe"
+        class="clickable-rows"
+        @row-click="openDetailDrawer($event.data)"
       >
         <Column field="instrument" header="Ticker" sortable />
         <Column field="sector" header="Sektor" sortable><template #body="{ data }"><span class="src">{{ data.sector || '-' }}</span></template></Column>
@@ -227,9 +265,142 @@ async function saveOutcome(row, field, value) {
         <Column field="fund_score" header="Score" sortable><template #body="{ data }"><span class="src">{{ data.fund_score ?? '-' }}</span></template></Column>
         <Column header="Flags"><template #body="{ data }"><span class="src">{{ flagCount(data) }}</span></template></Column>
       </DataTable>
+      <p class="src" style="margin-top:8px">Klik baris utk buka detail + override (drawer). Validasi Lane &amp; Rasio Bank di bawah masih section standalone -- pindah ke drawer ini di Langkah 3.</p>
     </div>
   </section>
 
+  <Drawer v-model:visible="detailDrawerOpen" position="right" style="width:32rem; max-width:92vw" :header="detailTicker || 'Detail Emiten'">
+    <p v-if="detailError" class="src">{{ detailError }}</p>
+    <template v-else-if="detail">
+      <p>
+        <b>{{ detail.metadata.instrument }}</b> — {{ detail.metadata.sector || '-' }} · {{ detail.metadata.market }} ·
+        lane <span class="badge" :class="LANE_CLASS[detail.metadata.lane] || 'lane-none'">{{ detail.metadata.lane }}</span>
+      </p>
+      <template v-if="detail.grade">
+        <p class="src">
+          Grade terakhir ({{ detail.grade.graded_at }}): score={{ detail.grade.fund_score }}, kuadran mesin=<b>{{ detail.grade.quadrant }}</b>
+          <span v-if="detail.grade.giel_override" class="badge MED">Override Giel: {{ detail.grade.giel_override.quadrant }} — {{ detail.grade.giel_override.reason }}</span>
+        </p>
+        <p class="src">Flags: {{ detail.grade.integrity_flags.length ? detail.grade.integrity_flags.join(', ') : 'tidak ada' }}</p>
+      </template>
+      <p v-else class="src">Belum pernah digrade — jalankan "Uji Kelayakan" di tab Intake dulu.</p>
+      <div style="overflow-x:auto">
+      <table style="margin-top:8px">
+        <thead><tr><th v-for="h in fundamentalsHeader()" :key="h">{{ h }}</th></tr></thead>
+        <tbody>
+          <tr v-for="f in detail.fundamentals" :key="f.quarter_end">
+            <td class="src">{{ f.quarter_end }}</td>
+            <template v-if="detail.metadata.is_financial">
+              <td>{{ fmt(f.net_income) ?? '-' }}</td><td>{{ f.car ?? '-' }}</td><td>{{ f.npl_gross ?? '-' }}</td><td>{{ f.nim ?? '-' }}</td><td>{{ f.ldr ?? '-' }}</td>
+            </template>
+            <template v-else>
+              <td>{{ fmt(f.revenue) ?? '-' }}</td><td>{{ fmt(f.net_income) ?? '-' }}</td><td>{{ fmt(f.operating_cash_flow) ?? '-' }}</td><td>{{ fmt(f.free_cash_flow) ?? '-' }}</td>
+            </template>
+            <td class="src">{{ f.confidence }}</td>
+          </tr>
+          <tr v-if="!detail.fundamentals.length"><td colspan="7" class="src">belum ada fundamentals</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </template>
+    <div class="form-grid" style="margin-top:16px">
+      <div>
+        <label class="field">Override Kuadran</label>
+        <select v-model="override.quadrant">
+          <option value="INVESTABLE">INVESTABLE</option><option value="WATCH">WATCH</option>
+          <option value="SPECULATIVE">SPECULATIVE</option><option value="AVOID">AVOID</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="field">Alasan Override (wajib)</label>
+      <textarea v-model="override.reason" placeholder="Kenapa kamu tidak setuju dgn kuadran mesin?"></textarea>
+    </div>
+    <div class="form-row" style="margin-top:8px">
+      <button class="btn small secondary" @click="saveOverride">Simpan Override</button>
+    </div>
+  </Drawer>
+
+  <section>
+    <h2>Validasi Lane (Bar-Replay Sign-off)</h2>
+    <div class="panel">
+      <p class="src">Kontrak §13.1 poin 5: "Engine teruji di BTC ≠ teruji di
+        BBRI" — lane instrumen HANYA naik ke TRADE/BOTH setelah kamu
+        benar-benar mereview chart historisnya sendiri (bar-replay manual, di
+        luar dashboard ini, mis. Panel 5). Form ini CUMA MEREKAM keputusan
+        itu — tidak ada validasi otomatis apa pun di baliknya.</p>
+      <div class="form-grid">
+        <div><label class="field">Ticker</label><input v-model="lane.ticker" type="text" placeholder="mis. BBCA"></div>
+        <div>
+          <label class="field">Lane Baru</label>
+          <select v-model="lane.newLane">
+            <option value="TRADE">TRADE</option><option value="BOTH">BOTH</option>
+            <option value="INVEST">INVEST</option><option value="NONE">NONE</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="field">Evidence (wajib) — apa yang dicek di bar-replay & kesimpulannya</label>
+        <textarea v-model="lane.evidence" placeholder="mis. Cek 2 tahun candle historis BBCA di Panel 5, zona S&R konsisten dgn kalibrasi fraksi harga, pola breakout/retest valid, tidak ada gap tak wajar di luar ARA/ARB normal..."></textarea>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <button class="btn" @click="validateLane">Rekam Validasi Lane</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Rasio Bank (Manual — Khusus Emiten Finansial)</h2>
+    <div class="panel">
+      <p class="src">CAR/NPL/NIM/LDR TIDAK tersedia di yfinance (dikonfirmasi
+        saat riset G3) — isi manual dari laporan resmi bank (OJK/laporan
+        tahunan). Tidak akan pernah tertimpa oleh backfill fundamental
+        otomatis.</p>
+      <div class="form-grid">
+        <div><label class="field">Ticker</label><input v-model="bank.ticker" type="text" placeholder="mis. BBCA"></div>
+        <div><label class="field">Kuartal (akhir periode)</label><input v-model="bank.quarterEnd" type="date"></div>
+      </div>
+      <div class="form-grid" style="margin-top:12px">
+        <div><label class="field">CAR (%)</label><input v-model="bank.car" type="number" step="any"></div>
+        <div><label class="field">NPL Gross (%)</label><input v-model="bank.npl" type="number" step="any"></div>
+        <div><label class="field">NIM (%)</label><input v-model="bank.nim" type="number" step="any"></div>
+        <div><label class="field">LDR (%)</label><input v-model="bank.ldr" type="number" step="any"></div>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <button class="btn" @click="saveBankRatios">Simpan Rasio Bank</button>
+        <button class="btn small secondary" @click="loadBankRatios">Lihat Riwayat Ticker Ini</button>
+      </div>
+      <table style="margin-top:12px">
+        <thead><tr><th>Kuartal</th><th>CAR</th><th>NPL</th><th>NIM</th><th>LDR</th><th>Sumber</th></tr></thead>
+        <tbody v-if="!bankRatios"><tr><td colspan="6" class="src">klik "Lihat Riwayat" utk tampilkan</td></tr></tbody>
+        <tbody v-else>
+          <tr v-for="r in bankRatios" :key="r.quarter_end">
+            <td class="src">{{ r.quarter_end }}</td><td>{{ r.car ?? '-' }}</td><td>{{ r.npl_gross ?? '-' }}</td>
+            <td>{{ r.nim ?? '-' }}</td><td>{{ r.ldr ?? '-' }}</td><td class="src">{{ r.source }}</td>
+          </tr>
+          <tr v-if="!bankRatios.length"><td colspan="6" class="src">belum ada rasio bank utk {{ bank.ticker }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  </template>
+
+  <template v-if="activeTab === 'portfolio'">
+  <section>
+    <h2>Portofolio / Holdings</h2>
+    <div class="panel">
+      <p class="src">Belum dibangun — komponen baru (docs/universe_portfolio_restructure_v1.md
+        §4), menunggu Langkah 4-6: tabel `holdings` universal (saham/emas/
+        kripto/reksadana/valas satu tabel), form input minimal, view Per
+        Provider/Per Book/Alokasi vs SOP/Per Mata Uang, + guard (book wajib,
+        konversi TRADE↔INVEST terkunci, indikator basi, flag TRADE tanpa
+        `linked_journal_id`). Tab ini disiapkan lebih dulu supaya navigasi
+        sudah siap begitu komponennya jadi.</p>
+    </div>
+  </section>
+  </template>
+
+  <template v-if="activeTab === 'intake'">
   <section>
     <h2>+ Intake Kandidat (metadata)</h2>
     <div class="panel">
@@ -296,92 +467,22 @@ async function saveOutcome(row, field, value) {
   </section>
 
   <section>
-    <h2>Detail Emiten (Komponen B)</h2>
+    <h2>Riwayat Keputusan Intake</h2>
     <div class="panel">
-      <div class="form-grid">
-        <div><label class="field">Ticker</label><input v-model="detailTicker" type="text" placeholder="mis. BBCA"></div>
-        <div style="align-self:end"><button class="btn secondary" @click="loadDetail">Lihat Detail</button></div>
-      </div>
-      <div style="margin-top:12px">
-        <p v-if="detailError" class="src">{{ detailError }}</p>
-        <template v-else-if="detail">
-          <p>
-            <b>{{ detail.metadata.instrument }}</b> — {{ detail.metadata.sector || '-' }} · {{ detail.metadata.market }} ·
-            lane <span class="badge" :class="LANE_CLASS[detail.metadata.lane] || 'lane-none'">{{ detail.metadata.lane }}</span>
-          </p>
-          <template v-if="detail.grade">
-            <p class="src">
-              Grade terakhir ({{ detail.grade.graded_at }}): score={{ detail.grade.fund_score }}, kuadran mesin=<b>{{ detail.grade.quadrant }}</b>
-              <span v-if="detail.grade.giel_override" class="badge MED">Override Giel: {{ detail.grade.giel_override.quadrant }} — {{ detail.grade.giel_override.reason }}</span>
-            </p>
-            <p class="src">Flags: {{ detail.grade.integrity_flags.length ? detail.grade.integrity_flags.join(', ') : 'tidak ada' }}</p>
-          </template>
-          <p v-else class="src">Belum pernah digrade — jalankan "Uji Kelayakan" di atas dulu.</p>
-          <table style="margin-top:8px">
-            <thead><tr><th v-for="h in fundamentalsHeader()" :key="h">{{ h }}</th></tr></thead>
-            <tbody>
-              <tr v-for="f in detail.fundamentals" :key="f.quarter_end">
-                <td class="src">{{ f.quarter_end }}</td>
-                <template v-if="detail.metadata.is_financial">
-                  <td>{{ fmt(f.net_income) ?? '-' }}</td><td>{{ f.car ?? '-' }}</td><td>{{ f.npl_gross ?? '-' }}</td><td>{{ f.nim ?? '-' }}</td><td>{{ f.ldr ?? '-' }}</td>
-                </template>
-                <template v-else>
-                  <td>{{ fmt(f.revenue) ?? '-' }}</td><td>{{ fmt(f.net_income) ?? '-' }}</td><td>{{ fmt(f.operating_cash_flow) ?? '-' }}</td><td>{{ fmt(f.free_cash_flow) ?? '-' }}</td>
-                </template>
-                <td class="src">{{ f.confidence }}</td>
-              </tr>
-              <tr v-if="!detail.fundamentals.length"><td colspan="7" class="src">belum ada fundamentals</td></tr>
-            </tbody>
-          </table>
-        </template>
-      </div>
-      <div class="form-grid" style="margin-top:16px">
-        <div>
-          <label class="field">Override Kuadran</label>
-          <select v-model="override.quadrant">
-            <option value="INVESTABLE">INVESTABLE</option><option value="WATCH">WATCH</option>
-            <option value="SPECULATIVE">SPECULATIVE</option><option value="AVOID">AVOID</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <label class="field">Alasan Override (wajib)</label>
-        <textarea v-model="override.reason" placeholder="Kenapa kamu tidak setuju dgn kuadran mesin?"></textarea>
-      </div>
-      <div class="form-row" style="margin-top:8px">
-        <button class="btn small secondary" @click="saveOverride">Simpan Override</button>
-      </div>
+      <p v-if="loadingIntakeLog" class="src">Memuat...</p>
+      <DataTable v-else :rows="intakeLog" :searchFields="['instrument', 'decision', 'reason']" emptyMessage="belum ada keputusan intake">
+        <Column field="decided_at" header="Tanggal" sortable><template #body="{ data }"><span class="src">{{ data.decided_at }}</span></template></Column>
+        <Column field="instrument" header="Ticker" sortable />
+        <Column field="decision" header="Keputusan" sortable>
+          <template #body="{ data }"><span class="badge" :class="decisionSeverity(data.decision)">{{ data.decision }}</span></template>
+        </Column>
+        <Column field="reason" header="Alasan" />
+      </DataTable>
     </div>
   </section>
+  </template>
 
-  <section>
-    <h2>Validasi Lane (Bar-Replay Sign-off)</h2>
-    <div class="panel">
-      <p class="src">Kontrak §13.1 poin 5: "Engine teruji di BTC ≠ teruji di
-        BBRI" — lane instrumen HANYA naik ke TRADE/BOTH setelah kamu
-        benar-benar mereview chart historisnya sendiri (bar-replay manual, di
-        luar dashboard ini, mis. Panel 5). Form ini CUMA MEREKAM keputusan
-        itu — tidak ada validasi otomatis apa pun di baliknya.</p>
-      <div class="form-grid">
-        <div><label class="field">Ticker</label><input v-model="lane.ticker" type="text" placeholder="mis. BBCA"></div>
-        <div>
-          <label class="field">Lane Baru</label>
-          <select v-model="lane.newLane">
-            <option value="TRADE">TRADE</option><option value="BOTH">BOTH</option>
-            <option value="INVEST">INVEST</option><option value="NONE">NONE</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <label class="field">Evidence (wajib) — apa yang dicek di bar-replay & kesimpulannya</label>
-        <textarea v-model="lane.evidence" placeholder="mis. Cek 2 tahun candle historis BBCA di Panel 5, zona S&R konsisten dgn kalibrasi fraksi harga, pola breakout/retest valid, tidak ada gap tak wajar di luar ARA/ARB normal..."></textarea>
-      </div>
-      <div class="form-row" style="margin-top:12px">
-        <button class="btn" @click="validateLane">Rekam Validasi Lane</button>
-      </div>
-    </div>
-  </section>
-
+  <template v-if="activeTab === 'log'">
   <section>
     <h2>Riwayat Validasi Lane</h2>
     <div class="panel">
@@ -396,56 +497,6 @@ async function saveOutcome(row, field, value) {
           </template>
         </Column>
         <Column field="evidence" header="Evidence" />
-      </DataTable>
-    </div>
-  </section>
-
-  <section>
-    <h2>Rasio Bank (Manual — Khusus Emiten Finansial)</h2>
-    <div class="panel">
-      <p class="src">CAR/NPL/NIM/LDR TIDAK tersedia di yfinance (dikonfirmasi
-        saat riset G3) — isi manual dari laporan resmi bank (OJK/laporan
-        tahunan). Tidak akan pernah tertimpa oleh backfill fundamental
-        otomatis.</p>
-      <div class="form-grid">
-        <div><label class="field">Ticker</label><input v-model="bank.ticker" type="text" placeholder="mis. BBCA"></div>
-        <div><label class="field">Kuartal (akhir periode)</label><input v-model="bank.quarterEnd" type="date"></div>
-      </div>
-      <div class="form-grid" style="margin-top:12px">
-        <div><label class="field">CAR (%)</label><input v-model="bank.car" type="number" step="any"></div>
-        <div><label class="field">NPL Gross (%)</label><input v-model="bank.npl" type="number" step="any"></div>
-        <div><label class="field">NIM (%)</label><input v-model="bank.nim" type="number" step="any"></div>
-        <div><label class="field">LDR (%)</label><input v-model="bank.ldr" type="number" step="any"></div>
-      </div>
-      <div class="form-row" style="margin-top:12px">
-        <button class="btn" @click="saveBankRatios">Simpan Rasio Bank</button>
-        <button class="btn small secondary" @click="loadBankRatios">Lihat Riwayat Ticker Ini</button>
-      </div>
-      <table style="margin-top:12px">
-        <thead><tr><th>Kuartal</th><th>CAR</th><th>NPL</th><th>NIM</th><th>LDR</th><th>Sumber</th></tr></thead>
-        <tbody v-if="!bankRatios"><tr><td colspan="6" class="src">klik "Lihat Riwayat" utk tampilkan</td></tr></tbody>
-        <tbody v-else>
-          <tr v-for="r in bankRatios" :key="r.quarter_end">
-            <td class="src">{{ r.quarter_end }}</td><td>{{ r.car ?? '-' }}</td><td>{{ r.npl_gross ?? '-' }}</td>
-            <td>{{ r.nim ?? '-' }}</td><td>{{ r.ldr ?? '-' }}</td><td class="src">{{ r.source }}</td>
-          </tr>
-          <tr v-if="!bankRatios.length"><td colspan="6" class="src">belum ada rasio bank utk {{ bank.ticker }}</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section>
-    <h2>Riwayat Keputusan Intake</h2>
-    <div class="panel">
-      <p v-if="loadingIntakeLog" class="src">Memuat...</p>
-      <DataTable v-else :rows="intakeLog" :searchFields="['instrument', 'decision', 'reason']" emptyMessage="belum ada keputusan intake">
-        <Column field="decided_at" header="Tanggal" sortable><template #body="{ data }"><span class="src">{{ data.decided_at }}</span></template></Column>
-        <Column field="instrument" header="Ticker" sortable />
-        <Column field="decision" header="Keputusan" sortable>
-          <template #body="{ data }"><span class="badge" :class="decisionSeverity(data.decision)">{{ data.decision }}</span></template>
-        </Column>
-        <Column field="reason" header="Alasan" />
       </DataTable>
     </div>
   </section>
@@ -481,4 +532,34 @@ async function saveOutcome(row, field, value) {
       </DataTable>
     </div>
   </section>
+  </template>
 </template>
+
+<style scoped>
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tab-btn:hover {
+  color: var(--text);
+}
+.tab-btn.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.clickable-rows :deep(tbody tr) {
+  cursor: pointer;
+}
+</style>

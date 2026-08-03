@@ -28,7 +28,7 @@ TAGS: dict[str, list[tuple[str, str]]] = {
     "geo": [
         ("geo:us", "Amerika Serikat"), ("geo:id", "Indonesia"), ("geo:cn", "China"),
         ("geo:eu", "Uni Eropa / kawasan euro"), ("geo:jp", "Jepang"), ("geo:uk", "Inggris"),
-        ("geo:in", "India"), ("geo:global", "lintas negara / global"), ("geo:asia", "kawasan Asia (regional)"),
+        ("geo:in", "India"), ("geo:global", "lintas negara / global"), ("geo:asia", "kawasan Asia (regional)"),("geo:kr", "geo", "Korea Selatan"),
     ],
     "org": [
         ("org:fed", "Federal Reserve"), ("org:fomc", "FOMC (komite kebijakan Fed)"),
@@ -36,13 +36,16 @@ TAGS: dict[str, list[tuple[str, str]]] = {
         ("org:gov-id", "Pemerintah RI (eksekutif)"), ("org:pboc", "People's Bank of China"),
         ("org:ecb", "European Central Bank"), ("org:boj", "Bank of Japan"), ("org:imf", "IMF"),
         ("org:worldbank", "World Bank"), ("org:comex", "COMEX"), ("org:lbma", "LBMA"),
-        ("org:idx", "Bursa Efek Indonesia (institusi)"),
+        ("org:idx", "Bursa Efek Indonesia (institusi)"),("org:opec", "org", "OPEC / OPEC+"),
     ],
     "who": [
         ("who:warsh", "Kevin Warsh (Fed Chair)"), ("who:powell", "Jerome Powell"),
         ("who:waller", "Christopher Waller"), ("who:williams", "John Williams (NY Fed)"),
         ("who:logan", "Lorie Logan (Dallas Fed)"), ("who:trump", "Donald Trump"),
         ("who:prabowo", "Prabowo Subianto"),
+        ("who:ueda",     "who", "Kazuo Ueda — Gubernur BoJ"),
+        ("who:takaichi", "who", "Sanae Takaichi — PM Jepang"),
+        ("who:katayama", "who", "Satsuki Katayama — Menkeu Jepang"),
         # who:purbaya SENGAJA tidak dimasukkan -- lihat docstring modul.
     ],
     "sym": [
@@ -51,7 +54,7 @@ TAGS: dict[str, list[tuple[str, str]]] = {
         ("sym:sp500", "S&P 500"), ("sym:idx", "IHSG (indeks)"), ("sym:usd-idr", "USD/IDR"),
         ("sym:usd-jpy", "USD/JPY"), ("sym:id-bbca", "BBCA"), ("sym:id-bbri", "BBRI"),
         ("sym:id-bmri", "BMRI"), ("sym:id-tlkm", "TLKM"), ("sym:us-tsla", "Tesla"),
-        ("sym:us-nvda", "Nvidia"), ("sym:us-aapl", "Apple"),
+        ("sym:us-nvda", "Nvidia"), ("sym:us-aapl", "Apple"),("sym:oil",   "sym", "Minyak mentah (Brent/WTI)"),("sym:kospi", "sym", "KOSPI — indeks Korea Selatan"),("sym:jgb10", "sym", "JGB 10 tahun"),
     ],
     "theme": [
         ("theme:rate-policy", "kebijakan suku bunga"), ("theme:inflation", "inflasi / CPI / PCE / PPI"),
@@ -66,7 +69,7 @@ TAGS: dict[str, list[tuple[str, str]]] = {
         ("sec:banking", "perbankan"), ("sec:consumer", "konsumer / ritel"), ("sec:energy", "energi"),
         ("sec:mining", "pertambangan"), ("sec:automotive", "otomotif"), ("sec:technology", "teknologi"),
         ("sec:property", "properti"), ("sec:telco", "telekomunikasi"), ("sec:healthcare", "kesehatan"),
-        ("sec:industrials", "industri"),
+        ("sec:industrials", "industri"),("sec:semiconductor", "sec", "Semikonduktor / memori"),("sec:defense","sec", "Pertahanan / defense contractor"),
     ],
 }
 
@@ -120,6 +123,70 @@ CANDIDATES = [
         "current_read": "Inflasi menggerus utang riil; aset riil jadi penerima transfer kekayaan.",
         "persona_tags": ["GEMA", "RIVAN"],
         "tags": ["theme:inflation", "theme:liquidity", "theme:fiscal", "sym:xau", "geo:global"],
+    },
+{
+        "title": "Perang AS-Iran & Premium Risiko Energi",
+        "current_read": (
+            "Konflik AS/Israel-Iran sejak Feb 2026 belum reda; gangguan Selat Hormuz "
+            "menaruh premium risiko permanen di harga energi dan menekan disinflasi global."
+        ),
+        "persona_tags": ["GEMA", "AKELA"],
+        "tags": ["theme:geopolitics", "theme:commodities", "sym:oil",
+                 "geo:us", "geo:global", "who:trump"],
+        "catatan_fakta": (
+            "Operation Epic Fury 28 Feb 2026 (AS+Israel). Eskalasi berlanjut: serangan "
+            "AS 8 Jul, waiver sanksi minyak Iran dicabut efektif 17 Jul. Brent sempat "
+            "$76.48 (tertinggi sejak 23 Jun). Arus tanker Hormuz (~1/5 pasokan minyak "
+            "global) sempat terhenti; Aramco Ras Tanura sempat dihentikan."
+        ),
+    },
+    {
+        "title": "Gelembung Semikonduktor Asia Pecah",
+        "current_read": (
+            "Euforia AI-semikonduktor Asia berbalik jadi deleveraging; koreksi KOSPI "
+            "adalah peringatan dini untuk pasar tech-heavy lain, bukan kejadian lokal."
+        ),
+        "persona_tags": ["AKELA", "RIVAN"],
+        "tags": ["sec:semiconductor", "sec:technology", "sym:kospi",
+                 "geo:kr", "geo:cn", "geo:asia", "theme:earnings"],
+        "catatan_fakta": (
+            "KOSPI puncak intraday 9,385.59 (19 Jun) → 5,663.24 (29 Jul) ≈ -40% dari "
+            "puncak. 8 circuit breaker sepanjang 2026. Samsung+SK Hynix >50% bobot "
+            "indeks. Pemicu struktural: tekanan DRAM dari CXMT (China) ~7.7% revenue "
+            "DRAM global. Likuidasi paksa ritel ₩2.3T dalam 2.5 bulan (leverage + "
+            "ETF berungkit). MSCI menolak masuk watchlist DM (23 Jun) → inflow pasif "
+            "~$29-30 miliar yang diharapkan tidak datang."
+        ),
+    },
+    {
+        "title": "Krisis Yen & Unwind Carry Trade",
+        "current_read": (
+            "Normalisasi BoJ tidak menyelamatkan yen; yen di titik terlemah 40 tahun "
+            "sementara yield JGB tertinggi 30 tahun — risiko unwind carry trade global naik."
+        ),
+        "persona_tags": ["GEMA", "AKELA"],
+        "tags": ["org:boj", "sym:usd-jpy", "sym:jgb10", "theme:currency",
+                 "theme:liquidity", "theme:rate-policy", "geo:jp",
+                 "who:ueda", "who:katayama"],
+        "catatan_fakta": (
+            "BoJ tahan 1.00% (31 Jul) setelah hike Juni — tertinggi sejak 1995. "
+            "JGB 10Y sempat ~2.78% (tertinggi 30 tahun), turun <2.8% pasca-BoJ. "
+            "Yen di titik terlemah 40 tahun; intervensi ¥11.73T (≈$74M) akhir Apr-Mei, "
+            "dugaan intervensi lagi 30 Jul (rally singkat). GDP FY2026 dinaikkan ke "
+            "~0.8% dari 0.5%. Poll Reuters 23 Jul: 70% ekonom lihat rate ≥1.50% pada Q2 2027."
+        ),
+    },
+    {
+        "title": "Deleveraging Ritel Lintas Pasar",
+        "current_read": (
+            "Leverage ritel yang menumpuk saat euforia sedang dipaksa keluar lintas "
+            "aset (ekuitas Asia, kripto); likuidasi paksa memperbesar amplitudo koreksi."
+        ),
+        "persona_tags": ["RIVAN", "AKELA"],
+        "tags": ["theme:liquidity", "theme:credit", "sym:kospi", "sym:btc", "geo:global"],
+        "catatan": "Berguna kalau ingin melacak pola likuidasi paksa lintas pasar "
+                   "(KOSPI ₩2.3T vs likuidasi long/short BTC dari Coinalyze). "
+                   "Overlap dengan RIVAN slice — cek jangan jadi duplikat.",
     },
 ]
 

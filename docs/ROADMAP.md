@@ -2341,7 +2341,89 @@ dia tulis sendiri di `docs/mode_ringkas_pwa_mobile_v1.md`.
   home-screen sungguhan (butuh HTTPS asli dari HP, belum dites Tailscale) —
   keduanya menunggu Giel coba sendiri.
 
+**Update — Track A: Railway deploy scaffolding, tetap SQLite (31 Jul 2026):**
+Giel putuskan deploy ke Railway TANPA migrasi Postgres (ARCHITECTURE §6.1
+trigger "cloud managed" fired, tapi app tetap single-user/single-writer,
+jadi diselesaikan pakai Railway Volume, bukan ganti database) — lihat
+`docs/deploy.md` §7 utk rasional & checklist Railway lengkap.
+- **`Dockerfile`** (baru, multi-stage) + **`.dockerignore`** (baru) —
+  `node:22-alpine` build frontend, `python:3.12-slim` runtime, `gunicorn
+  web.app:app --workers 2 --timeout 300` (timeout digenerouskan utk
+  `/api/run_daily_now`, lihat entri Snapshot 28 Jul di atas).
+- **`requirements.txt`** — tambah `gunicorn`.
+- **`web/app.py`** — `init_db()` dipindah ke level modul (dari dalam
+  `main()`) -- WAJIB krn gunicorn import modul langsung, tidak pernah
+  eksekusi `if __name__ == "__main__"`. Tanpa ini, Volume kosong di deploy
+  pertama bikin API pertama gagal (tabel belum ada).
+- **`tests/test_web_app.py`** — set `KASTARA_DB_PATH` ke file temp SEBELUM
+  `from web.app import ...`, krn perubahan di atas berarti sekadar
+  IMPORT modul ini sekarang memicu `init_db()` — tanpa guard ini, test
+  akan diam-diam nyentuh DB produksi asli via `.env` lokal Giel (ditemukan
+  saat verifikasi sesi ini, DB produksi TIDAK sempat berubah krn skema
+  sudah fully-migrated jadi `init_db()` jadi no-op idempoten kebetulan —
+  tapi tetap bug laten yang harus ditutup, bukan dibiarkan).
+- **`.env.example`** — catatan `FLASK_SECRET_KEY` sekarang WAJIB diisi
+  eksplisit utk deploy Railway (opsional cuma utk dev lokal) -- tanpa ini,
+  tiap redeploy invalidate semua sesi login.
+- Diverifikasi: `docker build` sukses, `docker run` + smoke test end-to-end
+  (`/` 200, `/api/auth/login` + `/api/auth/status` + `/api/latest`
+  authenticated semua jalan benar di dalam container), image test dihapus
+  setelah verifikasi. `pytest` full suite tetap 404 hijau.
+- **Belum dieksekusi** (butuh akun Railway Giel sendiri): buat project,
+  attach Volume, set env vars, deploy pertama, upload DB asli via `railway
+  ssh`, tambah service cron kedua — checklist lengkap di `docs/deploy.md`
+  §7.3.
+
 Sesuai `plan.txt`: **jangan lompat phase tanpa instruksi baru.** Kalau ada
 kebutuhan mendesak di luar urutan (seperti Phase 1 kemarin), itu boleh — tapi
 harus tercatat di sini dengan jelas kenapa keluar urutan, supaya roadmap tetap
 mencerminkan kenyataan, bukan rencana ideal yang sudah basi.
+
+**Update — /universe: Langkah 1 restrukturisasi 4 tab (31 Jul 2026):** Giel
+tulis dokumen desain penuh (`docs/universe_portfolio_restructure_v1.md`) --
+diagnosis kenapa halaman /universe pusing dibaca (8 section campur frekuensi
+harian/kuartalan, 5 form ticker-scoped berdiri sendiri, tidak ada hierarki
+baca), plus rencana Portfolio/Holdings tracker (komponen baru, Langkah 4-6,
+belum digarap). Disepakati eksekusi Langkah 1 saja sesi ini (murah, cepat
+lega) -- Langkah 2-6 (drawer per-ticker, tabel holdings, alokasi vs SOP,
+guard) menunggu instruksi lanjutan.
+- **`UniverseView.vue`** direstruktur jadi 4 tab (custom tab-bar, bukan
+  PrimeVue TabView -- konsisten gaya hand-rolled sidebar `App.vue`): Universe
+  (tabel + Detail Emiten/Override + Validasi Lane + Rasio Bank -- 4 section
+  ticker-scoped ini SEMENTARA tetap di sini, belum pindah ke drawer),
+  Portofolio (placeholder, isi menyusul Langkah 4), Intake (Intake Kandidat
+  + Uji Kelayakan + Riwayat Keputusan Intake), Log & Audit (Riwayat Validasi
+  Lane + Grader Log). **Isi tiap section TIDAK diubah sama sekali** --
+  murni regroup + reorder, sesuai batasan eksplisit Langkah 1 di dokumen.
+- Diverifikasi: `npm run build` bersih, pytest 403 hijau (1 skip pre-existing
+  tidak terkait). Tidak ada perubahan backend sesi ini.
+- (Catatan operasional, tidak terkait konten): ditemukan alias `nvm default`
+  di WSL menunjuk versi Node yang tidak terpasang (`lts/*` -> v24.18.1,
+  padahal cuma v24.16.0/v20.20.2 yang ada) -- itu sebabnya `npm run build`
+  sempat gagal "command not found" di tengah sesi. Diperbaiki dengan
+  `nvm alias default v24.16.0`. Bukan bug kode, murni environment lokal.
+
+**Update — /universe: Langkah 2, Detail Emiten jadi drawer (3 Agustus
+2026):** Lanjutan restrukturisasi (`docs/universe_portfolio_restructure_v1.md`).
+- **`DataTable.vue`** (komponen shared, dipakai ~10 view lain) — tambah
+  `v-bind="$attrs"` ke `PDataTable` internal, supaya listener/attribute
+  yang dilempar ke wrapper (mis. `@row-click`, `class`) diteruskan ke tabel
+  PrimeVue asli. Komponen ini multi-root (fragment), jadi tanpa ini
+  fallthrough attrs Vue 3 otomatis dibuang. Backward-compatible penuh --
+  view lain yang tidak lempar attrs tambahan tidak berubah perilakunya
+  (dikonfirmasi: prop yang sudah dideklarasikan tidak pernah masuk $attrs).
+- **`UniverseView.vue`** — tabel Universe sekarang `@row-click` buka
+  `<Drawer>` (PrimeVue, posisi kanan) berisi persis isi section "Detail
+  Emiten (Komponen B)" lama (termasuk form Override yang sudah menempel di
+  situ sejak sebelumnya) -- ticker otomatis dari baris yang diklik, form
+  input ticker manual + tombol "Lihat Detail" dihapus total. Validasi Lane
+  & Rasio Bank BELUM dipindah (masih section standalone) -- itu Langkah 3.
+  Baris tabel dapat `cursor:pointer` (`.clickable-rows :deep(tbody tr)`).
+- Diverifikasi LANGSUNG di browser (Giel login sendiri, aku hanya baca
+  halaman setelahnya — aturan kredensial tetap): klik baris BBCA membuka
+  drawer berisi metadata/lane/grade/fundamentals/override BBCA dengan
+  benar, screenshot dikonfirmasi. Sempat ketemu halaman ter-cache oleh
+  service worker PWA (Langkah 3 Aug sesi sebelumnya) yang menyajikan bundle
+  lama meski sudah `npm run build` ulang -- diperbaiki dgn unregister SW +
+  clear cache workbox via console, bukan bug kode.
+- `npm run build` bersih, pytest 403 hijau (1 skip pre-existing).

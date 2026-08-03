@@ -1,5 +1,16 @@
 """Test web/app.py pure helpers (Panel 1 snapshot compare + data-gap detection)."""
+import os
+import tempfile
+
 import pytest
+
+# web/app.py sekarang panggil init_db() di level modul (bukan cuma di
+# main(), lihat komentar di app.py -- perlu jalan juga di bawah gunicorn).
+# Set KASTARA_DB_PATH ke file temp SEBELUM import `web.app` di bawah, supaya
+# init_db() itu tidak diam-diam kena ke DB produksi asli (nilai KASTARA_DB_PATH
+# dari .env lokal) hanya krn test file ini import modulnya -- pola sama
+# disiplin keamanan DB produksi yang dipakai di seluruh proyek ini.
+os.environ["KASTARA_DB_PATH"] = tempfile.mktemp(suffix=".db")
 
 from db.connection import get_connection, init_db
 from indicators.calc import COMPARE_PERIODS

@@ -59,6 +59,14 @@ from scrapers.idx_uma import fetch_uma_announcements, is_recently_flagged, uma_h
 app = Flask(__name__, static_folder=None)
 app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 
+# init_db() di level modul (bukan cuma di main()) -- WAJIB supaya jalan juga
+# di bawah gunicorn (`gunicorn web.app:app`), yang import modul ini langsung
+# tanpa pernah eksekusi blok `if __name__ == "__main__"`. Tanpa ini, deploy
+# Railway dengan Volume KOSONG (belum ada file .db sama sekali) akan gagal
+# di query API pertama krn tabel belum ada. Idempotent (CREATE TABLE IF NOT
+# EXISTS + migrasi kolom cek dulu) -- aman dipanggil tiap kali modul di-import.
+init_db()
+
 # ---------- Auth (session sederhana, ganti dari "tanpa auth" plan_c.txt §6.4
 # -- dashboard Vue sekarang satu proses/port dgn API, siap di-expose kalau
 # Giel deploy. DASHBOARD_PASSWORD WAJIB diisi manual di .env -- TIDAK PERNAH
@@ -1356,7 +1364,6 @@ def spa(path):
 
 
 def main() -> None:
-    init_db()  # pastikan tabel ada (walau kosong) supaya API tidak error
     if not DASHBOARD_PASSWORD:
         print("[web] PERINGATAN: DASHBOARD_PASSWORD kosong -- login tidak akan bisa dipakai. Isi di .env.")
     host = os.getenv("WEB_HOST", "127.0.0.1")

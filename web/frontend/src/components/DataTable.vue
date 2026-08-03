@@ -29,6 +29,7 @@ watch(search, (v) => { filters.value.global.value = v })
     <input v-model="search" type="text" class="tbl-search" placeholder="Cari..." style="width:200px">
   </div>
   <PDataTable
+    v-bind="$attrs"
     :value="props.rows"
     :filters="filters"
     :globalFilterFields="props.searchFields"
