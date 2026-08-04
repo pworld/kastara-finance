@@ -333,7 +333,13 @@ CREATE TABLE IF NOT EXISTS news_thread_links (
     stance TEXT,                -- MENDUKUNG / KONTRA / NETRAL
     link_status TEXT DEFAULT 'SUGGESTED',   -- SUGGESTED / CONFIRMED / REJECTED
     note TEXT,
-    linked_at TEXT
+    linked_at TEXT,
+    is_milestone INTEGER DEFAULT 0,  -- Addendum F §24.4 F-2 (4 Aug 2026) --
+                                      -- tautan yang MENGUBAH arah narasi, toggle
+                                      -- manual Giel, TIDAK PERNAH otomatis.
+    is_backfill INTEGER DEFAULT 0    -- Addendum F §24.4 F-2 -- 1 kalau link
+                                      -- ini lahir dari tools/backfill_tag.py
+                                      -- (bukan pipeline harian), utk filter.
 );
 
 -- 25. Thread relations (Addendum B §20.1, GELOMBANG 2) -- relasi antar-thread
@@ -442,6 +448,13 @@ CREATE TABLE IF NOT EXISTS secondary_opinions (
     testable TEXT NOT NULL,          -- TESTABLE / SPEKULATIF (F3)
     my_stance TEXT,                  -- Giel setuju/tidak + kenapa
     conflict_of_interest TEXT,       -- kepentingan komersial/ideologis (F4)
+    relation_to_view TEXT,           -- SEJALAN / MENANTANG (F-2, 4 Aug 2026) --
+                                      -- klasifikasi eksplisit Giel, dipakai blok
+                                      -- ringkasan kepala thread §24.4 & digest
+                                      -- persona §24.3. Opsional (nullable) --
+                                      -- opini lama/tak diklasifikasi dihitung
+                                      -- jujur sebagai "belum diklasifikasi",
+                                      -- bukan ditebak masuk salah satu sisi.
     thread_id INTEGER REFERENCES news_threads(id),
     created_at TEXT
 );

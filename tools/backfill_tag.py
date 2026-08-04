@@ -37,7 +37,7 @@ def backfill_thread(conn, thread_id: int, since: str) -> dict[str, int]:
     ).fetchall()
     news_items = [dict(r) for r in rows]
     n_tags = suggest_tags_for_news(conn, news_items)
-    n_links = suggest_thread_links(conn, news_items)
+    n_links = suggest_thread_links(conn, news_items, is_backfill=True)
     return {"thread_title": thread["title"], "news_scanned": len(news_items), "tags_suggested": n_tags, "links_suggested": n_links}
 
 

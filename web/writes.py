@@ -882,7 +882,9 @@ def get_thread(conn: sqlite3.Connection, thread_id: int) -> dict[str, Any] | Non
     return _decode_thread(dict(row)) if row else None
 
 
-def suggest_thread_links(conn: sqlite3.Connection, news_items: list[dict[str, Any]]) -> int:
+def suggest_thread_links(
+    conn: sqlite3.Connection, news_items: list[dict[str, Any]], *, is_backfill: bool = False,
+) -> int:
     """Untuk tiap headline BARU & tiap thread ACTIVE, DUA jalur match (§21.5
     -- tag-match TAMBAHAN, keyword TIDAK dihapus, jadi "legacy/fallback"
     persis kata kontrak, bukan diganti):
@@ -899,7 +901,10 @@ def suggest_thread_links(conn: sqlite3.Connection, news_items: list[dict[str, An
     suggest_tags_for_news() (biar tag-match lihat tag yang baru disarankan di
     run yang sama) -- lookup row by (date, headline), natural key sama dgn
     idx_daily_news_dedup. TIDAK PERNAH set CONFIRMED (human gate, §20.0).
-    Return jumlah link baru."""
+    `is_backfill` (F-2 §24.4, default False) -- True HANYA saat dipanggil
+    dari tools/backfill_tag.py, dicatat di kolom is_backfill dipakai filter
+    UI (link lahir dari backfill vs pipeline harian biasa). Return jumlah
+    link baru."""
     if not news_items:
         return 0
     threads = conn.execute(
@@ -941,9 +946,9 @@ def suggest_thread_links(conn: sqlite3.Connection, news_items: list[dict[str, An
                 continue
             cur = conn.execute(
                 "INSERT OR IGNORE INTO news_thread_links "
-                "(thread_id, ref_table, ref_id, link_status, linked_at) "
-                "VALUES (?, 'daily_news', ?, 'SUGGESTED', ?)",
-                (thread_id, row["id"], now),
+                "(thread_id, ref_table, ref_id, link_status, linked_at, is_backfill) "
+                "VALUES (?, 'daily_news', ?, 'SUGGESTED', ?, ?)",
+                (thread_id, row["id"], now, int(is_backfill)),
             )
             inserted += cur.rowcount
     return inserted
@@ -980,6 +985,23 @@ def reject_thread_link(conn: sqlite3.Connection, link_id: int) -> bool:
     if not exists:
         return False
     conn.execute("UPDATE news_thread_links SET link_status = 'REJECTED' WHERE id = ?", (link_id,))
+    return True
+
+
+def set_link_milestone(conn: sqlite3.Connection, link_id: int, is_milestone: bool) -> bool:
+    """Toggle milestone 1 link CONFIRMED (F-2 §24.4, Lapis 2) -- SELALU
+    manual (Giel yang menilai tautan mana yang mengubah arah narasi),
+    TIDAK PERNAH otomatis. Boleh dipasang/dilepas di link mana pun (tidak
+    dibatasi cuma CONFIRMED di level guard -- toggle salah pilih gampang
+    dibalik, tidak perlu blokir keras). Return False kalau link_id tidak
+    ada."""
+    exists = conn.execute("SELECT 1 FROM news_thread_links WHERE id = ?", (link_id,)).fetchone()
+    if not exists:
+        return False
+    conn.execute(
+        "UPDATE news_thread_links SET is_milestone = ? WHERE id = ?",
+        (int(bool(is_milestone)), link_id),
+    )
     return True
 
 
@@ -1021,10 +1043,14 @@ def list_thread_links(
 ) -> list[dict[str, Any]]:
     """Link 1 thread + info sumber asli (date/source/headline/url), di-JOIN
     manual per ref_table (union Python-side -- lebih aman drpd dynamic-
-    table-name SQL). Dipakai halaman timeline thread (§20.5)."""
+    table-name SQL). Dipakai halaman timeline thread (§20.5). F-2 (§24.4)
+    tambah `is_milestone`/`is_backfill` (dipakai toggle & filter) + `tags`
+    (facet tag berita asal, HANYA utk daily_news/manual_articles --
+    policy_tracker memang tidak masuk ALLOWED_CONTENT_TAG_REF_TABLES,
+    jujur tampil array kosong bukan error)."""
     sql = (
-        "SELECT id, ref_table, ref_id, stance, link_status, note, linked_at "
-        "FROM news_thread_links WHERE thread_id = ?"
+        "SELECT id, ref_table, ref_id, stance, link_status, note, linked_at, "
+        "is_milestone, is_backfill FROM news_thread_links WHERE thread_id = ?"
     )
     params: list[Any] = [thread_id]
     if status:
@@ -1068,8 +1094,25 @@ def list_thread_links(
                 "headline": r["literal_statement"], "url": r["source_url"],
             }
 
+    tags_by_key: dict[tuple[str, int], list[str]] = {}
+    for taggable in ("daily_news", "manual_articles"):
+        ids = by_table.get(taggable)
+        if not ids:
+            continue
+        placeholders = ",".join("?" for _ in ids)
+        for r in conn.execute(
+            f"SELECT c.ref_id, t.canonical FROM content_tags c "
+            f"JOIN tag_dictionary t ON t.id = c.tag_id "
+            f"WHERE c.ref_table = ? AND c.ref_id IN ({placeholders})",
+            [taggable, *ids],
+        ):
+            tags_by_key.setdefault((taggable, r["ref_id"]), []).append(r["canonical"])
+
     for link in links:
         link["source_info"] = source_by_key.get((link["ref_table"], link["ref_id"]))
+        link["is_milestone"] = bool(link["is_milestone"])
+        link["is_backfill"] = bool(link["is_backfill"])
+        link["tags"] = tags_by_key.get((link["ref_table"], link["ref_id"]), [])
     return links
 
 
@@ -1101,15 +1144,16 @@ def merge_thread(conn: sqlite3.Connection, from_id: int, into_id: int) -> dict[s
     # (pasangan ref_table+ref_id yang sama sudah tertaut ke into_id juga),
     # punya into_id yang menang -- baris from_id yang jadi redundan dihapus.
     from_links = conn.execute(
-        "SELECT ref_table, ref_id, stance, link_status, note, linked_at "
+        "SELECT ref_table, ref_id, stance, link_status, note, linked_at, is_milestone, is_backfill "
         "FROM news_thread_links WHERE thread_id = ?", (from_id,),
     ).fetchall()
     for r in from_links:
         conn.execute(
             "INSERT OR IGNORE INTO news_thread_links "
-            "(thread_id, ref_table, ref_id, stance, link_status, note, linked_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (into_id, r["ref_table"], r["ref_id"], r["stance"], r["link_status"], r["note"], r["linked_at"]),
+            "(thread_id, ref_table, ref_id, stance, link_status, note, linked_at, is_milestone, is_backfill) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (into_id, r["ref_table"], r["ref_id"], r["stance"], r["link_status"], r["note"], r["linked_at"],
+             r["is_milestone"], r["is_backfill"]),
         )
     conn.execute("DELETE FROM news_thread_links WHERE thread_id = ?", (from_id,))
 
@@ -1535,29 +1579,69 @@ def suggest_tags_for_news(conn: sqlite3.Connection, news_items: list[dict[str, A
     return inserted
 
 
+def _stance_composition(rows: list[Any]) -> dict[str, int]:
+    composition = {"MENDUKUNG": 0, "KONTRA": 0, "NETRAL": 0}
+    for r in rows:
+        if r["stance"] in composition:
+            composition[r["stance"]] = r["n"]
+    return composition
+
+
 def thread_stats(conn: sqlite3.Connection, thread_id: int) -> dict[str, Any]:
     """1 thread: komposisi stance link CONFIRMED, jumlah SUGGESTED pending,
-    umur (hari). Dipisah dari get_thread() -- get_thread tetap murah untuk
-    polling ThreadIndexView/NewsView, ini cuma dipanggil Settings (jarang)."""
+    umur (hari), + blok ringkasan kepala thread F-2 (§24.4): tren 30 hari
+    (komposisi CONFIRMED yang linked_at-nya dalam 30 hari terakhir --
+    "ke mana arahnya belakangan", bukan cuma rasio total), shift_warning
+    (True kalau mayoritas stance 30 hari BEDA dari mayoritas keseluruhan --
+    sinyal komposisi bergeser), jumlah milestone, & ringkasan opini sekunder
+    (reuse thread_opinion_summary(), F1 tetap tidak tersentuh). Dipisah dari
+    get_thread() -- get_thread tetap murah untuk polling ThreadIndexView/
+    NewsView, ini dipanggil Settings & ThreadDetailView (jarang, lebih
+    berat)."""
     stance_rows = conn.execute(
         "SELECT stance, COUNT(*) AS n FROM news_thread_links "
         "WHERE thread_id = ? AND link_status = 'CONFIRMED' GROUP BY stance",
         (thread_id,),
     ).fetchall()
-    composition = {"MENDUKUNG": 0, "KONTRA": 0, "NETRAL": 0}
-    for r in stance_rows:
-        if r["stance"] in composition:
-            composition[r["stance"]] = r["n"]
+    composition = _stance_composition(stance_rows)
+    trend_rows = conn.execute(
+        "SELECT stance, COUNT(*) AS n FROM news_thread_links "
+        "WHERE thread_id = ? AND link_status = 'CONFIRMED' "
+        "AND linked_at >= date('now', '-30 day') GROUP BY stance",
+        (thread_id,),
+    ).fetchall()
+    trend_30d = _stance_composition(trend_rows)
+
+    def _majority(comp: dict[str, int]) -> str | None:
+        nonzero = {k: v for k, v in comp.items() if v > 0}
+        if not nonzero:
+            return None
+        top = max(nonzero.values())
+        leaders = [k for k, v in nonzero.items() if v == top]
+        return leaders[0] if len(leaders) == 1 else None
+
+    overall_majority = _majority(composition)
+    trend_majority = _majority(trend_30d)
+    shift_warning = bool(
+        overall_majority and trend_majority and overall_majority != trend_majority
+    )
     pending = conn.execute(
         "SELECT COUNT(*) AS n FROM news_thread_links WHERE thread_id = ? AND link_status = 'SUGGESTED'",
         (thread_id,),
+    ).fetchone()["n"]
+    milestone_count = conn.execute(
+        "SELECT COUNT(*) AS n FROM news_thread_links WHERE thread_id = ? "
+        "AND link_status = 'CONFIRMED' AND is_milestone = 1", (thread_id,),
     ).fetchone()["n"]
     age_row = conn.execute(
         "SELECT CAST(julianday('now') - julianday(created_at) AS INTEGER) AS age_days "
         "FROM news_threads WHERE id = ?", (thread_id,),
     ).fetchone()
     return {
-        "thread_id": thread_id, "composition": composition, "pending_suggested": pending,
+        "thread_id": thread_id, "composition": composition, "trend_30d": trend_30d,
+        "shift_warning": shift_warning, "pending_suggested": pending,
+        "milestone_count": milestone_count,
+        "opinions": thread_opinion_summary(conn, thread_id),
         "age_days": age_row["age_days"] if age_row and age_row["age_days"] is not None else 0,
     }
 
@@ -1577,9 +1661,7 @@ def list_threads_with_stats(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     ).fetchone()["n"]
     for t in threads:
         stats = thread_stats(conn, t["id"])
-        t["composition"] = stats["composition"]
-        t["pending_suggested"] = stats["pending_suggested"]
-        t["age_days"] = stats["age_days"]
+        t.update({k: v for k, v in stats.items() if k != "thread_id"})
         t["active_count"] = active_count
     return attach_content_tags(conn, "news_threads", threads)
 
@@ -1837,12 +1919,17 @@ def list_holding_conversions(conn: sqlite3.Connection, limit: int = 200) -> list
 
 ALLOWED_SOURCE_TYPE = {"VIDEO", "BOOK", "PAPER", "PODCAST", "REPORT", "OTHER"}
 ALLOWED_TESTABLE = {"TESTABLE", "SPEKULATIF"}
+# F-2 (§24.4, 4 Aug 2026) -- klasifikasi eksplisit relasi opini thd pandangan
+# Giel, dipakai blok ringkasan kepala thread + digest persona. Opsional
+# (nullable) -- lihat catatan di schema.sql, tidak ditebak dari teks bebas.
+ALLOWED_RELATION_TO_VIEW = {"SEJALAN", "MENANTANG"}
 
 
 def create_secondary_opinion(
     conn: sqlite3.Connection, *, source_type: str, source_ref: str, my_summary: str,
     core_claim: str, testable: str, author: str | None = None, my_stance: str | None = None,
     conflict_of_interest: str | None = None, thread_id: int | None = None,
+    relation_to_view: str | None = None,
 ) -> dict[str, Any]:
     """Catat 1 opini sekunder. Guard: source_type ∈ ALLOWED_SOURCE_TYPE,
     source_ref/my_summary/core_claim wajib non-kosong (F2: yang disimpan
@@ -1850,7 +1937,10 @@ def create_secondary_opinion(
     wajib, bukan opsional), testable ∈ {TESTABLE, SPEKULATIF} (F3, wajib
     diisi -- tidak ada default netral supaya Giel selalu sadar
     membedakannya). thread_id opsional (F1: menempel ke thread, bukan
-    tautan bukti) -- kalau diisi, thread-nya harus benar-benar ada."""
+    tautan bukti) -- kalau diisi, thread-nya harus benar-benar ada.
+    relation_to_view opsional (F-2) -- kalau diisi, harus ∈
+    ALLOWED_RELATION_TO_VIEW; kosong = jujur "belum diklasifikasi", bukan
+    error (opini boleh dicatat dulu, diklasifikasi belakangan)."""
     if source_type not in ALLOWED_SOURCE_TYPE:
         raise ValueError(f"source_type '{source_type}' tidak dikenal -- pilihan: {'/'.join(sorted(ALLOWED_SOURCE_TYPE))}")
     if not source_ref or not source_ref.strip():
@@ -1865,18 +1955,24 @@ def create_secondary_opinion(
         exists = conn.execute("SELECT 1 FROM news_threads WHERE id = ?", (thread_id,)).fetchone()
         if not exists:
             raise ValueError(f"thread_id {thread_id} tidak ditemukan")
+    if relation_to_view and relation_to_view not in ALLOWED_RELATION_TO_VIEW:
+        raise ValueError(
+            f"relation_to_view '{relation_to_view}' tidak dikenal -- pilihan: "
+            f"{'/'.join(sorted(ALLOWED_RELATION_TO_VIEW))}"
+        )
     now = today_wib()
     row = {
         "source_type": source_type, "source_ref": source_ref.strip(), "author": author,
         "my_summary": my_summary.strip(), "core_claim": core_claim.strip(), "testable": testable,
         "my_stance": my_stance, "conflict_of_interest": conflict_of_interest,
+        "relation_to_view": relation_to_view or None,
         "thread_id": thread_id, "created_at": now,
     }
     cur = conn.execute(
         "INSERT INTO secondary_opinions (source_type, source_ref, author, my_summary, core_claim, "
-        "testable, my_stance, conflict_of_interest, thread_id, created_at) "
+        "testable, my_stance, conflict_of_interest, relation_to_view, thread_id, created_at) "
         "VALUES (:source_type, :source_ref, :author, :my_summary, :core_claim, :testable, "
-        ":my_stance, :conflict_of_interest, :thread_id, :created_at)",
+        ":my_stance, :conflict_of_interest, :relation_to_view, :thread_id, :created_at)",
         row,
     )
     row["id"] = cur.lastrowid
@@ -1893,3 +1989,25 @@ def list_secondary_opinions(conn: sqlite3.Connection, *, thread_id: int | None =
         params.append(thread_id)
     sql += " ORDER BY created_at DESC, id DESC"
     return [dict(r) for r in conn.execute(sql, params).fetchall()]
+
+
+def thread_opinion_summary(conn: sqlite3.Connection, thread_id: int) -> dict[str, Any]:
+    """Ringkas opini sekunder 1 thread jadi {total, sejalan, menantang,
+    unclassified} (F-2 §24.4) -- dipakai blok ringkasan kepala thread &
+    digest persona. `relation_to_view` NULL dihitung jujur sebagai
+    unclassified, TIDAK ditebak masuk salah satu sisi (F1 tetap berlaku:
+    fungsi ini TIDAK PERNAH menyentuh news_thread_links/stance thread)."""
+    rows = conn.execute(
+        "SELECT relation_to_view, COUNT(*) AS n FROM secondary_opinions "
+        "WHERE thread_id = ? GROUP BY relation_to_view", (thread_id,),
+    ).fetchall()
+    summary = {"total": 0, "sejalan": 0, "menantang": 0, "unclassified": 0}
+    for r in rows:
+        summary["total"] += r["n"]
+        if r["relation_to_view"] == "SEJALAN":
+            summary["sejalan"] = r["n"]
+        elif r["relation_to_view"] == "MENANTANG":
+            summary["menantang"] = r["n"]
+        else:
+            summary["unclassified"] += r["n"]
+    return summary

@@ -2566,7 +2566,83 @@ sesuai keputusan F1-F5 terkunci di kontrak.
   terbukti jalan di data produksi asli, bukan cuma di test.
 - 5 test baru (`pytest -q`: 419 passed, 1 skipped pre-existing).
   `npm run build` bersih.
-- **Sisa (F-2, belum dikerjakan)**: blok ringkasan kepala thread + tren
-  30 hari, `is_milestone` toggle, grup bulanan collapsible, filter
-  stance/backfill/tag, digest persona satu baris -- menunggu instruksi
-  lanjutan Giel.
+
+**Update — Addendum F, F-2: Thread Readability (4 Agustus 2026, sesi sama):**
+`docs/phase_j_build_contract_v1_3_LOCKED.md` §24.4 -- lapis keterbacaan
+thread (hierarki, BUKAN kategori -- prinsip eksplisit kontrak: kategori
+memecah daftar & merusak busur waktu).
+- **Field baru di luar skema F-1 asli**: `secondary_opinions.relation_to_view`
+  (SEJALAN/MENANTANG, opsional). Contoh teks kontrak §24.3/24.4 butuh pecahan
+  "2 sejalan · 1 menantang" per thread -- data ini TIDAK ADA di skema F-1
+  (cuma `my_stance` bebas teks). Ditanyakan eksplisit ke Giel via
+  AskUserQuestion (bukan ditebak dari `my_stance` pakai keyword match --
+  klasifikasi editorial begini butuh keputusan Giel, bukan rule-based) --
+  Giel pilih "tambah field baru" (bukan "cukup jumlah total"). Migrasi
+  nullable, opini F-1 lama (termasuk 1 opini live-test) otomatis "belum
+  diklasifikasi", bukan ditebak masuk salah satu sisi.
+- **`news_thread_links`**: 2 kolom baru `is_milestone` (toggle manual Giel,
+  Lapis 2 §24.4 -- TIDAK PERNAH otomatis) + `is_backfill` (1 kalau link lahir
+  dari `tools/backfill_tag.py`, dipakai filter). `EXPECTED_TABLES` TIDAK
+  berubah (kolom baru di tabel lama, bukan tabel baru) -- masuk
+  `_COLUMN_MIGRATIONS` di `db/connection.py`.
+- **`web/writes.py`**: `thread_opinion_summary()` (total/sejalan/menantang/
+  unclassified per thread, reuse F1 guard -- baca `secondary_opinions` saja,
+  tidak pernah `news_thread_links`), `set_link_milestone()`, `suggest_thread_
+  links(..., is_backfill=False)` (param baru, default False = jalur pipeline
+  harian, `tools/backfill_tag.py` pass `True`), `thread_stats()` diperluas:
+  `trend_30d` (komposisi CONFIRMED 30 hari terakhir, dari `linked_at`),
+  `shift_warning` (True kalau mayoritas 30-hari beda dari mayoritas
+  keseluruhan), `milestone_count`, `opinions` (via `thread_opinion_summary`).
+  `list_thread_links()` diperluas: `is_milestone`/`is_backfill` + `tags`
+  (facet tag berita asal -- HANYA daily_news/manual_articles, policy_tracker
+  jujur array kosong krn memang bukan taggable, bukan error).
+- **`web/app.py`**: `POST /api/threads/link/<id>/milestone`; `GET
+  /api/threads/<id>` sekarang sertakan `thread_stats()` langsung (head block
+  butuh semua field ini di 1 request, bukan panggil `/api/threads/stats`
+  yang isinya SEMUA thread).
+- **`pipeline/compose_persona_context.py`**: `_thread_opinion_digest_lines()`
+  -- 1 baris per thread ACTIVE yang `persona_tags`-nya cocok lens DAN punya
+  opini (thread tanpa opini di-skip, bukan tampil "0 opini"). Larangan keras
+  §24.3 ditegakkan: TIDAK PERNAH kirim `my_summary` penuh (cuma jalur manual
+  §21.4 yang begitu), TIDAK PERNAH sentuh `news_thread_links` (F1 tetap).
+- **`ThreadDetailView.vue`**: blok ringkasan kepala thread (Lapis 1, persis
+  format kontrak: Bukti/Tren 30 hari + ⚠/Opini sekunder/umur), grup bulanan
+  `<details>` collapsible (Lapis 3 -- bulan terbaru terbuka, lama terlipat)
+  dgn toggle ★ milestone per link (Lapis 2), filter stance/tag/milestone-
+  saja/backfill-saja (client-side, murni sementara -- tidak ubah data).
+- **SENGAJA belum dibangun**: judul naratif per grup bulan (contoh kontrak
+  "Nominasi & syok harga awal") -- butuh tulisan manual Giel per periode,
+  tidak ada field/mekanisme input utk itu; grup bulanan sekarang cuma
+  hitungan+komposisi, bukan narasi. `thread_relations` (§20.1 GELOMBANG 2)
+  tetap schema-only.
+- Diverifikasi LANGSUNG di browser (restart server sendiri via preview tool
+  krn proses lama Giel sudah tidak jalan; Giel login manual): head block
+  tampil benar ("Bukti: 4 MENDUKUNG...", "Opini sekunder: 1 (0 sejalan ·
+  0 menantang) · 1 belum diklasifikasi"), toggle ★ milestone pada link nyata
+  (thread_id=4) -- `milestone_count` di head block langsung naik jadi 1,
+  filter "Milestone saja" langsung memangkas timeline 4 tautan -> 1, filter
+  tag dropdown terisi tag asli (`geo:us`/`org:fed`/`theme:inflation`/
+  `who:warsh`) dari data produksi.
+- 9 test baru writes.py (is_backfill flag, milestone toggle, tags attach,
+  trend_30d/shift_warning/milestone_count, opinion summary, relation_to_view
+  validasi) + 1 test backfill_tag.py (is_backfill=1 dari jalur backfill) +
+  2 test compose_persona_context.py (digest muncul utk lens cocok & thread
+  berisi, skip thread kosong) + 2 test test_db.py (kolom baru). Guard test
+  F1 lama (`test_secondary_opinion_never_leaks_into_thread_stats`) diupdate
+  -- `opinions` MEMANG berubah (itu tujuan F-2), tapi `composition`/
+  `trend_30d`/`shift_warning` tetap terbukti beku. `pytest -q`: 430 passed,
+  1 skipped pre-existing. `npm run build` bersih.
+
+**Update — ThreadDetailView.vue: pindah ke tab (4 Agustus 2026, sesi sama):**
+Giel minta halaman thread tidak banyak scroll -- 5 section (Ringkasan,
+Saran, Timeline, Opini Sekunder, Tautkan Manual) sebelumnya numpuk vertikal
+dalam 1 halaman, terparah section "Saran" bisa 86 item tanpa tab. Diubah ke
+tab-bar (pola sama `UniverseView.vue`, `activeTab` ref + tombol), label tab
+dinamis pakai hitungan hidup ("Saran (86)", "Timeline (4)", "Opini Sekunder
+(1)") supaya isi tab kelihatan tanpa harus dibuka. Murni frontend, nol
+perubahan backend/API -- CSS `.tab-bar`/`.tab-btn` disalin ke `<style
+scoped>` `ThreadDetailView.vue` sendiri (tadinya cuma scoped ke
+`UniverseView.vue`, tidak otomatis kebagi). Diverifikasi live: build bersih,
+`pytest -q` tetap 430 passed (tidak ada logic backend yang berubah), klik
+antar-tab di browser (thread_id=4 nyata) -- data & state (filter, toggle
+milestone yang sudah di-set sebelumnya) tetap benar per tab.

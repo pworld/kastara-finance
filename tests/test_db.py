@@ -80,3 +80,28 @@ def test_daily_news_has_rss_summary_column(tmp_path):
         conn.commit()
         row = conn.execute("SELECT rss_summary FROM daily_news").fetchone()
         assert row["rss_summary"] is None
+
+
+def test_news_thread_links_has_milestone_and_backfill_columns(tmp_path):
+    """Addendum F §24.4 (F-2) -- kolom baru, default 0, NULL wajar utk baris
+    lama (tidak ada backfill/migrasi nilai)."""
+    from db.connection import get_connection
+
+    db_file = tmp_path / "test_kastara-finance.db"
+    init_db(db_file)
+    with get_connection(db_file) as conn:
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(news_thread_links)")]
+        assert "is_milestone" in cols
+        assert "is_backfill" in cols
+
+
+def test_secondary_opinions_has_relation_to_view_column(tmp_path):
+    """Addendum F §24.4 (F-2) -- klasifikasi eksplisit, NULL wajar (opsional,
+    tidak ditebak dari teks bebas)."""
+    from db.connection import get_connection
+
+    db_file = tmp_path / "test_kastara-finance.db"
+    init_db(db_file)
+    with get_connection(db_file) as conn:
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(secondary_opinions)")]
+        assert "relation_to_view" in cols

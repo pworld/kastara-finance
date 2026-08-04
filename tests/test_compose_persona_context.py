@@ -245,6 +245,41 @@ def test_extra_news_ids_none_or_empty_produces_no_block(tmp_path):
     assert "BERITA PILIHAN GIEL" not in compose_persona_context(conn, "2026-07-08", "GEMA", extra_news_ids=[])
 
 
+# ---------- Digest opini sekunder -> persona (Addendum F §24.3, F-2) ----------
+
+def test_thread_opinion_digest_appears_for_matching_lens_only(tmp_path):
+    conn = _seed_db(tmp_path)
+    from web.writes import save_thread, create_secondary_opinion
+
+    t = save_thread(conn, title="Rezim Warsh Hawkish", persona_tags=["GEMA"])
+    conn.commit()
+    create_secondary_opinion(
+        conn, source_type="VIDEO", source_ref="url1", my_summary="s1", core_claim="c1",
+        testable="TESTABLE", thread_id=t["id"], relation_to_view="SEJALAN",
+    )
+    create_secondary_opinion(
+        conn, source_type="VIDEO", source_ref="url2", my_summary="s2", core_claim="c2",
+        testable="TESTABLE", thread_id=t["id"], relation_to_view="MENANTANG",
+    )
+    conn.commit()
+    gema_text = compose_persona_context(conn, "2026-07-08", "GEMA")
+    leon_text = compose_persona_context(conn, "2026-07-08", "LEON")
+    assert "[DIGEST OPINI SEKUNDER -- konteks pinggiran, BUKAN bukti thread]" in gema_text
+    assert "Rezim Warsh Hawkish: 2 opini sekunder (1 sejalan, 1 menantang)" in gema_text
+    assert "s1" not in gema_text and "s2" not in gema_text  # my_summary penuh TIDAK PERNAH ikut (§24.3)
+    assert "DIGEST OPINI SEKUNDER" not in leon_text  # persona_tags cuma GEMA
+
+
+def test_thread_opinion_digest_skips_threads_without_opinions(tmp_path):
+    conn = _seed_db(tmp_path)
+    from web.writes import save_thread
+
+    save_thread(conn, title="Thread Kosong", persona_tags=["GEMA"])
+    conn.commit()
+    text = compose_persona_context(conn, "2026-07-08", "GEMA")
+    assert "DIGEST OPINI SEKUNDER" not in text
+
+
 def test_rivan_slice_shows_equity_fundamentals_and_grade(tmp_path):
     """J-9 data plumbing: RIVAN slice mendapat ringkasan fundamental saham
     individual (revenue/net income/FCF, grade, foreign flow per-saham)."""

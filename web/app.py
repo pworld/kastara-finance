@@ -1306,7 +1306,7 @@ def secondary_opinions_create():
                 my_summary=body.get("my_summary", ""), core_claim=body.get("core_claim", ""),
                 testable=body.get("testable", ""), author=body.get("author"),
                 my_stance=body.get("my_stance"), conflict_of_interest=body.get("conflict_of_interest"),
-                thread_id=body.get("thread_id"),
+                thread_id=body.get("thread_id"), relation_to_view=body.get("relation_to_view"),
             )
             conn.commit()
     except ValueError as exc:
@@ -1339,6 +1339,10 @@ def thread_detail(thread_id):
         if thread is None:
             return jsonify({"error": "thread tidak ditemukan"}), 404
         thread["links"] = writes.list_thread_links(conn, thread_id)
+        # F-2 (§24.4) blok ringkasan kepala thread -- reuse thread_stats(),
+        # bukan endpoint baru (halaman detail sudah panggil endpoint ini).
+        stats = writes.thread_stats(conn, thread_id)
+        thread.update({k: v for k, v in stats.items() if k != "thread_id"})
     return jsonify(thread)
 
 
@@ -1424,6 +1428,17 @@ def thread_link_confirm(link_id):
 def thread_link_reject(link_id):
     with get_connection() as conn:
         ok = writes.reject_thread_link(conn, link_id)
+        conn.commit()
+    if not ok:
+        return jsonify({"error": "link tidak ditemukan"}), 404
+    return jsonify({"ok": True})
+
+
+@app.post("/api/threads/link/<int:link_id>/milestone")
+def thread_link_milestone(link_id):
+    body = request.get_json(force=True)
+    with get_connection() as conn:
+        ok = writes.set_link_milestone(conn, link_id, bool(body.get("is_milestone")))
         conn.commit()
     if not ok:
         return jsonify({"error": "link tidak ditemukan"}), 404

@@ -47,6 +47,24 @@ def test_backfill_thread_scopes_by_since_date(tmp_path):
         assert result["links_suggested"] == 1
 
 
+def test_backfill_thread_marks_links_is_backfill(tmp_path):
+    """F-2 (§24.4) filter: link yang lahir dari jalur backfill harus
+    tercatat is_backfill=1, beda dari suggest_thread_links() biasa (dipanggil
+    pipeline/run_daily.py, default is_backfill=0)."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Rezim Warsh", keywords=["warsh"])
+        _seed_news(conn, headline="Warsh signals hawkish stance", date="2026-01-15")
+        conn.commit()
+        backfill_thread(conn, thread["id"], "2026-01-01")
+        conn.commit()
+        link = conn.execute(
+            "SELECT is_backfill FROM news_thread_links WHERE thread_id = ?", (thread["id"],)
+        ).fetchone()
+        assert link["is_backfill"] == 1
+
+
 def test_backfill_thread_never_writes_stance_or_confirmed(tmp_path):
     """Backfill hanya SUGGESTED -- stance/link_status CONFIRMED/current_read
     thread TIDAK PERNAH ditulis oleh fungsi ini (§21.9, HARAM diotomasi)."""

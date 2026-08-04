@@ -85,6 +85,8 @@ from web.writes import (
     list_holding_conversions,
     create_secondary_opinion,
     list_secondary_opinions,
+    thread_opinion_summary,
+    set_link_milestone,
 )
 
 
@@ -2055,6 +2057,145 @@ def test_auto_dormant_stale_threads_only_touches_active_and_stale(tmp_path):
         assert get_thread(conn, closed["id"])["status"] == "CLOSED"
 
 
+# ---------- F-2: Thread Readability (Addendum F §24.4, 4 Aug 2026) ----------
+
+def test_suggest_thread_links_is_backfill_flag(tmp_path):
+    """Link yang lahir dari suggest_thread_links(is_backfill=True) (jalur
+    tools/backfill_tag.py) tercatat is_backfill=1; jalur pipeline harian
+    (default False) tetap is_backfill=0 -- dipakai filter §24.4."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Rezim Warsh", keywords=["warsh"])
+        news_id = _seed_news_row(conn, headline="Warsh signals hawkish stance")
+        conn.commit()
+        n = suggest_thread_links(
+            conn, [{"date": "2026-07-15", "headline": "Warsh signals hawkish stance"}], is_backfill=True,
+        )
+        assert n == 1
+        link = conn.execute(
+            "SELECT is_backfill FROM news_thread_links WHERE thread_id = ? AND ref_id = ?",
+            (thread["id"], news_id),
+        ).fetchone()
+        assert link["is_backfill"] == 1
+
+
+def test_set_link_milestone_toggle(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Rezim Warsh")
+        news_id = _seed_news_row(conn, headline="A")
+        conn.commit()
+        link = add_thread_link_manual(conn, thread["id"], "daily_news", news_id, "MENDUKUNG")
+        conn.commit()
+        assert set_link_milestone(conn, link["id"], True) is True
+        links = list_thread_links(conn, thread["id"])
+        assert links[0]["is_milestone"] is True
+        assert set_link_milestone(conn, link["id"], False) is True
+        links = list_thread_links(conn, thread["id"])
+        assert links[0]["is_milestone"] is False
+        assert set_link_milestone(conn, 9999, True) is False
+
+
+def test_list_thread_links_attaches_tags_and_flags(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Rezim Warsh")
+        news_id = _seed_news_row(conn, headline="A")
+        conn.commit()
+        create_tag(conn, "who:warsh")
+        apply_tag(conn, "daily_news", news_id, "who:warsh")
+        conn.commit()
+        link = add_thread_link_manual(conn, thread["id"], "daily_news", news_id, "MENDUKUNG")
+        conn.commit()
+        links = list_thread_links(conn, thread["id"])
+        assert links[0]["tags"] == ["who:warsh"]
+        assert links[0]["is_milestone"] is False
+        assert links[0]["is_backfill"] is False
+        # policy_tracker bukan taggable -- jujur array kosong, bukan error.
+        pt_id = conn.execute(
+            "INSERT INTO policy_tracker (date, speaker, institution, literal_statement, source_url, created_at) "
+            "VALUES ('2026-07-15', 'Warsh', 'Fed', 'statement', 'https://x.test', '')"
+        ).lastrowid
+        conn.commit()
+        add_thread_link_manual(conn, thread["id"], "policy_tracker", pt_id, "KONTRA")
+        conn.commit()
+        pt_link = next(l for l in list_thread_links(conn, thread["id"]) if l["ref_table"] == "policy_tracker")
+        assert pt_link["tags"] == []
+
+
+def test_thread_stats_trend_30d_and_shift_warning(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Rezim Warsh")
+        n1 = _seed_news_row(conn, headline="A")
+        n2 = _seed_news_row(conn, headline="B")
+        n3 = _seed_news_row(conn, headline="C")
+        conn.commit()
+        # Overall majority MENDUKUNG (2 vs 1), tapi 2 KONTRA yang paling baru
+        # (dalam 30 hari) -> shift_warning True (arah 30 hari beda dari total).
+        l1 = add_thread_link_manual(conn, thread["id"], "daily_news", n1, "MENDUKUNG")
+        conn.execute("UPDATE news_thread_links SET linked_at = date('now', '-45 day') WHERE id = ?", (l1["id"],))
+        l2 = add_thread_link_manual(conn, thread["id"], "daily_news", n2, "MENDUKUNG")
+        conn.execute("UPDATE news_thread_links SET linked_at = date('now', '-45 day') WHERE id = ?", (l2["id"],))
+        l3 = add_thread_link_manual(conn, thread["id"], "daily_news", n3, "KONTRA")
+        conn.commit()
+        stats = thread_stats(conn, thread["id"])
+        assert stats["composition"] == {"MENDUKUNG": 2, "KONTRA": 1, "NETRAL": 0}
+        assert stats["trend_30d"] == {"MENDUKUNG": 0, "KONTRA": 1, "NETRAL": 0}
+        assert stats["shift_warning"] is True
+        assert stats["milestone_count"] == 0
+
+        set_link_milestone(conn, l3["id"], True)
+        assert thread_stats(conn, thread["id"])["milestone_count"] == 1
+
+
+def test_thread_stats_includes_opinion_summary(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        thread = save_thread(conn, title="Rezim Warsh")
+        conn.commit()
+        create_secondary_opinion(
+            conn, source_type="VIDEO", source_ref="url1", my_summary="s1", core_claim="c1",
+            testable="TESTABLE", thread_id=thread["id"], relation_to_view="SEJALAN",
+        )
+        create_secondary_opinion(
+            conn, source_type="VIDEO", source_ref="url2", my_summary="s2", core_claim="c2",
+            testable="TESTABLE", thread_id=thread["id"], relation_to_view="MENANTANG",
+        )
+        create_secondary_opinion(
+            conn, source_type="VIDEO", source_ref="url3", my_summary="s3", core_claim="c3",
+            testable="TESTABLE", thread_id=thread["id"],
+        )
+        conn.commit()
+        summary = thread_opinion_summary(conn, thread["id"])
+        assert summary == {"total": 3, "sejalan": 1, "menantang": 1, "unclassified": 1}
+        assert thread_stats(conn, thread["id"])["opinions"] == summary
+
+
+def test_create_secondary_opinion_validates_relation_to_view(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        try:
+            create_secondary_opinion(
+                conn, source_type="VIDEO", source_ref="url", my_summary="s", core_claim="c",
+                testable="TESTABLE", relation_to_view="SETUJU",
+            )
+            assert False, "harusnya raise ValueError krn relation_to_view tidak dikenal"
+        except ValueError as exc:
+            assert "relation_to_view" in str(exc)
+        row = create_secondary_opinion(
+            conn, source_type="VIDEO", source_ref="url", my_summary="s", core_claim="c",
+            testable="TESTABLE", relation_to_view="MENANTANG",
+        )
+        assert row["relation_to_view"] == "MENANTANG"
+
+
 # ---------- merge_thread (24 Jul 2026 -- Giel: thread seed vs thread real tumpang tindih, "jangan merge close, buat jadi satu") ----------
 
 def test_merge_thread_repoints_links_and_tags_union_keywords(tmp_path):
@@ -2448,7 +2589,10 @@ def test_secondary_opinion_never_leaks_into_thread_stats(tmp_path):
     """Guard F1 (terkunci): opini sekunder TIDAK PERNAH masuk penghitung
     komposisi stance thread. Sengaja isi my_stance dgn teks yang MIRIP
     stance ("MENDUKUNG") persis buat pastikan tidak ada jalur yang
-    salah-baca kolom ini sebagai stance link."""
+    salah-baca kolom ini sebagai stance link. `opinions` (F-2, §24.4) MEMANG
+    sengaja berubah -- itu ringkasan opini yang legit dipakai blok kepala
+    thread; yang harus tetap beku SELAIN itu adalah composition/trend_30d/
+    shift_warning (jalur bukti thread, sama sekali beda tabel/fungsi)."""
     db = tmp_path / "t.db"
     init_db(db)
     with get_connection(db) as conn:
@@ -2456,6 +2600,7 @@ def test_secondary_opinion_never_leaks_into_thread_stats(tmp_path):
         conn.commit()
         before = thread_stats(conn, t["id"])
         assert before["composition"] == {"MENDUKUNG": 0, "KONTRA": 0, "NETRAL": 0}
+        assert before["opinions"] == {"total": 0, "sejalan": 0, "menantang": 0, "unclassified": 0}
 
         for _ in range(5):
             create_secondary_opinion(
@@ -2468,4 +2613,9 @@ def test_secondary_opinion_never_leaks_into_thread_stats(tmp_path):
         assert len(list_secondary_opinions(conn, thread_id=t["id"])) == 5
         after = thread_stats(conn, t["id"])
         assert after["composition"] == {"MENDUKUNG": 0, "KONTRA": 0, "NETRAL": 0}
-        assert after == before
+        assert after["trend_30d"] == before["trend_30d"]
+        assert after["shift_warning"] == before["shift_warning"] is False
+        assert after["opinions"] == {"total": 5, "sejalan": 0, "menantang": 0, "unclassified": 5}
+        after_minus_opinions = {k: v for k, v in after.items() if k != "opinions"}
+        before_minus_opinions = {k: v for k, v in before.items() if k != "opinions"}
+        assert after_minus_opinions == before_minus_opinions

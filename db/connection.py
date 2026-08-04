@@ -162,6 +162,15 @@ _COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
                                     # holding lama (kalau ada) akan NULL, tetap
                                     # ditampilkan tapi dikecualikan dari alokasi.
     ],
+    "news_thread_links": [
+        ("is_milestone", "INTEGER"),  # Addendum F §24.4 F-2 (4 Aug 2026)
+        ("is_backfill", "INTEGER"),
+    ],
+    "secondary_opinions": [
+        ("relation_to_view", "TEXT"),  # Addendum F §24.4 F-2 (4 Aug 2026) --
+                                        # opini lama (F-1) akan NULL, dihitung
+                                        # jujur sebagai "belum diklasifikasi".
+    ],
 }
 
 
