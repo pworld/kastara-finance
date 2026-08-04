@@ -477,16 +477,61 @@ def _manual_selection_block(conn: sqlite3.Connection, news_ids: list[int]) -> st
     return "\n".join(lines)
 
 
+# ---------- Digest opini sekunder -> persona (Addendum F §24.3, F-2) ----------
+
+def _thread_opinion_digest_lines(conn: sqlite3.Connection, lens: str) -> list[str]:
+    """Satu baris per thread ACTIVE yang persona_tags-nya cocok `lens` DAN
+    punya >=1 opini sekunder -- "supaya lensa tahu ada perdebatan" (§24.3),
+    TANPA my_summary penuh (larangan keras, cuma jalur manual §21.4 yang
+    kirim isi lengkap) dan TANPA menyentuh komposisi stance (F1 tetap
+    berlaku -- fungsi ini murni baca secondary_opinions, tidak pernah baca/
+    tulis news_thread_links). Thread tanpa opini di-skip (baris kosong
+    tidak berguna, bukan "0 opini sekunder")."""
+    threads = conn.execute(
+        "SELECT id, title, persona_tags FROM news_threads WHERE status = 'ACTIVE'"
+    ).fetchall()
+    lines: list[str] = []
+    for t in threads:
+        tags = json.loads(t["persona_tags"]) if t["persona_tags"] else []
+        if lens not in tags:
+            continue
+        rows = conn.execute(
+            "SELECT relation_to_view, COUNT(*) AS n FROM secondary_opinions "
+            "WHERE thread_id = ? GROUP BY relation_to_view", (t["id"],),
+        ).fetchall()
+        total = sejalan = menantang = unclassified = 0
+        for r in rows:
+            total += r["n"]
+            if r["relation_to_view"] == "SEJALAN":
+                sejalan = r["n"]
+            elif r["relation_to_view"] == "MENANTANG":
+                menantang = r["n"]
+            else:
+                unclassified += r["n"]
+        if total == 0:
+            continue
+        parts = []
+        if sejalan:
+            parts.append(f"{sejalan} sejalan")
+        if menantang:
+            parts.append(f"{menantang} menantang")
+        if unclassified:
+            parts.append(f"{unclassified} belum diklasifikasi")
+        lines.append(f"- {t['title']}: {total} opini sekunder ({', '.join(parts)})")
+    return lines
+
+
 def compose_persona_context(
     conn: sqlite3.Connection, date: str, lens: str, extra_news_ids: list[int] | None = None,
 ) -> str:
     """SHARED CORE + slice `lens` (GEMA/LEON/AKELA/RIVAN) + opsional blok
-    berita pilihan manual Giel (`extra_news_ids`, §21.4). Raise ValueError
+    berita pilihan manual Giel (`extra_news_ids`, §21.4) + opsional digest
+    opini sekunder per thread yang cocok lens (§24.3, F-2). Raise ValueError
     kalau lens tidak dikenal -- caller (web/app.py) yang validasi lens
     sebelum sampai sini, sama seperti pola llm/persona_analysis.py. Guard
     struktural non-negotiable: slice SELALU dipanggil terlepas dari
-    `extra_news_ids` -- seleksi manual tidak pernah menggantikan slice
-    (§21.4), cuma menambah blok di akhir."""
+    `extra_news_ids`/digest -- keduanya cuma menambah blok di akhir, tidak
+    pernah menggantikan slice (§21.4/§24.3)."""
     lens = lens.upper()
     if lens not in _SLICE_BUILDERS:
         raise ValueError(f"lens tidak dikenal: {lens}")
@@ -497,4 +542,8 @@ def compose_persona_context(
     manual_block = _manual_selection_block(conn, extra_news_ids or [])
     if manual_block:
         context = f"{context}\n\n{manual_block}"
+    digest_lines = _thread_opinion_digest_lines(conn, lens)
+    if digest_lines:
+        digest_block = "[DIGEST OPINI SEKUNDER -- konteks pinggiran, BUKAN bukti thread]\n\n" + "\n".join(digest_lines)
+        context = f"{context}\n\n{digest_block}"
     return context
