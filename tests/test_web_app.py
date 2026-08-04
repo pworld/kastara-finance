@@ -15,6 +15,7 @@ os.environ["KASTARA_DB_PATH"] = tempfile.mktemp(suffix=".db")
 from db.connection import get_connection, init_db
 from indicators.calc import COMPARE_PERIODS
 from indicators.calc import compare_from_series as _compare_from_series
+import web.app as web_app_mod
 from web.app import INSTRUMENT_SOURCE, SNAPSHOT_FIELDS, _all_instruments_with_gaps, _detect_gaps
 
 
@@ -207,3 +208,82 @@ def test_all_instruments_with_gaps_no_gap_returns_empty(tmp_path):
         conn.commit()
         results = _all_instruments_with_gaps(conn)
     assert results == []
+
+
+# ---------- Telegram bot 2-arah: /api/telegram/webhook (4 Agustus 2026) ----------
+# Endpoint publik (Telegram yang panggil, exempt session auth) -- test fokus
+# ke 2 gerbang keamanan (chat_id + secret token opsional) dan guard
+# command-tunggal (`/run_daily`), BUKAN test run_daily() beneran (network,
+# di-monkeypatch).
+
+class _ImmediateThread:
+    """Pengganti threading.Thread di test -- jalankan target() LANGSUNG
+    (synchronous), bukan di thread beneran, supaya efeknya bisa langsung
+    di-assert tanpa race/sleep."""
+    def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+        self._target = target
+        self._args = args
+        self._kwargs = kwargs or {}
+
+    def start(self):
+        self._target(*self._args, **self._kwargs)
+
+
+def test_telegram_webhook_ignores_unknown_chat_id(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "111")
+    monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "")
+    calls = []
+    monkeypatch.setattr(web_app_mod, "run_daily_mod", type("M", (), {"run_daily": lambda: calls.append("ran")})())
+    client = web_app_mod.app.test_client()
+    resp = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 999}, "text": "/run_daily"}})
+    assert resp.status_code == 200
+    assert resp.get_json() == {"ok": True}
+    assert calls == []
+
+
+def test_telegram_webhook_ignores_unknown_command(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "111")
+    monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "")
+    calls = []
+    monkeypatch.setattr(web_app_mod, "run_daily_mod", type("M", (), {"run_daily": lambda: calls.append("ran")})())
+    client = web_app_mod.app.test_client()
+    resp = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 111}, "text": "/halo"}})
+    assert resp.status_code == 200
+    assert calls == []
+
+
+def test_telegram_webhook_triggers_run_daily_for_allowed_chat(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "111")
+    monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "")
+    monkeypatch.setattr(web_app_mod, "threading", type("T", (), {"Thread": _ImmediateThread})())
+    fake_summary = {"news_inserted": 5, "sources_ok": 8, "sources_fail": 0, "sources_skip": 1}
+    monkeypatch.setattr(
+        web_app_mod, "run_daily_mod", type("M", (), {"run_daily": staticmethod(lambda: fake_summary)})()
+    )
+    sent = []
+    monkeypatch.setattr(web_app_mod, "send_message", lambda text, chat_id=None: sent.append((text, chat_id)))
+    client = web_app_mod.app.test_client()
+    resp = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 111}, "text": "/run_daily"}})
+    assert resp.status_code == 200
+    # _ImmediateThread jalankan target() SYNCHRONOUS saat .start() dipanggil --
+    # jadi pesan ringkasan (dikirim di dalam target) terkirim SEBELUM pesan ack
+    # (dikirim setelah .start() return di handler) -- beda dari urutan runtime
+    # asli (thread beneran, ack duluan). Cuma pastikan KEDUANYA terkirim & isinya benar.
+    assert len(sent) == 2
+    texts = [t for t, _ in sent]
+    assert any("5 berita baru" in t for t in texts)
+    assert any("Menjalankan pipeline harian" in t for t in texts)
+    assert all(chat_id == 111 for _, chat_id in sent)
+
+
+def test_telegram_webhook_requires_secret_token_when_configured(monkeypatch):
+    monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "rahasia123")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "111")
+    client = web_app_mod.app.test_client()
+    wrong = client.post(
+        "/api/telegram/webhook", json={"message": {"chat": {"id": 111}, "text": "/run_daily"}},
+        headers={"X-Telegram-Bot-Api-Secret-Token": "salah"},
+    )
+    assert wrong.status_code == 403
+    missing = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 111}, "text": "/run_daily"}})
+    assert missing.status_code == 403

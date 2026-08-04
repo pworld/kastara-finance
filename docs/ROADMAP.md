@@ -2646,3 +2646,43 @@ scoped>` `ThreadDetailView.vue` sendiri (tadinya cuma scoped ke
 `pytest -q` tetap 430 passed (tidak ada logic backend yang berubah), klik
 antar-tab di browser (thread_id=4 nyata) -- data & state (filter, toggle
 milestone yang sudah di-set sebelumnya) tetap benar per tab.
+
+**Update — Railway deploy pertama + koreksi rencana cron (4 Agustus 2026):**
+Giel selesai deploy pertama ke Railway. 2 temuan lapangan yang mengoreksi
+rencana `docs/deploy.md` §7 lama:
+- **Volume belum ke-attach** -- error boot pertama
+  (`sqlite3.OperationalError: unable to open database file`) krn Volume
+  Railway ternyata dibuat lewat right-click canvas project atau Command
+  Palette (Ctrl+K), BUKAN "Settings -> Volumes" seperti dugaan awal --
+  panduan sebelumnya salah, dikoreksi setelah cek docs Railway langsung.
+- **Rencana cron via service kedua TIDAK BISA DIPAKAI** -- dicek ke docs
+  Railway (`docs.railway.com/reference/volumes`): **satu Volume cuma bisa
+  attach ke satu service**. Service kedua utk `pipeline.run_daily` (rencana
+  §7.3 langkah 7 lama) otomatis butuh Volume sendiri = DB SQLite terpisah
+  kosong, melanggar aturan §3.2 "SATU DATABASE".
+- **Solusi pengganti**: bot Telegram 2 arah, 1 command (`/run_daily`) yang
+  memicu `run_daily_mod.run_daily()` di SERVICE YANG SAMA (yang sudah punya
+  Volume asli) -- bukan proses/service terpisah. Endpoint baru
+  `POST /api/telegram/webhook` (`web/app.py`), exempt dari session auth
+  (Telegram yang panggil, bukan browser) tapi digerbangi chat_id (harus
+  sama dgn `TELEGRAM_CHAT_ID`, diam-diam diabaikan kalau beda) + opsional
+  secret token header (`TELEGRAM_WEBHOOK_SECRET`). Command jalan di
+  background thread (Telegram retry kalau webhook lambat balas,
+  `run_daily()` bisa lama) -- ack cepat dulu, ringkasan/error dikirim
+  susulan lewat `notify/telegram.py::send_message()` yang sudah ada
+  (reuse, bukan modul baru).
+- **Fresh start** (keputusan Giel) -- DB lokal lama TIDAK diupload ke
+  Railway, tetap jadi data dev; production mulai dari `init_db()` kosong.
+- 4 test baru (`tests/test_web_app.py`): ignore chat_id asing, ignore
+  command tak dikenal, trigger sukses (thread di-mock synchronous +
+  `run_daily_mod`/`send_message` di-monkeypatch, bukan network beneran),
+  guard secret token wajib kalau dikonfigurasi. `pytest -q`: 434 passed,
+  1 skipped pre-existing.
+- `docs/deploy.md` §7.3 dikoreksi (langkah upload-DB & service-kedua
+  dicoret, alasan ditulis eksplisit bukan dihapus diam-diam) + §8 baru
+  (Cron Harian via Telegram) ditambahkan lengkap dgn langkah setup manual
+  (`setWebhook` sekali via curl, butuh token/domain asli Giel -- tidak
+  dieksekusi olehku, itu kredensial/aksi publik).
+- **Belum dieksekusi** (butuh Giel jalankan sendiri): registrasi webhook ke
+  Telegram (`setWebhook` API call), verifikasi kirim `/run_daily` beneran
+  dari HP setelah service Railway hidup dgn benar.

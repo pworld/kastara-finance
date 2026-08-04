@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -74,7 +75,17 @@ init_db()
 # RISK_CAPITAL_*). Kosong -> login endpoint menolak dgn pesan jelas, bukan
 # diam-diam membolehkan siapa saja masuk. ----------
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "").strip()
-AUTH_EXEMPT_API_PATHS = {"/api/auth/login", "/api/auth/status"}
+AUTH_EXEMPT_API_PATHS = {"/api/auth/login", "/api/auth/status", "/api/telegram/webhook"}
+# Telegram bot 2-arah (trigger manual /run_daily, 4 Agustus 2026) -- SATU
+# command saja, sengaja tidak generalisasi jadi command framework penuh
+# (bot masih dominan push 1-arah, lihat notify/telegram.py). Webhook publik
+# (Telegram yang panggil, bukan browser Giel) -- makanya exempt dari session
+# auth di atas, tapi digerbangi 2 lapis di bawah: (1) chat_id HARUS sama
+# dengan TELEGRAM_CHAT_ID (abaikan diam-diam kalau beda -- tidak bocorkan
+# info ke pengirim tak dikenal), (2) kalau TELEGRAM_WEBHOOK_SECRET diisi,
+# header rahasia Telegram (X-Telegram-Bot-Api-Secret-Token, di-set saat
+# setWebhook) harus cocok juga -- pertahanan tambahan drpd cuma chat_id.
+TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
 FRONTEND_DIST = Path(__file__).resolve().parent / "frontend" / "dist"
 
 
@@ -434,6 +445,51 @@ def run_daily_now():
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": str(exc)}), 500
     return jsonify(summary)
+
+
+def _run_daily_via_telegram(chat_id: str | int) -> None:
+    """Jalan di background thread (bukan langsung di request webhook) --
+    Telegram akan RETRY kirim update kalau webhook tidak balas cepat, dan
+    run_daily() bisa lama (fetch semua sumber eksternal, sama seperti
+    /api/run_daily_now). Balas dulu ack cepat di handler webhook, baru
+    jalankan ini di thread terpisah -- hasil/error dikirim susulan lewat
+    send_message() begitu selesai."""
+    try:
+        summary = run_daily_mod.run_daily()
+        text = (
+            f"[run_daily via Telegram] selesai -- {summary['news_inserted']} berita baru, "
+            f"{summary['sources_ok']} sumber ok / {summary['sources_fail']} gagal / "
+            f"{summary['sources_skip']} skip."
+        )
+    except Exception as exc:  # noqa: BLE001
+        text = f"[run_daily via Telegram] GAGAL: {type(exc).__name__}: {exc}"
+    send_message(text, chat_id=chat_id)
+
+
+@app.post("/api/telegram/webhook")
+def telegram_webhook():
+    """Bot Telegram 2-arah, SATU command (`/run_daily`) -- trigger manual
+    pipeline harian dari HP tanpa buka dashboard, jawab keluhan "cron belum
+    aktif" (Railway Volume tidak bisa dipakai bareng 2 service, jadi cron
+    service terpisah tidak realistis utk SQLite single-file, lihat
+    ROADMAP.md 4 Agustus 2026). Endpoint publik (Telegram yang panggil, exempt
+    dari session auth) -- digerbangi chat_id (abaikan diam-diam kalau beda,
+    jangan bocorkan info) + opsional secret token header (kalau
+    TELEGRAM_WEBHOOK_SECRET diisi)."""
+    if TELEGRAM_WEBHOOK_SECRET:
+        if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != TELEGRAM_WEBHOOK_SECRET:
+            return jsonify({"ok": False}), 403
+    update = request.get_json(silent=True) or {}
+    message = update.get("message") or {}
+    chat_id = message.get("chat", {}).get("id")
+    allowed_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if not chat_id or not allowed_chat_id or str(chat_id) != allowed_chat_id:
+        return jsonify({"ok": True})
+    text = (message.get("text") or "").strip()
+    if text == "/run_daily":
+        threading.Thread(target=_run_daily_via_telegram, args=(chat_id,), daemon=True).start()
+        send_message("Menjalankan pipeline harian sekarang, tunggu ringkasannya...", chat_id=chat_id)
+    return jsonify({"ok": True})
 
 
 @app.post("/api/backfill/all/preview")

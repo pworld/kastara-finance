@@ -28,7 +28,7 @@ TAGS: dict[str, list[tuple[str, str]]] = {
     "geo": [
         ("geo:us", "Amerika Serikat"), ("geo:id", "Indonesia"), ("geo:cn", "China"),
         ("geo:eu", "Uni Eropa / kawasan euro"), ("geo:jp", "Jepang"), ("geo:uk", "Inggris"),
-        ("geo:in", "India"), ("geo:global", "lintas negara / global"), ("geo:asia", "kawasan Asia (regional)"),("geo:kr", "geo", "Korea Selatan"),
+        ("geo:in", "India"), ("geo:global", "lintas negara / global"), ("geo:asia", "kawasan Asia (regional)"), ("geo:kr", "Korea Selatan"),
     ],
     "org": [
         ("org:fed", "Federal Reserve"), ("org:fomc", "FOMC (komite kebijakan Fed)"),
@@ -36,16 +36,16 @@ TAGS: dict[str, list[tuple[str, str]]] = {
         ("org:gov-id", "Pemerintah RI (eksekutif)"), ("org:pboc", "People's Bank of China"),
         ("org:ecb", "European Central Bank"), ("org:boj", "Bank of Japan"), ("org:imf", "IMF"),
         ("org:worldbank", "World Bank"), ("org:comex", "COMEX"), ("org:lbma", "LBMA"),
-        ("org:idx", "Bursa Efek Indonesia (institusi)"),("org:opec", "org", "OPEC / OPEC+"),
+        ("org:idx", "Bursa Efek Indonesia (institusi)"), ("org:opec", "OPEC / OPEC+"),
     ],
     "who": [
         ("who:warsh", "Kevin Warsh (Fed Chair)"), ("who:powell", "Jerome Powell"),
         ("who:waller", "Christopher Waller"), ("who:williams", "John Williams (NY Fed)"),
         ("who:logan", "Lorie Logan (Dallas Fed)"), ("who:trump", "Donald Trump"),
         ("who:prabowo", "Prabowo Subianto"),
-        ("who:ueda",     "who", "Kazuo Ueda — Gubernur BoJ"),
-        ("who:takaichi", "who", "Sanae Takaichi — PM Jepang"),
-        ("who:katayama", "who", "Satsuki Katayama — Menkeu Jepang"),
+        ("who:ueda", "Kazuo Ueda — Gubernur BoJ"),
+        ("who:takaichi", "Sanae Takaichi — PM Jepang"),
+        ("who:katayama", "Satsuki Katayama — Menkeu Jepang"),
         # who:purbaya SENGAJA tidak dimasukkan -- lihat docstring modul.
     ],
     "sym": [
@@ -54,7 +54,8 @@ TAGS: dict[str, list[tuple[str, str]]] = {
         ("sym:sp500", "S&P 500"), ("sym:idx", "IHSG (indeks)"), ("sym:usd-idr", "USD/IDR"),
         ("sym:usd-jpy", "USD/JPY"), ("sym:id-bbca", "BBCA"), ("sym:id-bbri", "BBRI"),
         ("sym:id-bmri", "BMRI"), ("sym:id-tlkm", "TLKM"), ("sym:us-tsla", "Tesla"),
-        ("sym:us-nvda", "Nvidia"), ("sym:us-aapl", "Apple"),("sym:oil",   "sym", "Minyak mentah (Brent/WTI)"),("sym:kospi", "sym", "KOSPI — indeks Korea Selatan"),("sym:jgb10", "sym", "JGB 10 tahun"),
+        ("sym:us-nvda", "Nvidia"), ("sym:us-aapl", "Apple"), ("sym:oil", "Minyak mentah (Brent/WTI)"),
+        ("sym:kospi", "KOSPI — indeks Korea Selatan"), ("sym:jgb10", "JGB 10 tahun"),
     ],
     "theme": [
         ("theme:rate-policy", "kebijakan suku bunga"), ("theme:inflation", "inflasi / CPI / PCE / PPI"),
@@ -69,7 +70,8 @@ TAGS: dict[str, list[tuple[str, str]]] = {
         ("sec:banking", "perbankan"), ("sec:consumer", "konsumer / ritel"), ("sec:energy", "energi"),
         ("sec:mining", "pertambangan"), ("sec:automotive", "otomotif"), ("sec:technology", "teknologi"),
         ("sec:property", "properti"), ("sec:telco", "telekomunikasi"), ("sec:healthcare", "kesehatan"),
-        ("sec:industrials", "industri"),("sec:semiconductor", "sec", "Semikonduktor / memori"),("sec:defense","sec", "Pertahanan / defense contractor"),
+        ("sec:industrials", "industri"), ("sec:semiconductor", "Semikonduktor / memori"),
+        ("sec:defense", "Pertahanan / defense contractor"),
     ],
 }
 

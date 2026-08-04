@@ -217,27 +217,91 @@ managed backup/replikasi) — itu semua biaya tanpa manfaat riil di sini.
 [ ] 4. Deploy pertama kali (Volume masih kosong) -- pastikan container hidup
        & /api/auth/status merespons (schema kosong ter-buat otomatis lewat
        init_db() level-modul di atas).
-[ ] 5. Upload DB asli yang sudah ada (lihat percakapan sebelumnya):
-       railway ssh -- "cat > /data/kastara-finance.db" < kastara-finance.db
-       (dari mesin lokal, path ke file .db asli Giel)
-[ ] 6. Redeploy/restart service supaya proses baca ulang file yang baru
-       di-upload (tidak perlu rebuild image, cuma restart container).
-[ ] 7. Tambah service KEDUA (cron): image sama, custom start command
-       `python -m pipeline.run_daily`, Railway Cron Schedule field diisi
-       jam yang sepadan dgn crontab lokal (00:00 WIB = 17:00 UTC).
-[ ] 8. Verifikasi: login dari browser publik, cek /m + PWA install dari HP
+[ ] 5. Fresh start (keputusan Giel 4 Agustus 2026) -- DB lokal lama TIDAK
+       diupload, tetap jadi data dev di mesin lokal. Volume Railway mulai
+       kosong, init_db() level-modul otomatis buat 30 tabel fresh.
+[ ] 6. ~~Tambah service KEDUA (cron)~~ -- TIDAK DIPAKAI. Lihat §8: Railway
+       Volume cuma bisa attach ke SATU service (dikonfirmasi dari docs
+       Railway sendiri, 4 Agustus 2026) -- service kedua akan punya Volume
+       terpisah = DB terpisah, melanggar aturan §3.2 "SATU DATABASE".
+       Gantinya: trigger manual via Telegram bot (§8).
+[ ] 7. Verifikasi: login dari browser publik, cek /m + PWA install dari HP
        (start_url sudah /m, lihat ROADMAP.md 31 Jul 2026), cek Trigger
        Berita dari Snapshot benar-benar mengisi data.
 ```
 
 ### 7.4 Yang TIDAK dikerjakan di sesi ini
 
-Migrasi Postgres (dianggap tidak perlu, §7.1). Bot Telegram inbound
-(kirim-URL-simpan-artikel) — fitur terpisah, belum dibangun. Langkah 7.3 di
-atas belum dieksekusi (butuh akun Railway Giel sendiri) — bagian ini
-disiapkan supaya Giel tinggal jalankan checklist-nya.
+Migrasi Postgres (dianggap tidak perlu, §7.1). Upload DB lokal lama ke
+Railway (fresh start dipilih, §7.3 langkah 5). Cron via service Railway
+terpisah (tidak bisa krn constraint Volume, §8).
+
+---
+
+## 8. CRON HARIAN via TELEGRAM (bukan service kedua, 4 Agustus 2026)
+
+### 8.0 Kenapa bukan Railway Cron Job biasa
+
+Rencana awal §7.3 langkah 7 (service kedua khusus cron, custom start command
+`python -m pipeline.run_daily`, Railway Cron Schedule) **tidak bisa dipakai**
+utk app ini: dicek langsung ke docs Railway saat eksekusi (4 Agustus 2026) --
+**satu Volume cuma bisa attach ke satu service**. Service kedua akan
+otomatis butuh Volume-nya sendiri (DB SQLite terpisah, kosong) -- itu
+melanggar aturan keras §3.2 "SATU DATABASE, pindah = pindah semua", bukan
+sekadar duplikasi data tapi 2 sumber kebenaran yang diam-diam divergen.
+
+### 8.1 Solusi: trigger manual via bot Telegram (2 arah, 1 command)
+
+Daripada Railway Cron Job (butuh service kedua), pipeline harian di-trigger
+lewat command Telegram `/run_daily` yang memanggil endpoint di SERVICE YANG
+SAMA (yang sudah punya Volume/DB asli) -- bukan proses terpisah.
+- **`POST /api/telegram/webhook`** (`web/app.py`) -- exempt dari session
+  auth (Telegram yang panggil, bukan browser Giel), tapi digerbangi 2 lapis:
+  (1) `chat_id` pesan HARUS sama dengan `TELEGRAM_CHAT_ID` (abaikan diam-diam
+  kalau beda, tidak bocorkan info ke pengirim asing), (2) opsional secret
+  token header `X-Telegram-Bot-Api-Secret-Token` (kalau
+  `TELEGRAM_WEBHOOK_SECRET` diisi) -- pertahanan tambahan drpd cuma chat_id.
+- Command `/run_daily` -> jalankan `run_daily_mod.run_daily()` di
+  **background thread** (bukan langsung di handler) -- Telegram retry kirim
+  update kalau webhook tidak balas cepat, dan `run_daily()` bisa lama (fetch
+  semua sumber eksternal). Handler balas ack cepat dulu ("Menjalankan
+  pipeline harian sekarang..."), baru kirim pesan susulan (ringkasan/error)
+  setelah proses beneran selesai, reuse `notify/telegram.py::send_message()`.
+- Bot ini masih bot **1 command saja** (`/run_daily`) -- BUKAN command
+  framework penuh. Command lain (mis. `/status`) belum ada, bisa ditambah
+  nanti kalau terbukti perlu, bukan dibangun spekulatif sekarang.
+
+### 8.2 Setup (aksi manual, butuh token/domain asli Giel)
+
+```
+[ ] 1. Set env var di Railway (Settings -> Variables), sama seperti .env:
+       TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (sudah ada dari Daily Briefing
+       kalau sudah pernah setup lokal). Tambah juga:
+       TELEGRAM_WEBHOOK_SECRET=<string acak, rekomendasi tapi opsional>
+[ ] 2. Setelah service live & domain publik ada (§7.3 langkah 4/7), daftar-
+       kan webhook ke Telegram SEKALI (dari mesin lokal, ganti <TOKEN>/
+       <URL>/<SECRET>):
+       curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+         -d "url=https://<domain-railway-kamu>/api/telegram/webhook" \
+         -d "secret_token=<SECRET, sama dgn TELEGRAM_WEBHOOK_SECRET>"
+[ ] 3. Verifikasi: kirim "/run_daily" dari akun Telegram-mu ke bot -- balasan
+       ack harus muncul dalam hitungan detik, lalu ringkasan hasil beberapa
+       saat kemudian (durasi run_daily() beneran, network fetch semua sumber).
+[ ] 4. Cek `curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo` kalau
+       mau pastikan webhook ter-register benar (lihat field "url" & tidak
+       ada "last_error_message").
+```
+
+### 8.3 Yang TIDAK dikerjakan
+
+Command Telegram lain selain `/run_daily`. Rate-limiting/anti-spam di
+endpoint webhook (dianggap tidak perlu -- gerbang chat_id sudah cukup ketat
+utk app single-user ini). Konfirmasi 2 langkah sebelum trigger (mis. "yakin?"
+sebelum run) -- `/run_daily` dianggap aman dipicu langsung, sama seperti
+tombol "Trigger Berita (Sekarang)" di Snapshot yang juga tanpa konfirmasi.
 
 ---
 
 *Deployment & Mobile Access Strategy v1.0 — mulai dari Tahap 1, biarkan pemakaian nyata yang menentukan Tahap 3. Pakai dulu, bangun setelah tahu.*
 *§7 (Railway) ditambahkan 31 Jul 2026 sebagai override eksplisit Giel — lihat catatan transparansi di atas.*
+*§8 (Telegram cron trigger) ditambahkan 4 Agustus 2026 setelah deploy pertama Giel menemukan constraint Volume-per-service Railway di lapangan.*
