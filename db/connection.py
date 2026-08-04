@@ -51,6 +51,7 @@ EXPECTED_TABLES = [
     "content_tags",
     "holdings",
     "holding_book_conversion_log",
+    "secondary_opinions",
 ]
 
 

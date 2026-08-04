@@ -83,6 +83,8 @@ from web.writes import (
     compute_portfolio_allocation,
     convert_holding_book,
     list_holding_conversions,
+    create_secondary_opinion,
+    list_secondary_opinions,
 )
 
 
@@ -2362,3 +2364,108 @@ def test_list_holding_conversions_ordered_with_instrument_info(tmp_path):
         assert len(log) == 2
         assert {r["instrument"] for r in log} == {"BBCA", "TSLA"}
         assert all(r["reason"] for r in log)
+
+
+# ---------- Secondary Opinions -- Addendum F §24, F-1 (3 Aug 2026) ----------
+
+def test_create_secondary_opinion_minimal(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        row = create_secondary_opinion(
+            conn, source_type="VIDEO", source_ref="https://youtube.com/watch?v=abc",
+            my_summary="Dia bilang emas ke $40rb krn bank sentral akumulasi 244 ton/bulan",
+            core_claim="Bank sentral akumulasi emas 244 ton/bulan",
+            testable="TESTABLE",
+        )
+        conn.commit()
+        assert row["source_type"] == "VIDEO"
+        assert row["testable"] == "TESTABLE"
+        assert row["thread_id"] is None
+        assert row["id"] is not None
+
+
+def test_create_secondary_opinion_rejects_missing_fields(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        base = dict(source_type="VIDEO", source_ref="url", my_summary="ringkasan", core_claim="klaim", testable="TESTABLE")
+        for overrides, msg in [
+            (dict(source_type="TWEET"), "source_type"),
+            (dict(source_ref=""), "source_ref"),
+            (dict(my_summary=""), "my_summary"),
+            (dict(core_claim=""), "core_claim"),
+            (dict(testable="MUNGKIN"), "testable"),
+        ]:
+            try:
+                create_secondary_opinion(conn, **{**base, **overrides})
+                assert False, f"harusnya raise ValueError utk kasus: {msg}"
+            except ValueError as exc:
+                assert msg in str(exc)
+
+
+def test_create_secondary_opinion_validates_thread_id(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        try:
+            create_secondary_opinion(
+                conn, source_type="BOOK", source_ref="Judul Buku", my_summary="ringkasan",
+                core_claim="klaim", testable="SPEKULATIF", thread_id=9999,
+            )
+            assert False, "harusnya raise ValueError krn thread tidak ada"
+        except ValueError as exc:
+            assert "tidak ditemukan" in str(exc)
+
+        t = save_thread(conn, title="Rezim Warsh Hawkish")
+        conn.commit()
+        row = create_secondary_opinion(
+            conn, source_type="BOOK", source_ref="Judul Buku", my_summary="ringkasan",
+            core_claim="klaim", testable="SPEKULATIF", thread_id=t["id"],
+        )
+        assert row["thread_id"] == t["id"]
+
+
+def test_list_secondary_opinions_filters_by_thread(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        t1 = save_thread(conn, title="Thread A")
+        t2 = save_thread(conn, title="Thread B")
+        conn.commit()
+        create_secondary_opinion(conn, source_type="PODCAST", source_ref="ep 1", my_summary="s1", core_claim="c1", testable="TESTABLE", thread_id=t1["id"])
+        create_secondary_opinion(conn, source_type="PAPER", source_ref="paper 1", my_summary="s2", core_claim="c2", testable="SPEKULATIF", thread_id=t2["id"])
+        create_secondary_opinion(conn, source_type="OTHER", source_ref="obrolan", my_summary="s3", core_claim="c3", testable="SPEKULATIF")  # tanpa thread
+        conn.commit()
+
+        assert len(list_secondary_opinions(conn)) == 3
+        t1_only = list_secondary_opinions(conn, thread_id=t1["id"])
+        assert len(t1_only) == 1
+        assert t1_only[0]["source_ref"] == "ep 1"
+
+
+def test_secondary_opinion_never_leaks_into_thread_stats(tmp_path):
+    """Guard F1 (terkunci): opini sekunder TIDAK PERNAH masuk penghitung
+    komposisi stance thread. Sengaja isi my_stance dgn teks yang MIRIP
+    stance ("MENDUKUNG") persis buat pastikan tidak ada jalur yang
+    salah-baca kolom ini sebagai stance link."""
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        t = save_thread(conn, title="Rezim Warsh Hawkish")
+        conn.commit()
+        before = thread_stats(conn, t["id"])
+        assert before["composition"] == {"MENDUKUNG": 0, "KONTRA": 0, "NETRAL": 0}
+
+        for _ in range(5):
+            create_secondary_opinion(
+                conn, source_type="VIDEO", source_ref="url", my_summary="ringkasan",
+                core_claim="klaim", testable="TESTABLE", my_stance="MENDUKUNG",
+                thread_id=t["id"],
+            )
+        conn.commit()
+
+        assert len(list_secondary_opinions(conn, thread_id=t["id"])) == 5
+        after = thread_stats(conn, t["id"])
+        assert after["composition"] == {"MENDUKUNG": 0, "KONTRA": 0, "NETRAL": 0}
+        assert after == before

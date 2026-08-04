@@ -93,6 +93,31 @@ async function addManualLink() {
   manual.value.note = ''
   loadThread()
 }
+
+// ---------- Opini Sekunder (Addendum F §24, F-1) -- LAPISAN TERPISAH dari
+// timeline (F1: tidak pernah dihitung ke komposisi stance thread) ----------
+const opinions = ref([])
+const opinionForm = ref({
+  source_type: 'VIDEO', source_ref: '', author: '', my_summary: '', core_claim: '',
+  testable: 'TESTABLE', my_stance: '', conflict_of_interest: '',
+})
+
+async function loadOpinions() {
+  opinions.value = await get(`/api/secondary_opinions?thread_id=${threadId}`)
+}
+onMounted(loadOpinions)
+
+async function addOpinion() {
+  const body = { ...opinionForm.value, thread_id: Number(threadId) }
+  const result = await post('/api/secondary_opinions', body)
+  if (result.error) { toast(result.error); return }
+  toast('Opini sekunder disimpan')
+  opinionForm.value = {
+    source_type: 'VIDEO', source_ref: '', author: '', my_summary: '', core_claim: '',
+    testable: 'TESTABLE', my_stance: '', conflict_of_interest: '',
+  }
+  loadOpinions()
+}
 </script>
 
 <template>
@@ -174,6 +199,67 @@ async function addManualLink() {
           </div>
           <div v-if="l.note" class="src" style="margin-top:2px">{{ l.note }}</div>
         </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Opini Sekunder</h2>
+      <div class="panel">
+        <p class="src">Destilasi Giel dari sumber luar (video/buku/paper/podcast) -- lapisan terpisah, TIDAK PERNAH masuk hitungan komposisi stance thread di atas.</p>
+        <p v-if="!opinions.length" class="src">belum ada opini sekunder untuk thread ini</p>
+        <div v-for="o in opinions" :key="o.id" style="padding:10px 0;border-bottom:1px solid var(--border)">
+          <span class="src">{{ o.created_at }} · {{ o.source_type }} · {{ o.source_ref }}<span v-if="o.author"> · {{ o.author }}</span></span>
+          <span class="badge" style="margin-left:8px">{{ o.testable }}</span>
+          <div style="margin-top:4px"><strong>{{ o.core_claim }}</strong></div>
+          <div class="src" style="margin-top:2px">{{ o.my_summary }}</div>
+          <div v-if="o.my_stance" class="src" style="margin-top:2px">Pandangan Giel: {{ o.my_stance }}</div>
+          <div v-if="o.conflict_of_interest" class="src" style="margin-top:2px">Conflict of interest: {{ o.conflict_of_interest }}</div>
+        </div>
+
+        <details class="collapsible" style="margin-top:12px">
+          <summary>Tambah opini sekunder</summary>
+          <div class="form-grid" style="margin-top:8px">
+            <div>
+              <label class="field">Tipe Sumber</label>
+              <select v-model="opinionForm.source_type">
+                <option value="VIDEO">VIDEO</option>
+                <option value="BOOK">BOOK</option>
+                <option value="PAPER">PAPER</option>
+                <option value="PODCAST">PODCAST</option>
+                <option value="REPORT">REPORT</option>
+                <option value="OTHER">OTHER</option>
+              </select>
+            </div>
+            <div><label class="field">Sumber (URL/judul)</label><input v-model="opinionForm.source_ref" type="text"></div>
+            <div><label class="field">Author (opsional)</label><input v-model="opinionForm.author" type="text"></div>
+            <div>
+              <label class="field">Testable</label>
+              <select v-model="opinionForm.testable">
+                <option value="TESTABLE">TESTABLE</option>
+                <option value="SPEKULATIF">SPEKULATIF</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <label class="field">Klaim Inti (satu kalimat)</label>
+            <input v-model="opinionForm.core_claim" type="text">
+          </div>
+          <div class="form-row">
+            <label class="field">Ringkasan (destilasi sendiri, bukan transkrip)</label>
+            <textarea v-model="opinionForm.my_summary"></textarea>
+          </div>
+          <div class="form-row">
+            <label class="field">Pandangan Giel (setuju/tidak + kenapa, opsional)</label>
+            <textarea v-model="opinionForm.my_stance"></textarea>
+          </div>
+          <div class="form-row">
+            <label class="field">Conflict of Interest (opsional)</label>
+            <input v-model="opinionForm.conflict_of_interest" type="text">
+          </div>
+          <div class="form-row" style="margin-top:8px">
+            <button class="btn small" @click="addOpinion">Simpan</button>
+          </div>
+        </details>
       </div>
     </section>
 

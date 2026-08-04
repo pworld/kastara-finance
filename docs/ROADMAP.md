@@ -2534,3 +2534,39 @@ selesai).
 - Backend perlu di-restart 2x lagi selama sesi ini (endpoint baru tiap
   kali) -- pola yang sama berulang terus, dicatat lagi supaya tidak lupa:
   `python -m web.app` TIDAK hot-reload.
+
+**Update — Addendum F, F-1: Secondary Opinions fondasi (4 Agustus 2026):**
+`docs/phase_j_build_contract_v1_3_LOCKED.md` §24 (Addendum F) -- lapisan
+opini sekunder (video/buku/paper/podcast) yang TERPISAH dari bukti thread,
+sesuai keputusan F1-F5 terkunci di kontrak.
+- **`secondary_opinions`** (30 tabel) -- `source_type`, `source_ref`,
+  `author`, `my_summary` (destilasi Giel, F2 -- bukan transkrip mentah),
+  `core_claim`, `testable` (TESTABLE/SPEKULATIF, F3), `my_stance`,
+  `conflict_of_interest` (F4), `thread_id` opsional. `EXPECTED_TABLES` +
+  `tests/test_db.py` (29→30 tabel) diupdate.
+- **`create_secondary_opinion()`/`list_secondary_opinions()`** di
+  `web/writes.py` + `POST`/`GET /api/secondary_opinions` di `web/app.py`.
+- **Guard F1 (non-negotiable)**: opini sekunder TIDAK PERNAH masuk
+  penghitung komposisi stance thread (`thread_stats`) -- dijamin BY
+  CONSTRUCTION (tabel terpisah, tidak pernah di-JOIN oleh `thread_stats`)
+  DAN oleh test regresi eksplisit
+  (`test_secondary_opinion_never_leaks_into_thread_stats`, sengaja isi
+  `my_stance` dengan teks "MENDUKUNG" utk pastikan tidak ada jalur yang
+  salah-baca kolom ini sebagai stance link).
+- **`ThreadDetailView.vue`**: rak "Opini Sekunder" baru, posisinya
+  SENGAJA terpisah dari section "Timeline (link CONFIRMED)" (§24.3,
+  "dilarang dicampur ke timeline") -- form 8 field lengkap + daftar opini
+  existing per thread.
+- Diverifikasi LANGSUNG di browser (Giel login manual, kredensial tidak
+  pernah dipegang sendiri): submit 1 opini video nyata ke thread "Rezim
+  Warsh Dovish" (thread_id=4) via UI -- muncul benar di rak, lalu
+  `GET /api/threads/stats` dicek ULANG setelahnya: `composition.MENDUKUNG`
+  tetap 4 (jumlah sebelum opini ditambah, tidak berubah) meski `my_stance`
+  opini yang baru disimpan sengaja berisi kata "MENDUKUNG" -- guard F1
+  terbukti jalan di data produksi asli, bukan cuma di test.
+- 5 test baru (`pytest -q`: 419 passed, 1 skipped pre-existing).
+  `npm run build` bersih.
+- **Sisa (F-2, belum dikerjakan)**: blok ringkasan kepala thread + tren
+  30 hari, `is_milestone` toggle, grup bulanan collapsible, filter
+  stance/backfill/tag, digest persona satu baris -- menunggu instruksi
+  lanjutan Giel.

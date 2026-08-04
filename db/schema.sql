@@ -426,6 +426,26 @@ CREATE TABLE IF NOT EXISTS holding_book_conversion_log (
     converted_at TEXT
 );
 
+-- 30. Secondary opinions (Addendum F §24, F-1, 3 Aug 2026) -- lapisan
+-- TERPISAH dari bukti thread (news_thread_links), BY DESIGN tidak ada
+-- kolom stance MENDUKUNG/KONTRA di sini (F1) -- tabel ini TIDAK PERNAH
+-- dibaca oleh penghitung komposisi thread (thread_stats/list_threads_
+-- with_stats). Yang disimpan DESTILASI Giel sendiri, bukan transkrip
+-- mentah (F2) -- source_ref cukup URL/judul, my_summary yang jadi isi.
+CREATE TABLE IF NOT EXISTS secondary_opinions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_type TEXT NOT NULL,       -- VIDEO/BOOK/PAPER/PODCAST/REPORT/OTHER
+    source_ref TEXT NOT NULL,        -- URL / judul buku / penerbit
+    author TEXT,
+    my_summary TEXT NOT NULL,        -- destilasi Giel (F2), bukan transkrip
+    core_claim TEXT NOT NULL,        -- klaim inti, satu kalimat
+    testable TEXT NOT NULL,          -- TESTABLE / SPEKULATIF (F3)
+    my_stance TEXT,                  -- Giel setuju/tidak + kenapa
+    conflict_of_interest TEXT,       -- kepentingan komersial/ideologis (F4)
+    thread_id INTEGER REFERENCES news_threads(id),
+    created_at TEXT
+);
+
 -- Index untuk performa query range-tanggal saat histori membesar (5 tahun+).
 
 -- asset_ohlcv: query utama selalu "WHERE instrument = ? ORDER BY date" (chart,

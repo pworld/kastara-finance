@@ -1294,6 +1294,33 @@ def holdings_conversions_list():
     return jsonify(rows)
 
 
+# ---------- Secondary Opinions -- Addendum F §24, F-1 (3 Aug 2026) ----------
+
+@app.post("/api/secondary_opinions")
+def secondary_opinions_create():
+    body = request.get_json(force=True)
+    try:
+        with get_connection() as conn:
+            row = writes.create_secondary_opinion(
+                conn, source_type=body.get("source_type", ""), source_ref=body.get("source_ref", ""),
+                my_summary=body.get("my_summary", ""), core_claim=body.get("core_claim", ""),
+                testable=body.get("testable", ""), author=body.get("author"),
+                my_stance=body.get("my_stance"), conflict_of_interest=body.get("conflict_of_interest"),
+                thread_id=body.get("thread_id"),
+            )
+            conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(row)
+
+
+@app.get("/api/secondary_opinions")
+def secondary_opinions_list():
+    with get_connection() as conn:
+        rows = writes.list_secondary_opinions(conn, thread_id=request.args.get("thread_id", type=int))
+    return jsonify(rows)
+
+
 # ---------- News Threads (Addendum B §20, N-1 fondasi). Auto-suggest jalan
 # di pipeline/run_daily.py (writes.suggest_thread_links) -- endpoint di sini
 # murni baca + konfirmasi/tolak/patch, tidak ada logic matching di route. ----------

@@ -1188,7 +1188,7 @@ def attach_thread_suggestions(conn: sqlite3.Connection, news_rows: list[dict[str
 # docs/ROADMAP.md.
 
 ALLOWED_FACETS = {"geo", "org", "who", "sym", "theme", "sec"}
-ALLOWED_CONTENT_TAG_REF_TABLES = {"daily_news", "manual_articles", "news_threads"}
+ALLOWED_CONTENT_TAG_REF_TABLES = {"daily_news", "manual_articles", "news_threads", "secondary_opinions"}
 _TAG_VALUE_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 # Simbol global/makro yang TIDAK ambigu lintas market (tidak butuh region-
 # prefix) -- ketemu 17 Jul 2026 saat seed_tags.py jalan: kontrak §21.1 sendiri
@@ -1825,3 +1825,71 @@ def list_holding_conversions(conn: sqlite3.Connection, limit: int = 200) -> list
         (limit,),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ---------- Secondary Opinions -- Addendum F §24, F-1 (3 Aug 2026) ----------
+# F1 (terkunci): lapisan TERPISAH dari bukti thread -- TIDAK ADA kolom stance
+# di sini, dan TIDAK ADA fungsi apa pun di file ini yang membaca tabel ini
+# untuk menghitung komposisi MENDUKUNG/KONTRA/NETRAL (itu murni
+# news_thread_links, lihat thread_stats()/list_threads_with_stats() di
+# atas). Guard ini ditegaskan lewat test, bukan cuma komentar -- lihat
+# test_secondary_opinion_never_leaks_into_thread_stats.
+
+ALLOWED_SOURCE_TYPE = {"VIDEO", "BOOK", "PAPER", "PODCAST", "REPORT", "OTHER"}
+ALLOWED_TESTABLE = {"TESTABLE", "SPEKULATIF"}
+
+
+def create_secondary_opinion(
+    conn: sqlite3.Connection, *, source_type: str, source_ref: str, my_summary: str,
+    core_claim: str, testable: str, author: str | None = None, my_stance: str | None = None,
+    conflict_of_interest: str | None = None, thread_id: int | None = None,
+) -> dict[str, Any]:
+    """Catat 1 opini sekunder. Guard: source_type ∈ ALLOWED_SOURCE_TYPE,
+    source_ref/my_summary/core_claim wajib non-kosong (F2: yang disimpan
+    destilasi Giel, bukan transkrip -- makanya my_summary & core_claim
+    wajib, bukan opsional), testable ∈ {TESTABLE, SPEKULATIF} (F3, wajib
+    diisi -- tidak ada default netral supaya Giel selalu sadar
+    membedakannya). thread_id opsional (F1: menempel ke thread, bukan
+    tautan bukti) -- kalau diisi, thread-nya harus benar-benar ada."""
+    if source_type not in ALLOWED_SOURCE_TYPE:
+        raise ValueError(f"source_type '{source_type}' tidak dikenal -- pilihan: {'/'.join(sorted(ALLOWED_SOURCE_TYPE))}")
+    if not source_ref or not source_ref.strip():
+        raise ValueError("source_ref wajib diisi")
+    if not my_summary or not my_summary.strip():
+        raise ValueError("my_summary wajib diisi (destilasi kamu sendiri, bukan transkrip mentah)")
+    if not core_claim or not core_claim.strip():
+        raise ValueError("core_claim wajib diisi")
+    if testable not in ALLOWED_TESTABLE:
+        raise ValueError(f"testable '{testable}' tidak dikenal -- pilihan: {'/'.join(sorted(ALLOWED_TESTABLE))}")
+    if thread_id is not None:
+        exists = conn.execute("SELECT 1 FROM news_threads WHERE id = ?", (thread_id,)).fetchone()
+        if not exists:
+            raise ValueError(f"thread_id {thread_id} tidak ditemukan")
+    now = today_wib()
+    row = {
+        "source_type": source_type, "source_ref": source_ref.strip(), "author": author,
+        "my_summary": my_summary.strip(), "core_claim": core_claim.strip(), "testable": testable,
+        "my_stance": my_stance, "conflict_of_interest": conflict_of_interest,
+        "thread_id": thread_id, "created_at": now,
+    }
+    cur = conn.execute(
+        "INSERT INTO secondary_opinions (source_type, source_ref, author, my_summary, core_claim, "
+        "testable, my_stance, conflict_of_interest, thread_id, created_at) "
+        "VALUES (:source_type, :source_ref, :author, :my_summary, :core_claim, :testable, "
+        ":my_stance, :conflict_of_interest, :thread_id, :created_at)",
+        row,
+    )
+    row["id"] = cur.lastrowid
+    return row
+
+
+def list_secondary_opinions(conn: sqlite3.Connection, *, thread_id: int | None = None) -> list[dict[str, Any]]:
+    """Semua opini sekunder, terbaru dulu. Filter opsional by thread_id --
+    dipakai rak "Opini Sekunder" di halaman thread (§24.3)."""
+    sql = "SELECT * FROM secondary_opinions"
+    params: list[Any] = []
+    if thread_id is not None:
+        sql += " WHERE thread_id = ?"
+        params.append(thread_id)
+    sql += " ORDER BY created_at DESC, id DESC"
+    return [dict(r) for r in conn.execute(sql, params).fetchall()]
