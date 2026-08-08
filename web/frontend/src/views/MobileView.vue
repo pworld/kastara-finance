@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Dialog from 'primevue/dialog'
 import { get, post } from '../lib/api'
-import { today, daysAgo, FACET_COLOR } from '../lib/format'
+import { today, daysAgo, FACET_COLOR, fmt } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
 import { useAuthStore } from '../stores/auth'
 
@@ -95,10 +95,47 @@ async function rejectThreadLink(threadLink) {
 }
 
 // ---------- Thread aktif (ringkas, klik -> timeline penuh) ----------
+// 6 Agustus 2026: mobile sempat ketinggalan F-1/F-2 (Opini Sekunder +
+// readability layer) yang sudah ada di ThreadDetailView.vue sejak 3-4
+// Agustus -- data-nya (trend_30d, shift_warning, opinions) SUDAH ikut di
+// /api/threads/stats (thread_stats() di writes.py), cuma belum ditampilkan
+// di sini. Ditambah di sini, bukan endpoint baru.
 const activeThreads = ref([])
 async function loadActiveThreads() {
   const rows = await get('/api/threads/stats')
   activeThreads.value = rows.filter((t) => t.status === 'ACTIVE')
+}
+
+const ALLOWED_SOURCE_TYPE = ['VIDEO', 'BOOK', 'PAPER', 'PODCAST', 'REPORT', 'OTHER']
+const ALLOWED_TESTABLE = ['TESTABLE', 'SPEKULATIF']
+const opinionDialogOpen = ref(false)
+const opinionThread = ref(null)
+const opinionForm = ref({
+  source_type: 'VIDEO', source_ref: '', author: '', my_summary: '', core_claim: '',
+  testable: 'TESTABLE', my_stance: '', conflict_of_interest: '', relation_to_view: '',
+})
+function openOpinionDialog(thread) {
+  opinionThread.value = thread
+  opinionForm.value = {
+    source_type: 'VIDEO', source_ref: '', author: '', my_summary: '', core_claim: '',
+    testable: 'TESTABLE', my_stance: '', conflict_of_interest: '', relation_to_view: '',
+  }
+  opinionDialogOpen.value = true
+}
+async function saveOpinion() {
+  const f = opinionForm.value
+  if (!f.source_ref.trim() || !f.my_summary.trim() || !f.core_claim.trim()) {
+    toast('Sumber, ringkasan, & klaim inti wajib diisi'); return
+  }
+  await post('/api/secondary_opinions', {
+    ...f, author: f.author || null, my_stance: f.my_stance || null,
+    conflict_of_interest: f.conflict_of_interest || null,
+    relation_to_view: f.relation_to_view || null,
+    thread_id: opinionThread.value.thread_id,
+  })
+  toast('Opini sekunder dicatat')
+  opinionDialogOpen.value = false
+  loadActiveThreads()
 }
 
 // ---------- Posisi ONGOING + warning earnings/event ----------
@@ -116,9 +153,51 @@ function warningFor(instrument) {
   return earningsWarnings.value.find((w) => w.instrument === instrument)
 }
 
+// ---------- Portofolio / Holdings (6 Agustus 2026) ----------
+// Sama alasan spt Opini Sekunder di atas -- ketinggalan dari
+// UniverseView.vue Tab Portofolio (docs/universe_portfolio_restructure_v1.md,
+// 3 Agustus). Log holding baru diperlakukan sama seperti catat prediksi
+// (record-keeping, bukan keputusan trading) -- BUKAN pelanggaran prinsip
+// "endpoint keputusan tidak dirender di sini" (itu utk approve sinyal,
+// sizing, backfill, settings, run persona -- lihat komentar atas file ini).
+const ALLOWED_BOOK = ['TRADE', 'INVEST']
+const ALLOWED_CURRENCY = ['IDR', 'USD', 'SGD']
+const ALLOWED_SOP_CATEGORY = ['SAHAM_IHSG', 'EMAS', 'CRYPTO', 'VALAS', 'GLOBAL_EQ', 'KAS_IDR']
+const holdings = ref([])
+const allocation = ref(null)
+const showHoldingForm = ref(false)
+const holdingForm = ref({
+  instrument: '', provider: '', book: 'INVEST', quantity: '', unit: '', avgPrice: '',
+  currency: 'IDR', sopCategory: 'SAHAM_IHSG', openedAt: '', notes: '',
+})
+async function loadHoldings() {
+  const [h, a] = await Promise.all([get('/api/holdings'), get('/api/portfolio/allocation')])
+  holdings.value = h
+  allocation.value = a
+}
+async function saveHolding() {
+  const f = holdingForm.value
+  if (!f.instrument.trim() || !f.provider.trim() || !f.unit.trim() || !f.quantity) {
+    toast('Instrumen, provider, unit, & quantity wajib diisi'); return
+  }
+  await post('/api/holdings', {
+    instrument: f.instrument, provider: f.provider, book: f.book,
+    quantity: Number(f.quantity), unit: f.unit,
+    avg_price: f.avgPrice ? Number(f.avgPrice) : null, currency: f.currency,
+    sop_category: f.sopCategory, opened_at: f.openedAt || null, notes: f.notes || null,
+  })
+  toast('Holding dicatat')
+  holdingForm.value = {
+    instrument: '', provider: '', book: f.book, quantity: '', unit: '', avgPrice: '',
+    currency: f.currency, sopCategory: f.sopCategory, openedAt: '', notes: '',
+  }
+  showHoldingForm.value = false
+  loadHoldings()
+}
+
 async function loadAll() {
   loading.value = true
-  await Promise.all([loadLatest(), loadDue(), loadHighNews(), loadActiveThreads(), loadOngoing()])
+  await Promise.all([loadLatest(), loadDue(), loadHighNews(), loadActiveThreads(), loadOngoing(), loadHoldings()])
   loading.value = false
 }
 onMounted(loadAll)
@@ -211,10 +290,53 @@ async function logout() {
       <section class="mobile-card">
         <div class="mobile-card-title">BONUS · Thread Aktif</div>
         <p v-if="!activeThreads.length" class="src">tidak ada thread ACTIVE</p>
-        <RouterLink v-for="t in activeThreads" :key="t.thread_id" :to="`/threads/${t.thread_id}`" class="mobile-thread-row">
-          <span>{{ t.title }}</span>
-          <span class="src">🟢{{ t.composition?.MENDUKUNG || 0 }} / 🔴{{ t.composition?.KONTRA || 0 }}<template v-if="t.pending_suggested"> · {{ t.pending_suggested }} saran baru</template></span>
-        </RouterLink>
+        <div v-for="t in activeThreads" :key="t.thread_id" class="mobile-thread-block">
+          <RouterLink :to="`/threads/${t.thread_id}`" class="mobile-thread-row">
+            <span>{{ t.title }}<span v-if="t.shift_warning" class="badge HIGH" style="margin-left:6px">⚠ shift</span></span>
+            <span class="src">🟢{{ t.composition?.MENDUKUNG || 0 }} / 🔴{{ t.composition?.KONTRA || 0 }} / ⚪{{ t.composition?.NETRAL || 0 }}<template v-if="t.pending_suggested"> · {{ t.pending_suggested }} saran baru</template></span>
+          </RouterLink>
+          <div class="src" style="margin-top:2px">
+            30 hari: 🟢{{ t.trend_30d?.MENDUKUNG || 0 }} / 🔴{{ t.trend_30d?.KONTRA || 0 }} / ⚪{{ t.trend_30d?.NETRAL || 0 }}
+            <template v-if="t.milestone_count"> · ★{{ t.milestone_count }}</template>
+            <template v-if="t.opinions?.total"> · {{ t.opinions.total }} opini ({{ t.opinions.sejalan }} sejalan/{{ t.opinions.menantang }} menantang)</template>
+          </div>
+          <button class="btn small secondary" style="margin-top:6px" @click="openOpinionDialog(t)">+ Opini Sekunder</button>
+        </div>
+      </section>
+
+      <section class="mobile-card">
+        <div class="mobile-card-title">Portofolio</div>
+        <div v-if="allocation" class="src" style="margin-bottom:8px">
+          Total (est. IDR): {{ fmt(allocation.total_idr) }}
+          <template v-if="allocation.excluded?.length"> · {{ allocation.excluded.length }} holding belum terhitung (avg_price/kategori kosong)</template>
+        </div>
+        <div class="mobile-btn-row">
+          <button class="btn mobile-btn-big" @click="showHoldingForm = !showHoldingForm">+ Tambah Holding</button>
+        </div>
+        <div v-if="showHoldingForm" class="mobile-form">
+          <input v-model="holdingForm.instrument" type="text" placeholder="Instrumen, mis. BBCA / BTC">
+          <input v-model="holdingForm.provider" type="text" placeholder="Provider, mis. Stockbit / Indodax">
+          <select v-model="holdingForm.book">
+            <option v-for="b in ALLOWED_BOOK" :key="b" :value="b">{{ b }}</option>
+          </select>
+          <input v-model="holdingForm.quantity" type="number" placeholder="Quantity">
+          <input v-model="holdingForm.unit" type="text" placeholder="Unit, mis. lembar / BTC">
+          <input v-model="holdingForm.avgPrice" type="number" placeholder="Avg price (opsional)">
+          <select v-model="holdingForm.currency">
+            <option v-for="c in ALLOWED_CURRENCY" :key="c" :value="c">{{ c }}</option>
+          </select>
+          <select v-model="holdingForm.sopCategory">
+            <option v-for="c in ALLOWED_SOP_CATEGORY" :key="c" :value="c">{{ c }}</option>
+          </select>
+          <input v-model="holdingForm.openedAt" type="date">
+          <textarea v-model="holdingForm.notes" placeholder="Catatan (opsional)"></textarea>
+          <button class="btn mobile-btn-big" @click="saveHolding">Simpan Holding</button>
+        </div>
+        <p v-if="!holdings.length" class="src" style="margin-top:8px">belum ada holding tercatat</p>
+        <div v-for="h in holdings" :key="h.id" class="mobile-ongoing-row">
+          <span>{{ h.instrument }} <span class="src">({{ h.provider }})</span></span>
+          <span class="src">{{ h.quantity }} {{ h.unit }} · {{ h.book }}</span>
+        </div>
       </section>
 
       <section class="mobile-card">
@@ -238,6 +360,30 @@ async function logout() {
         <option value="NETRAL">NETRAL</option>
       </select>
       <button class="btn mobile-btn-big" @click="confirmThreadLink">Konfirmasi</button>
+    </Dialog>
+
+    <Dialog v-model:visible="opinionDialogOpen" modal header="Opini Sekunder" style="width:90vw; max-width:420px">
+      <p v-if="opinionThread" class="src">Utk thread "<b>{{ opinionThread.title }}</b>"</p>
+      <div class="mobile-form">
+        <select v-model="opinionForm.source_type">
+          <option v-for="s in ALLOWED_SOURCE_TYPE" :key="s" :value="s">{{ s }}</option>
+        </select>
+        <input v-model="opinionForm.source_ref" type="text" placeholder="Sumber (URL / judul buku / penerbit)">
+        <input v-model="opinionForm.author" type="text" placeholder="Author (opsional)">
+        <textarea v-model="opinionForm.my_summary" placeholder="Ringkasan versi kamu (wajib, bukan transkrip)"></textarea>
+        <input v-model="opinionForm.core_claim" type="text" placeholder="Klaim inti, satu kalimat">
+        <select v-model="opinionForm.testable">
+          <option v-for="t in ALLOWED_TESTABLE" :key="t" :value="t">{{ t }}</option>
+        </select>
+        <textarea v-model="opinionForm.my_stance" placeholder="Sikap kamu -- setuju/tidak & kenapa (opsional)"></textarea>
+        <input v-model="opinionForm.conflict_of_interest" type="text" placeholder="Conflict of interest (opsional)">
+        <select v-model="opinionForm.relation_to_view">
+          <option value="">-- belum diklasifikasi --</option>
+          <option value="SEJALAN">SEJALAN</option>
+          <option value="MENANTANG">MENANTANG</option>
+        </select>
+        <button class="btn mobile-btn-big" @click="saveOpinion">Simpan Opini</button>
+      </div>
     </Dialog>
   </div>
 </template>
@@ -332,12 +478,21 @@ async function logout() {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
   text-decoration: none;
   color: inherit;
 }
-.mobile-thread-row:last-child, .mobile-ongoing-row:last-child {
+.mobile-ongoing-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.mobile-ongoing-row:last-child {
+  border-bottom: none;
+}
+.mobile-thread-block {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.mobile-thread-block:last-child {
   border-bottom: none;
 }
 </style>

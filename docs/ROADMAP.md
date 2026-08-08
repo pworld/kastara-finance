@@ -2686,3 +2686,284 @@ rencana `docs/deploy.md` §7 lama:
 - **Belum dieksekusi** (butuh Giel jalankan sendiri): registrasi webhook ke
   Telegram (`setWebhook` API call), verifikasi kirim `/run_daily` beneran
   dari HP setelah service Railway hidup dgn benar.
+
+**Update — Backfill berita historis via search on-site (4 Agustus 2026):**
+Setelah deploy Railway, 29 dari 43 hari `daily_news` lokal kosong (cron WSL
+tidak jalan konsisten). RSS tidak bisa mengisi ulang tanggal lampau (rolling
+window "sekarang" doang) -- 3 pendekatan dicek LANGSUNG (bukan asumsi
+dokumentasi) sebelum bangun apa pun, lihat rencana tersimpan di sesi ini:
+- **Wayback Machine CDX API** -- di-`curl` langsung ke 7 URL feed asli
+  proyek ini: nyaris nol coverage (1 snapshot dari Fed FOMC, di luar
+  jendela gap pula). Ditolak.
+- **Paid news API** (NewsAPI.org $449/bln, NewsData.io/Currents/GNews
+  lebih murah) -- tidak ada yang menjamin index sumber spesifik proyek ini
+  tanpa bayar dulu utk tes, dan langganan bulanan utk gap satu-kali tidak
+  sepadan. Ditolak.
+- **Search on-site tiap sumber sendiri** -- DITERIMA, live-tes ke 2 dari 7
+  sumber (CNBC Indonesia, ANTARA) dgn hasil positif nyata sebelum bangun
+  apa pun.
+
+**Yang dibangun** (`scrapers/news_archive.py`, `tools/backfill_news_
+archive.py`):
+- **CNBC Indonesia**: API JSON publik `api/v2/search-result` ditemukan
+  lewat Network tab (BUKAN didokumentasikan) -- field `dtnewsdate` (tanggal
+  terbit asli) memungkinkan filter rentang akurat, tanpa perlu headless
+  browser.
+- **ANTARA Ekonomi**: halaman search server-rendered, `requests`+
+  `BeautifulSoup` biasa cukup (diverifikasi live -- headline muncul di raw
+  HTML tanpa eksekusi JS). Tanggal di listing berupa teks relatif ("3 jam
+  lalu"/"5 hari lalu"/"kemarin"/tanggal absolut Indonesia) -- di-parse ke
+  tanggal absolut via `_parse_antara_relative_date()`, akurasi level-hari
+  (sama seperti presisi `daily_news.date`).
+- **5 sumber lain** (Investing ID, Bisnis.com, CNBC Finance/Economy, Fed
+  FOMC) SENGAJA belum ditambah -- masing-masing perlu verifikasi live yang
+  sama sebelum diasumsikan bekerja serupa (CNBC Market section, misalnya,
+  ternyata JS-rendered/infinite-scroll saat dicek).
+- Query pakai kamus `IMPACT_KEYWORDS` yang SUDAH ADA (`scrapers/feeds_
+  config.py`), bukan daftar kata baru -- targeted subset (apa yang dianggap
+  penting di pipeline ini), BUKAN replikasi "semua artikel hari itu" (itu
+  butuh listing per-tanggal yang ternyata JS-rendered, di luar scope
+  sesi ini).
+- `tools/backfill_news_archive.py` -- pola preview→konfirmasi→commit sama
+  seperti `pipeline/backfill.py`, `--yes` utk skip prompt, hasil masuk lewat
+  `insert_news_dedup()` yang sudah ada (tidak ada jalur insert baru).
+- 16 test baru (`tests/test_news_archive.py` + `tests/test_backfill_news_
+  archive.py`) -- termasuk test LIVE NETWORK (pola sama `test_news.py`
+  yang sudah ada, bukan mock) utk kedua fungsi pencarian, mock hanya utk
+  test orkestrasi CLI (dedup, source-gagal-tidak-hentikan-yang-lain,
+  preview/commit flow) supaya tidak spam request eksternal tiap test run.
+  `pytest -q`: 450 passed, 1 skipped pre-existing.
+- **Diverifikasi hidup, bukan simulasi**: dijalankan sungguhan (temp DB,
+  bukan produksi) thd gap asli 2026-06-16..2026-06-24 -- **33 artikel nyata
+  ditemukan di 8 dari 9 hari gap**. Bukti konkret, bukan klaim teoretis.
+- **DIEKSEKUSI ke DB lokal asli** (4 Agustus 2026, `--since 2026-06-16
+  --until 2026-07-26`, satu panggilan cakup semua 6 jendela gap terpisah --
+  `INSERT OR IGNORE` aman utk hari yang sudah terisi di antaranya, 5 dari
+  189 kandidat kena dedup): **184 baris baru masuk `daily_news` (3311 ->
+  3495)**. Hasil: 39 dari 43 hari sekarang punya berita (naik dari 14
+  sebelumnya), sisa 4 hari kosong (2026-06-21, 06-27, 07-11, 07-12) --
+  kemungkinan memang hari sepi utk 26 kata kunci HIGH/MED yang dipakai,
+  belum dicoba kata kunci lebih luas.
+- **Belum dieksekusi**: replikasi ke DB Railway (fresh-start production) --
+  perlu export+apply ulang pola yang sama seperti migrasi news/chart
+  sebelumnya, kapan Giel siap. Giel eksplisit minta scope lebih luas dari
+  sekadar isi gap ("data is power, mungkin bisa belajar dari masa lalu")
+  tapi memilih tetap prioritaskan 29 hari gap dulu (bukan tarik sejauh
+  mungkin ke belakang) -- opsi tarik lebih jauh (~6-12 bulan realistis,
+  BUKAN sampai 2010 -- kedalaman search API CNBC dites langsung: capped
+  10.000 hasil, utk keyword umum cuma tembus ~11 bulan ke belakang;
+  paginasi ANTARA juga tidak reliable lewat ~page 100) masih terbuka
+  kalau nanti diminta.
+
+**Update — Perluas backfill sampai 1 Januari 2026 (4 Agustus 2026, sesi
+sama):** Giel minta lengkapi lebih jauh ke belakang. `search_cnbcindonesia`
+di-upgrade dari 1-halaman relevance-sort (`isrelevance=1`, top-20 doang) ke
+paginasi bertingkat date-sort (`isrelevance=0`, diverifikasi live urut
+tanggal-terbaru-dulu bersih) -- `page_size`/`max_pages` (default 15, dari
+10) menggantikan param `limit` lama, berhenti begitu 1 halaman penuh sudah
+lebih tua dari `date_from`.
+- **Dites dulu keterbatasan nyata sebelum dijalankan lebar-lebar**:
+  keyword umum ("bank indonesia") butuh ~7.200 item (360 halaman) utk
+  tembus Januari -- TIDAK REALISTIS. Tapi keyword frekuensi sedang ("cpi",
+  "earnings") tembus Januari cuma dgn 300 item (15 halaman) -- jadi
+  cakupan penuh mustahil per-keyword, tapi cakupan PARSIAL-TAPI-NYATA lewat
+  gabungan 21 keyword tetap berharga.
+- **Dijalankan ke DB lokal asli**: `--since 2026-01-01 --until 2026-06-14`
+  -- **516 baris baru** (0 duplikat, semua kandidat baru krn rentang belum
+  pernah disentuh). `daily_news` sekarang **2026-01-01 s/d 2026-07-27,
+  4011 baris total** (dari 3495 sebelumnya).
+- **Hasil akhir cakupan 208 hari (1 Jan - 27 Jul)**: 186 hari ADA berita,
+  22 hari masih kosong (banyak yg kemungkinan akhir pekan/hari sepi genuine
+  utk 21 kata kunci HIGH/MED yang dipakai, bukan berarti scraper gagal --
+  belum diverifikasi satu-satu mana yang akhir pekan vs beneran kelewat).
+- Data yang TERSEDIA tapi BELUM dipakai (lihat respons ke Giel soal
+  "data apa saja yg bisa di-scrape"): CNBC Indonesia API JSON balikin FULL
+  body artikel (`strisi`, HTML lengkap), nama+profil penulis, kategori/
+  kanal, tag topik (`strkeyword_name`), gambar -- proyek ini cuma ambil
+  headline+URL+tanggal+ringkasan (sama seperti field yang dipakai RSS asli,
+  §22.1 D3 "HIGH saja"), sengaja tidak menyimpan body lengkap (prinsip F2/
+  D2 di kontrak: destilasi/ekstraktif, bukan transkrip mentah/artikel utuh
+  tersimpan berlebih).
+
+**Update -- Sapuan dalam sampai 2010 (5 Agustus 2026, sesi sama):** Giel
+minta ditarik lebih jauh lagi ("ambil per tahun sampai 2010 tapi dengan
+cara santai. buat jeda tidak apa apa"). Sebelum jalan, diprobe live `total`
+tiap 1 dari 21 kata kunci HIGH/MED lewat API CNBC langsung -- **8 kata
+kunci volume tinggi kena cap keras 10.000 hasil** (`bank indonesia`, `fed`,
+`ihsg`, `inflasi`, `obligasi`, `rupiah`, `suku bunga`, `the fed`) --
+2010 **provably unreachable** utk ini berapa pun `max_pages`/kesabaran
+diberikan (batas platform, bukan lambat). **13 kata kunci sisanya** (`bi
+rate`, `cpi`, `earnings`, `etf`, `fomc`, `gdp`, `inflation`, `nasdaq`,
+`powell`, `rate cut`, `rate hike`, `unemployment`, `yield`) total-nya jauh
+di bawah cap (123-9530) -- punya peluang nyata tembus 2010, jadi hanya 13
+ini yang dijalankan (dilewati 8 yg mustahil drpd buang jam request sia-sia).
+- **Bukan literal per-tahun**: `search_cnbcindonesia`/`search_antaranews`
+  urut terbaru-dulu tanpa offset absolut per tanggal -- panggil terpisah
+  per tahun berarti tiap tahun HARUS paging ulang semua tahun yang lebih
+  baru dulu sebelum sampai target (mis. 2010 lewat 2011..2026 dulu), lalu
+  diulang lagi dari nol utk 2011, dst -- boros drastis. Dipakai SATU
+  sapuan per keyword dari sekarang mundur ke 2010-01-01 (paging berhenti
+  begitu 1 halaman penuh sudah lebih tua dari `date_from`) -- tiap halaman
+  cuma pernah diminta sekali, hasil tetap mencakup semua tahun turun ke
+  2010, cuma cara eksekusinya beda dari permintaan harfiah bukan cakupannya.
+- **`tools/deep_backfill_2010.py`** (baru, one-off) -- checkpoint per-
+  keyword (commit ke DB stlh tiap keyword selesai, bukan nunggu semua 13x2
+  sumber kelar) supaya kalau job berhenti di tengah (network/timeout),
+  progress yg sudah masuk tidak hilang. `delay=1.5` detik antar-request
+  ("santai", sesuai permintaan Giel), `max_pages` digenerosi (CNBC 400,
+  ANTARA 100) supaya paging benar-benar bisa tembus ke 2010 utk keyword
+  yang totalnya besar tapi belum kena cap (mis. `nasdaq` total 9530).
+  `tools/backfill_news_archive.py` juga di-upgrade (`--keywords`/
+  `--max-pages`/`--delay`, semua opsional & backward-compatible) supaya
+  kemampuan ini bisa dipakai lagi lewat CLI biasa nanti, bukan cuma
+  script sekali-pakai.
+- **Dijalankan ke DB lokal asli** (5 Agustus 2026, `python -m
+  tools.deep_backfill_2010`, ~13 keyword x 2 sumber, delay 1.5s/request):
+  **40.016 baris baru** (0 gagal per-source/keyword, semua 13 keyword
+  selesai). `daily_news` sekarang **44.027 baris total** (dari 4.011),
+  rentang **2010-01-19 s/d 2026-08-05**, **3.583 hari distinct punya
+  berita**. Sumber: CNBC Indonesia + ANTARA Ekonomi (2 sumber yg
+  terverifikasi live 4 Agustus 2026 -- 5 sumber lain di
+  `feeds_config.py` masih belum diverifikasi utk jalur search ini).
+  Breakdown per tahun (rows / hari-ada-berita): 2010: 80/69 · 2011:
+  111/95 · 2012: 19/17 · 2013: 108/88 · 2014: 69/59 · 2015: 64/58 ·
+  2016: 61/57 · 2017: 149/106 · 2018: 3007/331 · 2019: 4300/350 · 2020:
+  4235/356 · 2021: 4762/351 · 2022: 5716/355 · 2023: 5764/359 · 2024:
+  4908/363 · 2025: 4695/358 · 2026: 5979/211. Cakupan 2010-2017 jarang
+  (rendah krn hanya 13 dari 21 keyword yg dipakai, dan sumber yg lebih
+  tua kemungkinan artikel lebih sedikit terindeks di search API-nya
+  sendiri), 2018 ke atas jauh lebih padat (>300 hari/tahun, mendekati
+  cakupan harian penuh).
+- **Belum dieksekusi**: replikasi ke DB Railway (masih fresh-start
+  production, lihat catatan sebelumnya) -- hanya DB lokal yang diperkaya
+  sejauh ini.
+
+**Update -- Migrasi Threads/Tags/News ke Railway + bot Telegram 2 command
+baru (5-6 Agustus 2026):** Giel lapor Threads & Tags "hilang" di Railway --
+setelah dicek `/api/threads` balikin `[]` bersih (bukan error), ternyata
+memang belum pernah diisi (keputusan fresh-start awal Railway sengaja
+skip threads/tags, cuma news/chart). Giel minta dimigrasikan.
+- **`kastara_migration.json` + `apply_migration.py`** (one-off, tidak
+  masuk repo permanen): payload JSON (44.027 baris `daily_news` s/d
+  2026-08-05, 11 threads, 72 tags, 718 thread_links, 253 content_tags)
+  diupload ke `/tmp` container Railway lewat `railway ssh -- "cat >
+  /tmp/kastara_migration.json"` < file`, lalu diterapkan lewat `railway
+  ssh -- python3 - < apply_migration.py` (pola stdin-pipe yang sudah
+  terbukti aman dari insiden `KASTARA_DB_PATH`/"ambiguous redirect"
+  sebelumnya). `ref_id` di thread_links/content_tags di-resolve ulang via
+  natural key (date+headline utk daily_news, title utk threads) -- BUKAN
+  disalin mentah, krn id lokal vs Railway beda urutan/nilai. Idempoten
+  (INSERT OR IGNORE via UNIQUE index yang sudah ada) -- dites jalan 2x
+  thd DB simulasi, run kedua 0 baris baru semua tabel. `usage_count`
+  tag_dictionary di-recompute di akhir (bukan cuma disalin) krn baris
+  content_tags yg dimigrasi tidak lewat `apply_tag()`.
+- **Bot Telegram diperluas dari 1 command jadi 3** -- Giel kirim `/start`
+  dan `/status` yang sebelumnya diam-diam diabaikan (`web/app.py:488-492`
+  cuma match `/run_daily` persis, command lain jatuh ke `return
+  jsonify({"ok": True})` tanpa aksi). Ditambah:
+  - `/start` -- balas teks bantuan daftar command (statis, tidak query DB).
+  - `/status` -- `web/writes.py::telegram_status_summary()` baru: baca
+    baris `daily_market` TERBARU (sumber "kapan run_daily terakhir jalan",
+    beda dari `daily_news` yang bisa nol baris di hari sepi) + decode
+    `source_flags` JSON jadi hitungan ok/gagal + jumlah `daily_news`
+    tanggal itu + jumlah `news_thread_links` status SUGGESTED yang nunggu
+    review Giel -- semua dari data yang SUDAH ada, tidak ada tabel/kolom
+    baru.
+  - Insiden webhook (dicatat krn berulang -- pola kegagalan Railway
+    project ini): `getWebhookInfo` awalnya balikin `last_error_message:
+    "Wrong response from webhook: 403 Forbidden"` -- akar masalah di
+    `web/app.py:479-481`, `X-Telegram-Bot-Api-Secret-Token` header dari
+    Telegram tidak cocok `TELEGRAM_WEBHOOK_SECRET` Railway (kemungkinan
+    var itu di-set tapi belum di-deploy, staged changes Railway tidak
+    auto-apply -- sama seperti insiden `KASTARA_DB_PATH` sebelumnya).
+    Giel pilih jalan simpel: `setWebhook` ULANG TANPA `secret_token`
+    (masih digerbangi chat_id check) drpd debug 2 nilai lintas sistem --
+    kerja setelah itu.
+- 7 test baru (`tests/test_web_app.py` 3 baru utk `/start`/`/status`/
+  no-pipeline-data-yet, `tests/test_web_writes.py` 2 baru utk
+  `telegram_status_summary`) -- full suite tetap hijau.
+
+**Update -- Rebuild bot Telegram per spec "Telegram Bot Commands v1.0"
+(6 Agustus 2026):** Giel kasih dokumen spec lengkap (versi 1.0, ditulis
+independen dari sesi ini) minta bot dibangun ulang jadi long-polling +
+systemd service di VPS terpisah (asumsi "host always-on" belum ada).
+**Konflik nyata dgn kondisi asli**: bot SUDAH jalan via webhook di Railway
+(diverifikasi live barusan -- `/start`/`/run_daily` sukses), dan Railway
+SENDIRI SUDAH jadi host always-on (itu tujuan awal deploy ke Railway).
+Long-polling+systemd butuh proses ke-2 yang jalan terus -- di Railway
+berarti service ke-2, kena blocker Volume-cuma-1-service PERSIS SAMA yang
+menggagalkan rencana cron-service terpisah 4 Agustus (§8.0 deploy.md).
+Ditanya ke Giel via AskUserQuestion sebelum eksekusi (bukan diam-diam
+override spec-nya) -- **Giel pilih: tetap webhook di Railway, ambil isi
+spec yang relevan** (bukan bangun VPS baru).
+- **`web/writes.py::telegram_status_summary()` ditulis ulang** -- dari
+  1 tanggal gabungan jadi TIAP tabel dicek tanggal terbarunya SENDIRI
+  (`daily_market`, `daily_news`, `asset_ohlcv` masing-masing bisa beda
+  tanggal, tidak diasumsikan selalu sinkron -- kalau berita ketinggalan
+  tapi market ok, itu sekarang kelihatan bukan tersembunyi). Field baru:
+  `sources_fail_names` (nama sumber yg gagal, bukan cuma angka),
+  `sources_skip`, `daily_news_date`/`asset_ohlcv_date` (+count masing2),
+  `econ_upcoming` (event `econ_calendar` >= hari ini), `pending_signals`
+  (`trade_signals` WHERE approved=0).
+- **`web/app.py` -- allowlist multi chat_id**: `TELEGRAM_CHAT_IDS` (jamak,
+  koma-pisah) baru, fallback ke `TELEGRAM_CHAT_ID` (tunggal) kalau belum
+  di-set -- backward-compatible, TIDAK perlu re-deploy env var Railway lagi
+  (sudah cukup drama env var minggu ini).
+- **Lock anti-double-run + rate limit utk `/run_daily`** (§3.2/3.3 spec) --
+  `RUN_DAILY_LOCK_PATH` (tempdir, isi PID+timestamp, stale >30 menit
+  diambil alih, WAJIB lepas via try/finally di `_run_daily_via_telegram`
+  supaya run yg crash tidak mengunci selamanya) + `RUN_DAILY_LAST_TRIGGER_
+  PATH` (jeda minimal 5 menit antar-trigger, beda tujuan dari lock --
+  cegah spam BERURUTAN stlh run sebelumnya selesai, bukan cuma cegah
+  tumpang tindih).
+- **Pesan `/run_daily` selesai SEKARANG FORMAT SAMA seperti `/status`**
+  (§2 spec eksplisit minta ini) -- drpd ringkasan ad-hoc terpisah,
+  `_format_status_message()` dipakai di 2 tempat (DRY, bukan 2 versi teks
+  yang bisa nyimpang).
+- **Command lain (`approve/reject sinyal`, `backfill`, `settings/grader
+  override`) SENGAJA TETAP TIDAK dibangun** -- persis matching §1 spec
+  ("operasi butuh gate/ritual sadar, bukan operasi pipa idempoten") --
+  3 command (`start`/`status`/`run_daily`) sudah dari awal satu2nya yg
+  diimplementasikan, keputusan ini TIDAK berubah, cuma sekarang eksplisit
+  didokumentasikan alasannya matching kerangka risiko spec, bukan cuma
+  "belum sempat".
+- 6 test baru (`tests/test_web_app.py`: multi chat_id allowlist, lock
+  blocks double-run, stale lock diambil alih, rate limit blocks) + 2 test
+  existing di-update (`telegram_status_summary` field baru, format pesan
+  /status baru) -- full suite tetap hijau.
+- Docs: `docs/deploy.md` §8.1/§8.2 diperbarui (3 command, alasan tetap
+  webhook drpd long-polling, `TELEGRAM_CHAT_IDS` opsional).
+
+**Update -- Mobile (`/m`) susul 2 fitur yg ketinggalan sejak dibangun
+(6 Agustus 2026):** Giel minta dibandingkan `/m` vs desktop -- ternyata
+`MobileView.vue` belum disentuh sejak commit pertamanya (31 Juli 2026,
+`git log` cek langsung, bukan asumsi) sementara 2 gelombang fitur desktop
+sudah jalan sesudahnya: Secondary Opinions F-1/F-2 (`ThreadDetailView.vue`,
++292 baris, 3-4 Agustus) & restrukturisasi Portofolio/Holdings
+(`UniverseView.vue`, +608/-141 baris, `docs/universe_portfolio_
+restructure_v1.md`, 3 Agustus). Keduanya ditambahkan ke `/m` sekarang --
+TIDAK ADA endpoint baru, semua reuse API yang sudah ada.
+- **Kartu "Thread Aktif"**: sekarang tampilkan trend_30d, badge ⚠ shift
+  kalau `shift_warning` true, jumlah milestone, ringkasan opini
+  (total/sejalan/menantang) -- semua sudah ada di `/api/threads/stats`
+  (`thread_stats()`), cuma belum dirender di mobile. Tombol "+ Opini
+  Sekunder" per thread buka Dialog form (8 field, sama seperti desktop:
+  source_type, source_ref, author, ringkasan, klaim inti, testable,
+  sikap, conflict_of_interest, relation_to_view) -> `POST /api/
+  secondary_opinions`.
+- **Kartu "Portofolio" baru**: ringkasan alokasi (total IDR-equivalent +
+  jumlah holding belum terhitung) dari `/api/portfolio/allocation`, daftar
+  holding, form "+ Tambah Holding" (instrumen/provider/book/quantity/unit/
+  avg price/currency/kategori SOP/tanggal/catatan) -> `POST /api/holdings`.
+  **Keputusan**: log holding baru diperlakukan sama seperti catat prediksi
+  (record-keeping, bukan keputusan trading) -- BUKAN pelanggaran prinsip
+  "endpoint keputusan tidak dirender di /m" (itu utk approve sinyal,
+  sizing, backfill, settings, run persona -- prinsip itu sendiri TETAP
+  tidak disentuh).
+- Verifikasi: `npm run build` bersih (364 modul, tidak ada error), dev
+  server dicek lewat browser -- `/m` redirect ke `/login` benar (guard
+  auth jalan), 0 console error. **Sama seperti sesi-sesi sebelumnya:
+  tidak bisa verifikasi visual isi kartu di balik login** (aturan
+  kredensial) -- dibuktikan lewat compile-clean + baca kode langsung,
+  bukan screenshot behind-auth.
+  tersimpan berlebih).

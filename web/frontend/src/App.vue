@@ -1,4 +1,5 @@
 <script setup>
+import { ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import Toast from 'primevue/toast'
 import { useAuthStore } from './stores/auth'
@@ -6,6 +7,16 @@ import { useAuthStore } from './stores/auth'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+
+// Sidebar collapse (6 Agustus 2026) -- reclaim lebar layar utk konten
+// (mis. tabel lebar di Universe/Chart). Persist ke localStorage supaya
+// pilihan bertahan lintas reload, bukan reset tiap buka app.
+const SIDEBAR_COLLAPSED_KEY = 'kastara_sidebar_collapsed'
+const sidebarCollapsed = ref(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1')
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed.value ? '1' : '0')
+}
 const navGroups = [
   {
     title: 'Daily',
@@ -59,9 +70,15 @@ async function logout() {
   <Toast />
   <RouterView v-if="route.path === '/login' || route.path === '/m'" />
   <div v-else class="shell">
-    <aside class="sidebar">
-      <div class="brand">KASTARA FINANCE</div>
-      <nav>
+    <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
+      <div class="brand-row">
+        <div class="brand" v-show="!sidebarCollapsed">KASTARA FINANCE</div>
+        <button
+          class="sidebar-toggle" @click="toggleSidebar"
+          :title="sidebarCollapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'"
+        >{{ sidebarCollapsed ? '»' : '«' }}</button>
+      </div>
+      <nav v-show="!sidebarCollapsed">
         <div v-for="group in navGroups" :key="group.title" class="nav-group">
           <div class="nav-group-title">{{ group.title }}</div>
           <RouterLink
@@ -70,7 +87,7 @@ async function logout() {
           >{{ item.label }}</RouterLink>
         </div>
       </nav>
-      <button class="btn small secondary logout-btn" @click="logout">Keluar</button>
+      <button class="btn small secondary logout-btn" v-show="!sidebarCollapsed" @click="logout">Keluar</button>
     </aside>
     <main class="content">
       <RouterView />
@@ -91,14 +108,46 @@ async function logout() {
   padding: 20px 0;
   display: flex;
   flex-direction: column;
+  transition: width .15s ease;
+  overflow: hidden;
+}
+.sidebar.collapsed {
+  width: 44px;
+}
+.brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 18px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.sidebar.collapsed .brand-row {
+  padding: 0 10px 18px;
+  justify-content: center;
 }
 .brand {
   font-size: 14px;
   font-weight: 700;
   letter-spacing: .5px;
-  padding: 0 20px 18px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 10px;
+  white-space: nowrap;
+}
+.sidebar-toggle {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+.sidebar-toggle:hover {
+  color: var(--text);
+  border-color: var(--muted);
 }
 nav {
   display: flex;

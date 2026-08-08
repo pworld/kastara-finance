@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const password = ref('')
@@ -8,13 +8,18 @@ const error = ref('')
 const loading = ref(false)
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 async function submit() {
   error.value = ''
   loading.value = true
   try {
     await auth.login(password.value)
-    router.push('/snapshot')
+    // 6 Agustus 2026: dulu hardcode '/snapshot' -- kalau orang buka /m
+    // (mis. dari PWA di HP) lalu dilempar ke /login, login selalu
+    // mendarat di dashboard desktop, bukan balik ke /m. `redirect` query
+    // diisi router guard (router/index.js) dgn tujuan asli.
+    router.push(route.query.redirect || '/snapshot')
   } catch (e) {
     error.value = e.message
   } finally {

@@ -28,6 +28,7 @@ from web.writes import (
     list_predictions,
     list_reading_entries,
     get_emiten_detail,
+    telegram_status_summary,
     list_bank_ratios,
     list_grader_log,
     list_intake_log,
@@ -2619,3 +2620,67 @@ def test_secondary_opinion_never_leaks_into_thread_stats(tmp_path):
         after_minus_opinions = {k: v for k, v in after.items() if k != "opinions"}
         before_minus_opinions = {k: v for k, v in before.items() if k != "opinions"}
         assert after_minus_opinions == before_minus_opinions
+
+
+# ---------- Telegram bot /status (5 Agustus 2026) ----------
+
+def test_telegram_status_summary_with_no_pipeline_data(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        assert telegram_status_summary(conn) == {"last_date": None}
+
+
+def test_telegram_status_summary_reports_latest_run(tmp_path):
+    db = tmp_path / "t.db"
+    init_db(db)
+    with get_connection(db) as conn:
+        conn.execute(
+            "INSERT INTO daily_market (date, created_at, source_flags) VALUES (?,?,?)",
+            ("2026-08-01", "2026-08-01 00:01:00+0700", json.dumps({"a": "ok", "b": "ok", "c": "fail"})),
+        )
+        conn.execute(
+            "INSERT INTO daily_market (date, created_at, source_flags) VALUES (?,?,?)",
+            ("2026-08-02", "2026-08-02 00:01:00+0700", json.dumps({"a": "ok", "x": "fail"})),
+        )
+        for headline in ["A", "B"]:
+            conn.execute(
+                "INSERT INTO daily_news (date, source, headline, raw_url, impact_level) VALUES (?,?,?,?,?)",
+                ("2026-08-02", "CNBC Indonesia", headline, f"https://x.test/{headline}", "LOW"),
+            )
+        for instrument in ["BTC", "BBCA"]:
+            conn.execute(
+                "INSERT INTO asset_ohlcv (date, instrument, close) VALUES (?,?,?)",
+                ("2026-08-02", instrument, 100.0),
+            )
+        conn.execute(
+            "INSERT INTO econ_calendar (event_date, event_name, country) VALUES (?,?,?)",
+            (today_wib(), "Test Event", "US"),
+        )
+        conn.execute(
+            "INSERT INTO trade_signals (date, instrument, signal_type, approved) VALUES (?,?,?,0)",
+            ("2026-08-02", "BTC", "LONG"),
+        )
+        t = save_thread(conn, title="Test thread")
+        news_id = conn.execute("SELECT id FROM daily_news WHERE headline='A'").fetchone()["id"]
+        conn.execute(
+            "INSERT INTO news_thread_links (thread_id, ref_table, ref_id, link_status, linked_at) "
+            "VALUES (?,'daily_news',?,'SUGGESTED',?)",
+            (t["id"], news_id, "2026-08-02 00:01:00+0700"),
+        )
+        conn.commit()
+
+        summary = telegram_status_summary(conn)
+        assert summary["last_date"] == "2026-08-02"
+        assert summary["sources_ok"] == 1
+        assert summary["sources_fail"] == 1
+        assert summary["sources_fail_names"] == ["x"]
+        assert summary["sources_skip"] == 0
+        assert summary["daily_market_date"] == "2026-08-02"
+        assert summary["daily_news_date"] == "2026-08-02"
+        assert summary["daily_news_count"] == 2
+        assert summary["asset_ohlcv_date"] == "2026-08-02"
+        assert summary["asset_ohlcv_count"] == 2
+        assert summary["econ_upcoming"] == 1
+        assert summary["pending_signals"] == 1
+        assert summary["pending_thread_links"] == 1

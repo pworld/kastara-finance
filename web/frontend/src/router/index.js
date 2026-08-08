@@ -49,7 +49,13 @@ router.beforeEach(async (to) => {
     if (auth.authenticated) return '/snapshot'
     return true
   }
-  if (!auth.authenticated) return '/login'
+  if (!auth.authenticated) {
+    // 6 Agustus 2026: dulu redirect ke /login TANPA bawa tujuan asli --
+    // hasilnya login SELALU mendarat di /snapshot, biar orang buka /m
+    // (mis. dari PWA di HP) tetap kelempar ke tampilan desktop stlh login.
+    // Simpan tujuan asli di query `redirect`, LoginView.vue baca ini.
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
   return true
 })
 

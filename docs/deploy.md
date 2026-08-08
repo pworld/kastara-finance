@@ -250,26 +250,50 @@ otomatis butuh Volume-nya sendiri (DB SQLite terpisah, kosong) -- itu
 melanggar aturan keras §3.2 "SATU DATABASE, pindah = pindah semua", bukan
 sekadar duplikasi data tapi 2 sumber kebenaran yang diam-diam divergen.
 
-### 8.1 Solusi: trigger manual via bot Telegram (2 arah, 1 command)
+### 8.1 Solusi: trigger manual via bot Telegram (2 arah, webhook, 3 command)
 
 Daripada Railway Cron Job (butuh service kedua), pipeline harian di-trigger
-lewat command Telegram `/run_daily` yang memanggil endpoint di SERVICE YANG
-SAMA (yang sudah punya Volume/DB asli) -- bukan proses terpisah.
+lewat command Telegram yang memanggil endpoint di SERVICE YANG SAMA (yang
+sudah punya Volume/DB asli) -- bukan proses terpisah, bukan long-polling.
 - **`POST /api/telegram/webhook`** (`web/app.py`) -- exempt dari session
   auth (Telegram yang panggil, bukan browser Giel), tapi digerbangi 2 lapis:
-  (1) `chat_id` pesan HARUS sama dengan `TELEGRAM_CHAT_ID` (abaikan diam-diam
-  kalau beda, tidak bocorkan info ke pengirim asing), (2) opsional secret
-  token header `X-Telegram-Bot-Api-Secret-Token` (kalau
-  `TELEGRAM_WEBHOOK_SECRET` diisi) -- pertahanan tambahan drpd cuma chat_id.
-- Command `/run_daily` -> jalankan `run_daily_mod.run_daily()` di
-  **background thread** (bukan langsung di handler) -- Telegram retry kirim
-  update kalau webhook tidak balas cepat, dan `run_daily()` bisa lama (fetch
-  semua sumber eksternal). Handler balas ack cepat dulu ("Menjalankan
-  pipeline harian sekarang..."), baru kirim pesan susulan (ringkasan/error)
-  setelah proses beneran selesai, reuse `notify/telegram.py::send_message()`.
-- Bot ini masih bot **1 command saja** (`/run_daily`) -- BUKAN command
-  framework penuh. Command lain (mis. `/status`) belum ada, bisa ditambah
-  nanti kalau terbukti perlu, bukan dibangun spekulatif sekarang.
+  (1) `chat_id` pesan HARUS masuk allowlist `TELEGRAM_CHAT_IDS` (jamak,
+  koma-pisah -- fallback ke `TELEGRAM_CHAT_ID` tunggal kalau blm di-set,
+  abaikan diam-diam kalau tidak masuk daftar, tidak bocorkan info ke
+  pengirim asing), (2) opsional secret token header
+  `X-Telegram-Bot-Api-Secret-Token` (kalau `TELEGRAM_WEBHOOK_SECRET`
+  diisi) -- pertahanan tambahan drpd cuma chat_id.
+- **3 command** (spec Giel "Telegram Bot Commands v1.0", 5-6 Agustus 2026):
+  - `/start` -- daftar command.
+  - `/status` -- baca `daily_market` terbaru (kapan run_daily terakhir) +
+    tanggal terbaru `asset_ohlcv`/`daily_news` MASING-MASING (bukan
+    diasumsikan sinkron) + event `econ_calendar` mendatang + sinyal
+    `trade_signals` pending approve + thread link SUGGESTED nunggu review.
+  - `/run_daily` -> jalankan `run_daily_mod.run_daily()` di **background
+    thread** (bukan langsung di handler) -- Telegram retry kirim update
+    kalau webhook tidak balas cepat, dan `run_daily()` bisa lama (fetch
+    semua sumber eksternal). Handler balas ack cepat ("⏳ run_daily
+    dimulai..."), baru kirim pesan susulan (format SAMA seperti `/status`)
+    setelah proses beneran selesai, reuse `notify/telegram.py::send_message()`.
+    Digerbangi **lock file** (`$TMPDIR/kastara_run_daily.lock`, isi
+    PID+timestamp, stale >30 menit diambil alih -- cegah 2 run bersamaan,
+    SQLite single-writer §6.1) + **rate limit 5 menit** antar-trigger
+    (file terpisah, cegah spam trigger BERURUTAN stlh run sebelumnya
+    selesai).
+- **Command lain SENGAJA tidak dibangun** (`approve/reject sinyal`,
+  `backfill`, `settings/grader override`) -- per spec §1: itu operasi yang
+  butuh gate/ritual sadar (anti-impulsif, friksi yang disengaja), bukan
+  operasi pipa idempoten seperti `run_daily`/`run_analysis` (well,
+  `run_analysis` juga belum dibangun sbg command -- ditandai "boleh" di
+  spec tapi tidak masuk 3 command yang benar2 dispesifikasikan, jadi belum
+  diimplementasikan, bisa ditambah nanti kalau terbukti perlu).
+- **Kenapa TETAP webhook, bukan long-polling+systemd** (draft awal spec
+  minta VPS terpisah): Railway SUDAH jadi host always-on -- prasyarat spec
+  itu sendiri sudah terpenuhi. Long-polling+systemd butuh proses ke-2 yang
+  jalan terus, yang di Railway berarti service ke-2 -- kena blocker Volume-
+  cuma-1-service yang SAMA PERSIS yang menggagalkan rencana cron-service
+  di atas (§8.0). Webhook di service yang sama menghindari masalah ini
+  sepenuhnya.
 
 ### 8.2 Setup (aksi manual, butuh token/domain asli Giel)
 
@@ -278,6 +302,8 @@ SAMA (yang sudah punya Volume/DB asli) -- bukan proses terpisah.
        TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (sudah ada dari Daily Briefing
        kalau sudah pernah setup lokal). Tambah juga:
        TELEGRAM_WEBHOOK_SECRET=<string acak, rekomendasi tapi opsional>
+       TELEGRAM_CHAT_IDS=<opsional, koma-pisah kalau mau >1 chat_id boleh
+       trigger bot -- kalau kosong fallback ke TELEGRAM_CHAT_ID tunggal>
 [ ] 2. Setelah service live & domain publik ada (§7.3 langkah 4/7), daftar-
        kan webhook ke Telegram SEKALI (dari mesin lokal, ganti <TOKEN>/
        <URL>/<SECRET>):

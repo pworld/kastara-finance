@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import tempfile
 import threading
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -54,7 +55,7 @@ from notify.telegram import send_message
 from pipeline.compose_briefing import compose_daily_briefing
 from pipeline.compose_persona_context import compose_persona_context
 from pipeline.run_grader import run_grader
-from scrapers.base import today_wib
+from scrapers.base import created_at, now_wib, today_wib
 from scrapers.idx_uma import fetch_uma_announcements, is_recently_flagged, uma_history_for
 
 app = Flask(__name__, static_folder=None)
@@ -76,16 +77,154 @@ init_db()
 # diam-diam membolehkan siapa saja masuk. ----------
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "").strip()
 AUTH_EXEMPT_API_PATHS = {"/api/auth/login", "/api/auth/status", "/api/telegram/webhook"}
-# Telegram bot 2-arah (trigger manual /run_daily, 4 Agustus 2026) -- SATU
-# command saja, sengaja tidak generalisasi jadi command framework penuh
-# (bot masih dominan push 1-arah, lihat notify/telegram.py). Webhook publik
+# Telegram bot 2-arah (dibangun 4 Agustus 2026, diperluas 5-6 Agustus 2026
+# per spec Giel "Telegram Bot Commands v1.0" -- lihat ROADMAP.md). TETAP
+# webhook di service Railway yang sama (Railway = host always-on, bukan
+# long-polling+systemd di VPS terpisah seperti draft awal spec -- Giel
+# eksplisit konfirmasi setelah dijelaskan Volume Railway cuma bisa 1
+# service, jadi proses ke-2 yg polling terus2an bakal kena blocker yang
+# sama persis dgn kenapa cron-service kedua ditolak). Webhook publik
 # (Telegram yang panggil, bukan browser Giel) -- makanya exempt dari session
-# auth di atas, tapi digerbangi 2 lapis di bawah: (1) chat_id HARUS sama
-# dengan TELEGRAM_CHAT_ID (abaikan diam-diam kalau beda -- tidak bocorkan
-# info ke pengirim tak dikenal), (2) kalau TELEGRAM_WEBHOOK_SECRET diisi,
-# header rahasia Telegram (X-Telegram-Bot-Api-Secret-Token, di-set saat
-# setWebhook) harus cocok juga -- pertahanan tambahan drpd cuma chat_id.
+# auth di atas, tapi digerbangi 2 lapis di bawah: (1) chat_id HARUS masuk
+# allowlist (abaikan diam-diam kalau tidak -- tidak bocorkan info ke
+# pengirim tak dikenal, sama prinsip §3.1 spec "balas dengan diam"), (2)
+# kalau TELEGRAM_WEBHOOK_SECRET diisi, header rahasia Telegram
+# (X-Telegram-Bot-Api-Secret-Token, di-set saat setWebhook) harus cocok
+# juga -- pertahanan tambahan drpd cuma chat_id.
 TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+
+# §3.2 spec: lock file cegah 2 /run_daily bersamaan (SQLite single-writer,
+# ARCHITECTURE §6.1). File di tempdir (bukan hardcode /tmp) supaya portabel
+# jalan di WSL/Windows dev maupun container Railway. Umur lock > 30 menit
+# dianggap stale (proses lama kemungkinan crash tanpa sempat hapus lock) --
+# diambil alih drpd mengunci selamanya.
+RUN_DAILY_LOCK_PATH = os.path.join(tempfile.gettempdir(), "kastara_run_daily.lock")
+RUN_DAILY_LAST_TRIGGER_PATH = os.path.join(tempfile.gettempdir(), "kastara_run_daily_last_trigger.txt")
+RUN_DAILY_LOCK_STALE_SECONDS = 30 * 60
+# §3.3 spec: jeda minimal antar-trigger (beda dari lock -- ini cegah spam
+# trigger BERURUTAN stlh run sebelumnya SUDAH selesai, bukan cuma cegah
+# tumpang tindih).
+RUN_DAILY_MIN_INTERVAL_SECONDS = 5 * 60
+
+_ID_MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+
+
+def _format_id_date(date_str: str) -> str:
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    return f"{dt.day:02d} {_ID_MONTH_ABBR[dt.month - 1]}"
+
+
+def _format_id_datetime(dt: datetime) -> str:
+    return f"{dt.day:02d} {_ID_MONTH_ABBR[dt.month - 1]} {dt.year} {dt.strftime('%H:%M')}"
+
+
+def _relative_time_id(iso_str: str | None) -> str:
+    """'2026-08-06 00:03:12+0700' -> '9 jam lalu' dst -- parse gagal (format
+    tak dikenal) balas string asli apa adanya, jangan raise (ini teks
+    Telegram, bukan jalur kritis)."""
+    if not iso_str:
+        return "-"
+    try:
+        dt = datetime.strptime(iso_str, "%Y-%m-%d %H:%M:%S%z")
+    except ValueError:
+        return iso_str
+    seconds = (now_wib() - dt).total_seconds()
+    if seconds < 60:
+        return "baru saja"
+    if seconds < 3600:
+        return f"{int(seconds // 60)} menit lalu"
+    if seconds < 86400:
+        return f"{int(seconds // 3600)} jam lalu"
+    return f"{int(seconds // 86400)} hari lalu"
+
+
+def _table_freshness(date_str: str | None) -> str:
+    """'2026-08-06' (hari ini) -> '06 Agu ✅'; tanggal lebih lama -> '⚠ (N
+    hari lalu)'; None -> belum ada data sama sekali."""
+    if not date_str:
+        return "⚠ belum ada data"
+    if date_str == today_wib():
+        return f"{_format_id_date(date_str)} ✅"
+    days = (datetime.strptime(today_wib(), "%Y-%m-%d") - datetime.strptime(date_str, "%Y-%m-%d")).days
+    return f"{_format_id_date(date_str)} ⚠ ({days} hari lalu)"
+
+
+def _format_status_message(s: dict[str, Any]) -> str:
+    """Bentuk teks /status (dan pesan susulan run_daily selesai -- §2 spec:
+    "sama format /status") dari dict `writes.telegram_status_summary()`."""
+    if not s["last_date"]:
+        return "Belum ada data pipeline sama sekali."
+    try:
+        run_at = _format_id_datetime(datetime.strptime(s["created_at"], "%Y-%m-%d %H:%M:%S%z"))
+    except (ValueError, TypeError):
+        run_at = s["created_at"] or "-"
+    lines = [
+        f"\U0001F4CA Status · {_format_id_datetime(now_wib())}",
+        f"Run terakhir : {run_at} ({_relative_time_id(s['created_at'])})",
+        f"Sumber       : {s['sources_ok']} ok · {s['sources_fail']} fail · {s['sources_skip']} skip",
+    ]
+    if s["sources_fail_names"]:
+        lines.append(f"  ⚠ fail: {', '.join(s['sources_fail_names'])}")
+    lines.append("Data terakhir:")
+    lines.append(f"  daily_market  : {_table_freshness(s['daily_market_date'])}")
+    lines.append(f"  asset_ohlcv   : {_table_freshness(s['asset_ohlcv_date'])} ({s['asset_ohlcv_count']} instrumen)")
+    lines.append(f"  daily_news    : {_table_freshness(s['daily_news_date'])} ({s['daily_news_count']} berita)")
+    lines.append(f"  econ_calendar : {s['econ_upcoming']} event mendatang")
+    lines.append(f"Sinyal pending approve : {s['pending_signals']}  (cek di dashboard)")
+    if s["pending_thread_links"]:
+        lines.append(f"Thread link SUGGESTED nunggu review : {s['pending_thread_links']}")
+    return "\n".join(lines)
+
+
+def _telegram_allowed_chat_ids() -> set[str]:
+    """§3.1 spec: allowlist, sekarang bisa lebih dari 1 chat_id.
+    `TELEGRAM_CHAT_IDS` (jamak, koma-pisah) baru -- fallback ke
+    `TELEGRAM_CHAT_ID` (tunggal, sudah di-set di Railway) kalau yg jamak
+    belum diisi, supaya tidak perlu re-deploy env var lagi cuma utk ini."""
+    raw = os.getenv("TELEGRAM_CHAT_IDS", "").strip() or os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    return {x.strip() for x in raw.split(",") if x.strip()}
+
+
+def _run_daily_lock_status() -> tuple[bool, str | None]:
+    """Return (masih_terkunci_dan_segar, 'HH:MM' sejak kapan). Lock stale
+    (>30 menit) dianggap TIDAK terkunci (diambil alih, bukan raise/nunggu
+    selamanya -- proses lama kemungkinan crash tanpa sempat hapus lock)."""
+    if not os.path.exists(RUN_DAILY_LOCK_PATH):
+        return False, None
+    try:
+        with open(RUN_DAILY_LOCK_PATH, encoding="utf-8") as f:
+            _pid_str, ts_str = f.read().strip().split("|", 1)
+        locked_at = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S%z")
+    except (OSError, ValueError):
+        return False, None
+    if (now_wib() - locked_at).total_seconds() >= RUN_DAILY_LOCK_STALE_SECONDS:
+        return False, None
+    return True, locked_at.strftime("%H:%M")
+
+
+def _run_daily_rate_limited() -> bool:
+    if not os.path.exists(RUN_DAILY_LAST_TRIGGER_PATH):
+        return False
+    try:
+        with open(RUN_DAILY_LAST_TRIGGER_PATH, encoding="utf-8") as f:
+            last = datetime.strptime(f.read().strip(), "%Y-%m-%d %H:%M:%S%z")
+    except (OSError, ValueError):
+        return False
+    return (now_wib() - last).total_seconds() < RUN_DAILY_MIN_INTERVAL_SECONDS
+
+
+def _acquire_run_daily_lock() -> None:
+    with open(RUN_DAILY_LOCK_PATH, "w", encoding="utf-8") as f:
+        f.write(f"{os.getpid()}|{created_at()}")
+    with open(RUN_DAILY_LAST_TRIGGER_PATH, "w", encoding="utf-8") as f:
+        f.write(created_at())
+
+
+def _release_run_daily_lock() -> None:
+    try:
+        os.remove(RUN_DAILY_LOCK_PATH)
+    except OSError:
+        pass
 FRONTEND_DIST = Path(__file__).resolve().parent / "frontend" / "dist"
 
 
@@ -452,43 +591,70 @@ def _run_daily_via_telegram(chat_id: str | int) -> None:
     Telegram akan RETRY kirim update kalau webhook tidak balas cepat, dan
     run_daily() bisa lama (fetch semua sumber eksternal, sama seperti
     /api/run_daily_now). Balas dulu ack cepat di handler webhook, baru
-    jalankan ini di thread terpisah -- hasil/error dikirim susulan lewat
-    send_message() begitu selesai."""
+    jalankan ini di thread terpisah -- hasil dikirim susulan lewat
+    send_message() begitu selesai, format SAMA seperti /status (spec §2)
+    drpd ringkasan ad-hoc terpisah. Lock DIJAMIN terlepas (try/finally)
+    biar run yang crash tidak mengunci /run_daily selamanya (>30 menit
+    juga otomatis dianggap stale kalau finally sendiri gagal jalan)."""
     try:
-        summary = run_daily_mod.run_daily()
-        text = (
-            f"[run_daily via Telegram] selesai -- {summary['news_inserted']} berita baru, "
-            f"{summary['sources_ok']} sumber ok / {summary['sources_fail']} gagal / "
-            f"{summary['sources_skip']} skip."
-        )
+        run_daily_mod.run_daily()
+        with get_connection() as conn:
+            s = writes.telegram_status_summary(conn)
+        text = "✅ run_daily selesai.\n\n" + _format_status_message(s)
     except Exception as exc:  # noqa: BLE001
         text = f"[run_daily via Telegram] GAGAL: {type(exc).__name__}: {exc}"
+    finally:
+        _release_run_daily_lock()
     send_message(text, chat_id=chat_id)
 
 
 @app.post("/api/telegram/webhook")
 def telegram_webhook():
-    """Bot Telegram 2-arah, SATU command (`/run_daily`) -- trigger manual
-    pipeline harian dari HP tanpa buka dashboard, jawab keluhan "cron belum
-    aktif" (Railway Volume tidak bisa dipakai bareng 2 service, jadi cron
-    service terpisah tidak realistis utk SQLite single-file, lihat
-    ROADMAP.md 4 Agustus 2026). Endpoint publik (Telegram yang panggil, exempt
-    dari session auth) -- digerbangi chat_id (abaikan diam-diam kalau beda,
-    jangan bocorkan info) + opsional secret token header (kalau
-    TELEGRAM_WEBHOOK_SECRET diisi)."""
+    """Bot Telegram 2-arah -- `/start`, `/status`, `/run_daily` (spec Giel
+    "Telegram Bot Commands v1.0", 5-6 Agustus 2026). Command lain di luar
+    3 ini SENGAJA tidak diimplementasikan (approve/reject sinyal, backfill,
+    settings/grader override -- §1 spec: butuh gate/ritual sadar, bukan
+    operasi pipa idempoten, jadi TIDAK layak dipicu dari HP). Endpoint
+    publik (Telegram yang panggil, exempt dari session auth) -- digerbangi
+    chat_id allowlist (abaikan diam-diam kalau tidak masuk daftar, jangan
+    bocorkan info -- §3.1 spec "balas dengan diam") + opsional secret
+    token header (kalau TELEGRAM_WEBHOOK_SECRET diisi)."""
     if TELEGRAM_WEBHOOK_SECRET:
         if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != TELEGRAM_WEBHOOK_SECRET:
             return jsonify({"ok": False}), 403
     update = request.get_json(silent=True) or {}
     message = update.get("message") or {}
     chat_id = message.get("chat", {}).get("id")
-    allowed_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
-    if not chat_id or not allowed_chat_id or str(chat_id) != allowed_chat_id:
+    allowed = _telegram_allowed_chat_ids()
+    if not chat_id or not allowed or str(chat_id) not in allowed:
         return jsonify({"ok": True})
     text = (message.get("text") or "").strip()
     if text == "/run_daily":
-        threading.Thread(target=_run_daily_via_telegram, args=(chat_id,), daemon=True).start()
-        send_message("Menjalankan pipeline harian sekarang, tunggu ringkasannya...", chat_id=chat_id)
+        locked, locked_since = _run_daily_lock_status()
+        if locked:
+            send_message(f"⏳ sedang berjalan sejak {locked_since}", chat_id=chat_id)
+        elif _run_daily_rate_limited():
+            send_message(
+                "Baru saja dijalankan (< 5 menit lalu) -- tunggu sebentar sebelum trigger lagi.",
+                chat_id=chat_id,
+            )
+        else:
+            _acquire_run_daily_lock()
+            threading.Thread(target=_run_daily_via_telegram, args=(chat_id,), daemon=True).start()
+            send_message("⏳ run_daily dimulai... (perkiraan 2-4 menit)", chat_id=chat_id)
+    elif text == "/start":
+        send_message(
+            "\U0001F537 Kastara Finance Bot\n"
+            "/status      -- status data & scraper terakhir\n"
+            "/run_daily   -- jalankan pipeline harian\n"
+            "/start       -- pesan ini\n\n"
+            "Push briefing tetap dari dashboard (Panel 6).",
+            chat_id=chat_id,
+        )
+    elif text == "/status":
+        with get_connection() as conn:
+            s = writes.telegram_status_summary(conn)
+        send_message(_format_status_message(s), chat_id=chat_id)
     return jsonify({"ok": True})
 
 

@@ -2011,3 +2011,55 @@ def thread_opinion_summary(conn: sqlite3.Connection, thread_id: int) -> dict[str
         else:
             summary["unclassified"] += r["n"]
     return summary
+
+
+# ---------- Telegram bot /status (5 Agustus 2026) ----------
+
+def telegram_status_summary(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Ringkas kondisi pipeline utk command Telegram /status -- dipakai
+    Giel cek "cron beneran jalan gak" dari HP tanpa buka dashboard (motivasi
+    asli fitur bot ini, lihat ROADMAP.md 4/5 Agustus 2026). `daily_market`
+    jadi sumber "kapan run_daily terakhir" krn diisi tiap run (beda dari
+    daily_news yang bisa nol baris di hari sepi). Tiap tabel (daily_market,
+    asset_ohlcv, daily_news) dicek TANGGAL TERBARUNYA SENDIRI-SENDIRI --
+    BUKAN diasumsikan selalu sinkron -- supaya "berita ketinggalan tapi
+    market ok" (atau sebaliknya) kelihatan, bukan tersembunyi di balik satu
+    tanggal gabungan."""
+    market_row = conn.execute(
+        "SELECT date, created_at, source_flags FROM daily_market ORDER BY date DESC LIMIT 1"
+    ).fetchone()
+    if not market_row:
+        return {"last_date": None}
+    flags = json.loads(market_row["source_flags"]) if market_row["source_flags"] else {}
+    fail_names = sorted(k for k, v in flags.items() if v == "fail")
+    news_row = conn.execute(
+        "SELECT date, COUNT(*) AS n FROM daily_news GROUP BY date ORDER BY date DESC LIMIT 1"
+    ).fetchone()
+    ohlcv_row = conn.execute(
+        "SELECT date, COUNT(*) AS n FROM asset_ohlcv GROUP BY date ORDER BY date DESC LIMIT 1"
+    ).fetchone()
+    econ_upcoming = conn.execute(
+        "SELECT COUNT(*) AS n FROM econ_calendar WHERE event_date >= ?", (today_wib(),),
+    ).fetchone()["n"]
+    pending_signals = conn.execute(
+        "SELECT COUNT(*) AS n FROM trade_signals WHERE approved = 0"
+    ).fetchone()["n"]
+    pending_links = conn.execute(
+        "SELECT COUNT(*) AS n FROM news_thread_links WHERE link_status = 'SUGGESTED'"
+    ).fetchone()["n"]
+    return {
+        "last_date": market_row["date"],
+        "created_at": market_row["created_at"],
+        "sources_ok": sum(1 for v in flags.values() if v == "ok"),
+        "sources_fail": len(fail_names),
+        "sources_fail_names": fail_names,
+        "sources_skip": sum(1 for v in flags.values() if v == "skip"),
+        "daily_market_date": market_row["date"],
+        "daily_news_date": news_row["date"] if news_row else None,
+        "daily_news_count": news_row["n"] if news_row else 0,
+        "asset_ohlcv_date": ohlcv_row["date"] if ohlcv_row else None,
+        "asset_ohlcv_count": ohlcv_row["n"] if ohlcv_row else 0,
+        "econ_upcoming": econ_upcoming,
+        "pending_signals": pending_signals,
+        "pending_thread_links": pending_links,
+    }

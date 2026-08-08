@@ -1,6 +1,8 @@
 """Test web/app.py pure helpers (Panel 1 snapshot compare + data-gap detection)."""
+import json
 import os
 import tempfile
+from datetime import timedelta
 
 import pytest
 
@@ -210,11 +212,18 @@ def test_all_instruments_with_gaps_no_gap_returns_empty(tmp_path):
     assert results == []
 
 
-# ---------- Telegram bot 2-arah: /api/telegram/webhook (4 Agustus 2026) ----------
-# Endpoint publik (Telegram yang panggil, exempt session auth) -- test fokus
-# ke 2 gerbang keamanan (chat_id + secret token opsional) dan guard
-# command-tunggal (`/run_daily`), BUKAN test run_daily() beneran (network,
-# di-monkeypatch).
+# ---------- Telegram bot 2-arah: /api/telegram/webhook ----------
+# Dibangun 4 Agustus 2026, diperluas 5-6 Agustus 2026 per spec Giel
+# "Telegram Bot Commands v1.0" (allowlist multi chat_id, /status kaya
+# per-tabel, lock anti-double-run + rate limit /run_daily) -- TETAP webhook
+# di Railway (bukan long-polling+systemd, lihat komentar app.py). Endpoint
+# publik (Telegram yang panggil, exempt session auth) -- test fokus ke
+# gerbang keamanan (allowlist + secret token opsional) dan guard 3-command,
+# BUKAN test run_daily() beneran (network, di-monkeypatch). Tiap test yang
+# menyentuh /run_daily WAJIB monkeypatch RUN_DAILY_LOCK_PATH/
+# RUN_DAILY_LAST_TRIGGER_PATH ke tmp_path -- constant aslinya nunjuk ke
+# tempdir asli, kalau tidak di-isolate test bisa saling bocor state lewat
+# lock file yang sama.
 
 class _ImmediateThread:
     """Pengganti threading.Thread di test -- jalankan target() LANGSUNG
@@ -229,9 +238,24 @@ class _ImmediateThread:
         self._target(*self._args, **self._kwargs)
 
 
-def test_telegram_webhook_ignores_unknown_chat_id(monkeypatch):
+def _isolate_run_daily_lock_paths(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_app_mod, "RUN_DAILY_LOCK_PATH", str(tmp_path / "run_daily.lock"))
+    monkeypatch.setattr(web_app_mod, "RUN_DAILY_LAST_TRIGGER_PATH", str(tmp_path / "run_daily_last_trigger.txt"))
+
+
+def _seed_daily_market(date="2026-08-06", flags=None):
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO daily_market (date, created_at, source_flags) VALUES (?,?,?)",
+            (date, web_app_mod.created_at(), json.dumps(flags or {"btc": "ok"})),
+        )
+        conn.commit()
+
+
+def test_telegram_webhook_ignores_unknown_chat_id(monkeypatch, tmp_path):
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "111")
     monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "")
+    _isolate_run_daily_lock_paths(monkeypatch, tmp_path)
     calls = []
     monkeypatch.setattr(web_app_mod, "run_daily_mod", type("M", (), {"run_daily": lambda: calls.append("ran")})())
     client = web_app_mod.app.test_client()
@@ -252,28 +276,107 @@ def test_telegram_webhook_ignores_unknown_command(monkeypatch):
     assert calls == []
 
 
-def test_telegram_webhook_triggers_run_daily_for_allowed_chat(monkeypatch):
+def test_telegram_webhook_accepts_any_id_in_telegram_chat_ids_list(monkeypatch, tmp_path):
+    # TELEGRAM_CHAT_IDS (jamak) -- allowlist beberapa chat_id sekaligus,
+    # bukan cuma satu (§3.1 spec).
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.setenv("TELEGRAM_CHAT_IDS", "111, 222")
+    monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "")
+    sent = []
+    monkeypatch.setattr(web_app_mod, "send_message", lambda text, chat_id=None: sent.append((text, chat_id)))
+    client = web_app_mod.app.test_client()
+    r1 = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 222}, "text": "/start"}})
+    r2 = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 333}, "text": "/start"}})
+    assert r1.status_code == 200 and r2.status_code == 200
+    assert len(sent) == 1
+    assert sent[0][1] == 222
+
+
+def test_telegram_webhook_triggers_run_daily_for_allowed_chat(monkeypatch, tmp_path):
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "111")
     monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "")
     monkeypatch.setattr(web_app_mod, "threading", type("T", (), {"Thread": _ImmediateThread})())
-    fake_summary = {"news_inserted": 5, "sources_ok": 8, "sources_fail": 0, "sources_skip": 1}
-    monkeypatch.setattr(
-        web_app_mod, "run_daily_mod", type("M", (), {"run_daily": staticmethod(lambda: fake_summary)})()
-    )
+    _isolate_run_daily_lock_paths(monkeypatch, tmp_path)
+
+    def _fake_run_daily():
+        _seed_daily_market()  # simulasi efek nyata run_daily() -- isi daily_market
+
+    monkeypatch.setattr(web_app_mod, "run_daily_mod", type("M", (), {"run_daily": staticmethod(_fake_run_daily)})())
     sent = []
     monkeypatch.setattr(web_app_mod, "send_message", lambda text, chat_id=None: sent.append((text, chat_id)))
     client = web_app_mod.app.test_client()
     resp = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 111}, "text": "/run_daily"}})
     assert resp.status_code == 200
     # _ImmediateThread jalankan target() SYNCHRONOUS saat .start() dipanggil --
-    # jadi pesan ringkasan (dikirim di dalam target) terkirim SEBELUM pesan ack
+    # jadi pesan hasil (dikirim di dalam target) terkirim SEBELUM pesan ack
     # (dikirim setelah .start() return di handler) -- beda dari urutan runtime
     # asli (thread beneran, ack duluan). Cuma pastikan KEDUANYA terkirim & isinya benar.
     assert len(sent) == 2
     texts = [t for t, _ in sent]
-    assert any("5 berita baru" in t for t in texts)
-    assert any("Menjalankan pipeline harian" in t for t in texts)
+    assert any("run_daily dimulai" in t for t in texts)
+    assert any("run_daily selesai" in t and "daily_market" in t for t in texts)
     assert all(chat_id == 111 for _, chat_id in sent)
+    # lock WAJIB terlepas setelah selesai (finally di _run_daily_via_telegram).
+    assert not os.path.exists(web_app_mod.RUN_DAILY_LOCK_PATH)
+
+
+def test_telegram_webhook_run_daily_blocked_when_already_locked(monkeypatch, tmp_path):
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "111")
+    monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "")
+    _isolate_run_daily_lock_paths(monkeypatch, tmp_path)
+    web_app_mod._acquire_run_daily_lock()  # simulasi run_daily lain SEDANG jalan
+    calls = []
+    monkeypatch.setattr(web_app_mod, "run_daily_mod", type("M", (), {"run_daily": lambda: calls.append("ran")})())
+    sent = []
+    monkeypatch.setattr(web_app_mod, "send_message", lambda text, chat_id=None: sent.append((text, chat_id)))
+    client = web_app_mod.app.test_client()
+    resp = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 111}, "text": "/run_daily"}})
+    assert resp.status_code == 200
+    assert calls == []  # TIDAK jalan lagi krn masih terkunci
+    assert len(sent) == 1
+    assert "sedang berjalan sejak" in sent[0][0]
+
+
+def test_telegram_webhook_run_daily_stale_lock_taken_over(monkeypatch, tmp_path):
+    # Lock berumur > 30 menit dianggap stale (proses lama kemungkinan crash
+    # tanpa sempat hapus lock) -- diambil alih, BUKAN mengunci selamanya.
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "111")
+    monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "")
+    monkeypatch.setattr(web_app_mod, "threading", type("T", (), {"Thread": _ImmediateThread})())
+    _isolate_run_daily_lock_paths(monkeypatch, tmp_path)
+    stale_time = web_app_mod.now_wib() - timedelta(minutes=45)
+    with open(web_app_mod.RUN_DAILY_LOCK_PATH, "w", encoding="utf-8") as f:
+        f.write(f"99999|{stale_time.strftime('%Y-%m-%d %H:%M:%S%z')}")
+
+    def _fake_run_daily():
+        _seed_daily_market()
+
+    monkeypatch.setattr(web_app_mod, "run_daily_mod", type("M", (), {"run_daily": staticmethod(_fake_run_daily)})())
+    sent = []
+    monkeypatch.setattr(web_app_mod, "send_message", lambda text, chat_id=None: sent.append((text, chat_id)))
+    client = web_app_mod.app.test_client()
+    resp = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 111}, "text": "/run_daily"}})
+    assert resp.status_code == 200
+    texts = [t for t, _ in sent]
+    assert any("run_daily dimulai" in t for t in texts)  # bukan "sedang berjalan"
+
+
+def test_telegram_webhook_run_daily_rate_limited(monkeypatch, tmp_path):
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "111")
+    monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "")
+    _isolate_run_daily_lock_paths(monkeypatch, tmp_path)
+    with open(web_app_mod.RUN_DAILY_LAST_TRIGGER_PATH, "w", encoding="utf-8") as f:
+        f.write(web_app_mod.created_at())  # trigger "baru saja"
+    calls = []
+    monkeypatch.setattr(web_app_mod, "run_daily_mod", type("M", (), {"run_daily": lambda: calls.append("ran")})())
+    sent = []
+    monkeypatch.setattr(web_app_mod, "send_message", lambda text, chat_id=None: sent.append((text, chat_id)))
+    client = web_app_mod.app.test_client()
+    resp = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 111}, "text": "/run_daily"}})
+    assert resp.status_code == 200
+    assert calls == []
+    assert len(sent) == 1
+    assert "5 menit" in sent[0][0]
 
 
 def test_telegram_webhook_requires_secret_token_when_configured(monkeypatch):
@@ -287,3 +390,67 @@ def test_telegram_webhook_requires_secret_token_when_configured(monkeypatch):
     assert wrong.status_code == 403
     missing = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 111}, "text": "/run_daily"}})
     assert missing.status_code == 403
+
+
+def test_telegram_webhook_start_sends_help_text(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "111")
+    monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "")
+    sent = []
+    monkeypatch.setattr(web_app_mod, "send_message", lambda text, chat_id=None: sent.append((text, chat_id)))
+    client = web_app_mod.app.test_client()
+    resp = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 111}, "text": "/start"}})
+    assert resp.status_code == 200
+    assert len(sent) == 1
+    assert "/run_daily" in sent[0][0]
+    assert "/status" in sent[0][0]
+    assert sent[0][1] == 111
+
+
+def test_telegram_webhook_status_reports_last_run(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "111")
+    monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "")
+    with get_connection() as conn:
+        # DB file di-share SATU utk seluruh test file ini (module-level
+        # KASTARA_DB_PATH) -- bersihkan dulu supaya row daily_market dari
+        # test lain (mis. seed /run_daily bertanggal hari ini) tidak
+        # ngalahin MAX(date) row test ini.
+        conn.execute("DELETE FROM daily_market")
+        conn.commit()
+        conn.execute(
+            "INSERT INTO daily_market (date, created_at, source_flags) VALUES (?,?,?)",
+            ("2026-08-05", web_app_mod.created_at(), json.dumps({"btc": "ok", "yf": "fail"})),
+        )
+        conn.execute(
+            "INSERT INTO daily_news (date, source, headline, raw_url, impact_level) VALUES (?,?,?,?,?)",
+            ("2026-08-05", "CNBC Indonesia", "Test headline", "https://x.test", "LOW"),
+        )
+        conn.commit()
+    sent = []
+    monkeypatch.setattr(web_app_mod, "send_message", lambda text, chat_id=None: sent.append((text, chat_id)))
+    client = web_app_mod.app.test_client()
+    resp = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 111}, "text": "/status"}})
+    assert resp.status_code == 200
+    assert len(sent) == 1
+    text, chat_id = sent[0]
+    assert "1 ok" in text
+    assert "1 fail" in text
+    assert "1 berita" in text
+    assert "daily_market" in text
+    assert "asset_ohlcv" in text
+    assert "econ_calendar" in text
+    assert "Sinyal pending approve" in text
+    assert chat_id == 111
+
+
+def test_telegram_webhook_status_with_no_pipeline_data_yet(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "111")
+    monkeypatch.setattr(web_app_mod, "TELEGRAM_WEBHOOK_SECRET", "")
+    with get_connection() as conn:
+        conn.execute("DELETE FROM daily_market")
+        conn.commit()
+    sent = []
+    monkeypatch.setattr(web_app_mod, "send_message", lambda text, chat_id=None: sent.append((text, chat_id)))
+    client = web_app_mod.app.test_client()
+    resp = client.post("/api/telegram/webhook", json={"message": {"chat": {"id": 111}, "text": "/status"}})
+    assert resp.status_code == 200
+    assert sent == [("Belum ada data pipeline sama sekali.", 111)]
