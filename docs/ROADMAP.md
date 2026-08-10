@@ -3126,4 +3126,46 @@ kepanjangan di layar sempit):
   Browser-check tidak bisa dilanjutkan (port 5000 masih kepakai proses
   lama sesi ini, sama seperti pengecekan sebelumnya) -- Giel perlu cek
   langsung navigasi antar-tab di HP.
+
+**Update -- Bersihkan duplikat daily_news dari bug tanggal-scrape lama
+(6 Agustus 2026, sesi sama):** Giel kasih 1 contoh nyata -- artikel "World
+Cup gave bars..." (tanggal asli Jul 15) muncul dgn tanggal 2026-08-09 di
+produksi. Digali: bug `scrapers/news.py` yang diperbaiki sesi ini (stamp
+`target_date` bukan tanggal terbit asli) sudah lama aktif -- 1 artikel yg
+lama nongkrong di window rolling RSS ke-insert ULANG tiap hari cron jalan,
+tiap kali dpt tanggal SCRAPE baru (salah). Fix scraper cuma cegah KE
+DEPAN, tidak beresin baris yg SUDAH terlanjur masuk -- jadi dibangun
+`tools/dedupe_news.py` (one-off cleanup, bukan bagian pipeline harian).
+- **Strategi tentukan tanggal benar per grup (headline+source+raw_url,
+  SEMUA identik = pasti artikel yang sama)**: (1) kalau raw_url CNBC
+  (pola `/YYYY/MM/DD/` tertanam di path URL-nya sendiri -- diverifikasi
+  match 100% di sampel) -- pakai tanggal itu, dari sumbernya langsung,
+  bukan tebakan. (2) kalau tidak (mis. ANTARA, URL cuma id artikel) --
+  pakai MIN(date) di antara duplikat, best-effort. **Sengaja group by
+  raw_url JUGA, bukan cuma headline+source** -- headline generik yang
+  genuinely berulang di artikel BEDA (mis. ANTARA "IHSG melemah ikuti
+  bursa Asia" dipakai utk banyak hari asli beda) TIDAK ikut kena kolaps,
+  krn raw_url-nya beda (diverifikasi: 986 grup kalau cuma headline+source,
+  778 stlh raw_url ikut dicek -- 208 grup itu memang bukan bug, HARUS
+  dibiarkan).
+- **content_tags/news_thread_links yang nempel di baris yg dihapus WAJIB
+  di-repoint ke baris yang dipertahankan dulu** (bukan orphan) -- kalau
+  target sudah py pasangan yg sama (UNIQUE collision), baris duplikat
+  dihapus bukan di-UPDATE (guard collision, bukan crash). `tag_dictionary.
+  usage_count` di-recompute di akhir.
+- **Dites di COPY DB dulu** (bukan langsung ke file asli) -- 778 grup,
+  1993 baris berlebih, 0 orphan referensi stlh, idempoten (run ke-2 = 0
+  perubahan), contoh "World Cup" jadi benar 2026-07-15. **Baru setelah
+  itu dijalankan ke DB lokal asli** (Giel eksplisit konfirmasi "ok") --
+  hasil PERSIS sama dgn dry-run di copy: 1993 baris dihapus, 113 tanggal
+  dikoreksi, 38 tag + 67 thread link di-repoint, 0 orphan, 0 grup
+  duplikat tersisa.
+- **Belum dijalankan ke Railway** (production) -- perlu script terpisah +
+  `railway ssh`, pola sama migrasi data sebelumnya (Giel jalankan
+  sendiri, aku tidak punya akses DB Railway langsung).
+- 6 test baru (`tests/test_dedupe_news.py`): preview counting, kolaps +
+  ambil tanggal dari URL, fallback MIN(date), headline sama tapi raw_url
+  beda TIDAK dikolaps (guard §21.9-style, mencegah false-positive),
+  repoint tags/thread-links tanpa orphan + usage_count recompute,
+  idempoten. 469 test total tetap hijau.
   tersimpan berlebih).
