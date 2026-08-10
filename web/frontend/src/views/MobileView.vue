@@ -273,6 +273,19 @@ async function loadAll() {
 }
 onMounted(loadAll)
 
+// ---------- Tab (6 Agustus 2026) -- Giel lapor scroll kepanjangan begitu
+// Chart/Thread/Portofolio ditambah (6 kartu ditumpuk 1 layar). Pecah jadi
+// tab spt ThreadDetailView.vue/UniverseView.vue (pola sama, activeTab +
+// TABS computed) -- Utama gabung WAJIB+INTI (ritual harian, harus tetap
+// jadi 1 langkah bukan 2 tab terpisah), sisanya 1 tab per kartu.
+const activeTab = ref('utama')
+const TABS = computed(() => [
+  { id: 'utama', label: 'Utama' },
+  { id: 'chart', label: 'Chart' },
+  { id: 'thread', label: `Thread${activeThreads.value.length ? ` (${activeThreads.value.length})` : ''}` },
+  { id: 'posisi', label: `Posisi${holdings.value.length + ongoing.value.length ? ` (${holdings.value.length + ongoing.value.length})` : ''}` },
+])
+
 async function logout() {
   await auth.logout()
   router.push('/login')
@@ -304,6 +317,14 @@ async function logout() {
     <p v-if="loading" class="src" style="padding:16px">Memuat...</p>
 
     <template v-else>
+      <div class="tab-bar">
+        <button
+          v-for="t in TABS" :key="t.id" class="tab-btn" :class="{ active: activeTab === t.id }"
+          @click="activeTab = t.id"
+        >{{ t.label }}</button>
+      </div>
+
+      <template v-if="activeTab === 'utama'">
       <section class="mobile-card mobile-wajib">
         <div class="mobile-card-title">WAJIB · ~1 menit</div>
         <p class="src">Catat 1 prediksi ATAU nilai 1 yang jatuh tempo -- satu-satunya yang tidak bisa dikejar besok.</p>
@@ -369,7 +390,9 @@ async function logout() {
           >{{ n.for_reading ? '★ Reading' : '📖 tandai for Reading' }}</button>
         </div>
       </section>
+      </template>
 
+      <template v-if="activeTab === 'chart'">
       <section class="mobile-card">
         <div class="mobile-card-title">Chart</div>
         <select v-if="chartAssets.length" v-model="chartInstrument" style="width:auto; margin-bottom:8px">
@@ -378,7 +401,9 @@ async function logout() {
         <svg viewBox="0 0 800 400" preserveAspectRatio="none" ref="chartEl" class="mobile-chart-svg"></svg>
         <p v-if="chartMeta" class="src" style="margin-top:6px">{{ chartMeta }}</p>
       </section>
+      </template>
 
+      <template v-if="activeTab === 'thread'">
       <section class="mobile-card">
         <div class="mobile-card-title">BONUS · Thread Aktif</div>
         <p v-if="!activeThreads.length" class="src">tidak ada thread ACTIVE</p>
@@ -395,7 +420,9 @@ async function logout() {
           <button class="btn small secondary" style="margin-top:6px" @click="openOpinionDialog(t)">+ Opini Sekunder</button>
         </div>
       </section>
+      </template>
 
+      <template v-if="activeTab === 'posisi'">
       <section class="mobile-card">
         <div class="mobile-card-title">Portofolio</div>
         <div v-if="allocation" class="src" style="margin-bottom:8px">
@@ -442,6 +469,7 @@ async function logout() {
           </span>
         </div>
       </section>
+      </template>
     </template>
 
     <Dialog v-model:visible="stanceDialogOpen" modal header="Konfirmasi Tautan Thread" style="width:90vw; max-width:420px">
@@ -514,6 +542,29 @@ async function logout() {
 }
 .mobile-quick-actions button {
   flex: 1;
+}
+.tab-bar {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  padding: 12px 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab-btn.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
 }
 .mobile-card {
   margin: 12px 16px;

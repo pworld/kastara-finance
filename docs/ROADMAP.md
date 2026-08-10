@@ -3100,4 +3100,30 @@ semua scraper market, atau sebaliknya.
   (matching konvensi proyek -- `run_daily()`/`/api/run_daily_now` sendiri
   juga tidak ada test-nya, orkestrator live-network, verifikasi manual
   lewat pemakaian nyata, bukan mock berlapis).
+
+**Update -- `/m` dipecah jadi tab, bukan 1 layar scroll panjang (6 Agustus
+2026, sesi sama):** Giel lapor scroll di mobile dashboard "sangat
+melelahkan" -- masuk akal, `/m` sudah tumbuh dari 4 kartu (desain awal,
+31 Juli) jadi 6 kartu ditumpuk 1 layar (WAJIB, Berita, Chart, Thread,
+Portofolio, Posisi -- 3 kartu terakhir ditambah hari ini juga). Dipecah
+jadi 4 tab, pola SAMA PERSIS `ThreadDetailView.vue`/`UniverseView.vue`
+(`activeTab` ref + `TABS` computed + `.tab-bar`/`.tab-btn`, CSS diadaptasi
+lebar mobile -- `overflow-x:auto` jaga-jaga drpd wrap kalau label
+kepanjangan di layar sempit):
+- **Utama** -- WAJIB (prediksi) + INTI (berita) TETAP digabung 1 tab
+  (bukan dipisah lagi) -- keduanya ritual harian yang harus 1 langkah,
+  bukan 2 tab terpisah yang malah nambah friksi.
+- **Chart** -- kartu Chart sendirian.
+- **Thread (N)** -- kartu Thread Aktif, label pakai jumlah thread ACTIVE.
+- **Posisi (N)** -- Portofolio + Posisi ONGOING digabung 1 tab (sama-sama
+  "punya apa saat ini"), label pakai jumlah holding+posisi gabungan.
+- Tab bar muncul SETELAH loading selesai (di dalam `v-else`, sebelum
+  section pertama) -- tombol Get News/Get Price di header TETAP selalu
+  terlihat lintas tab (bukan bagian dari salah satu tab), sesuai fungsinya
+  sebagai aksi cepat bukan konten per-tab.
+- Verifikasi: `npm run build` bersih (tag `<template>` seimbang -- Vue
+  compile-error keras kalau tidak, jadi ini sinyal struktural yang kuat).
+  Browser-check tidak bisa dilanjutkan (port 5000 masih kepakai proses
+  lama sesi ini, sama seperti pengecekan sebelumnya) -- Giel perlu cek
+  langsung navigasi antar-tab di HP.
   tersimpan berlebih).
