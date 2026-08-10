@@ -314,6 +314,115 @@ def run_daily(date: str | None = None, db_path=None) -> dict[str, Any]:
     return summary
 
 
+def run_news_only(date: str | None = None, db_path=None) -> dict[str, Any]:
+    """Subset `run_daily()` -- CUMA fetch+simpan berita (news+tags+thread-
+    suggest+auto-dormant), TIDAK sentuh market/crypto/econ/positioning sama
+    sekali. Dibangun 6 Agustus 2026 utk tombol "Get News" di `/m` (Giel
+    minta trigger terpisah dari harga -- kadang cuma mau lihat berita
+    terbaru tanpa nunggu semua scraper market ikut jalan). Transaksi
+    SENDIRI (bukan bagian transaksi run_daily()) -- sengaja, supaya trigger
+    scoped ini benar2 independen, tidak numpang commit pipeline penuh.
+    Reuse helper yang SAMA PERSIS dgn run_daily() (insert_news_dedup dst) --
+    bukan reimplementasi, murni subset urutan langkah."""
+    date = date or today_wib()
+    init_db(db_path)
+    news_items, news_health = fetch_all_news(date)
+    with get_connection(db_path) as conn:
+        n_news = insert_news_dedup(conn, news_items)
+        n_tags_suggested = suggest_tags_for_news(conn, news_items)
+        n_thread_links = suggest_thread_links(conn, news_items)
+        n_auto_dormant = auto_dormant_stale_threads(conn)
+        conn.commit()
+    return {
+        "date": date,
+        "news_inserted": n_news,
+        "tags_suggested": n_tags_suggested,
+        "thread_links_suggested": n_thread_links,
+        "threads_auto_dormant": n_auto_dormant,
+        "rss_ok": sum(1 for v in news_health.values() if v == "ok"),
+        "rss_dead": [name for name, status in news_health.items() if status == "dead"],
+    }
+
+
+def run_price_only(date: str | None = None, db_path=None) -> dict[str, Any]:
+    """Subset `run_daily()` -- CUMA fetch+simpan data market/harga (crypto,
+    coinalyze, yfinance macro, FRED, equity universe, IDX flow, econ
+    calendar, positioning), TIDAK sentuh berita/tags/thread sama sekali.
+    Pasangan `run_news_only()` utk tombol "Get Price" di `/m`. Transaksi
+    SENDIRI, sama alasan seperti run_news_only()."""
+    date = date or today_wib()
+    init_db(db_path)
+
+    crypto = fetch_btc(date)
+    coinalyze = fetch_coinalyze(date)
+    yf = fetch_macro_yf(date)
+    fred = fetch_macro_fred(date)
+    econ = fetch_econ_calendar()
+    positioning = fetch_positioning()
+    idx_flow = fetch_idx_foreign_flow(date)
+    equity = fetch_equity_universe(date, db_path)
+
+    with get_connection(db_path) as conn:
+        idx_tickers = [
+            r["instrument"] for r in
+            conn.execute("SELECT instrument FROM instrument_metadata WHERE market = 'IDX'").fetchall()
+        ]
+    stock_flow = fetch_idx_stock_foreign_flow(idx_tickers)
+
+    flags = SourceFlags()
+    for part in (crypto, coinalyze, yf, fred, econ, positioning, idx_flow, equity, stock_flow):
+        flags.merge(part.get("source_flags", {}))
+
+    asset_rows: list[dict[str, Any]] = []
+    if crypto.get("btc_close") is not None:
+        asset_rows.append({
+            "instrument": "BTC", "date": crypto["date"],
+            "open": crypto.get("btc_open"), "high": crypto.get("btc_high"),
+            "low": crypto.get("btc_low"), "close": crypto.get("btc_close"),
+            "volume": crypto.get("btc_volume"),
+        })
+    asset_rows.extend(yf.get("asset_rows", []))
+    asset_rows.extend(equity.get("asset_rows", []))
+
+    with get_connection(db_path) as conn:
+        for row in asset_rows:
+            row.setdefault("created_at", created_at())
+            upsert_asset_ohlcv(conn, row)
+        for row in asset_rows:
+            ma20 = volume_ma20_for_instrument(row["instrument"], row["date"], db_path)
+            if ma20 is not None:
+                conn.execute(
+                    "UPDATE asset_ohlcv SET volume_ma20 = ? WHERE date = ? AND instrument = ?",
+                    (ma20, row["date"], row["instrument"]),
+                )
+        market: dict[str, Any] = {}
+        for part in (crypto, coinalyze, yf, fred):
+            for k, v in part.items():
+                if k in DAILY_MARKET_COLS:
+                    market[k] = v
+        market["net_liquidity"] = net_liquidity(fred.get("walcl"), fred.get("rrp"), fred.get("tga"))
+        market["btc_volume_ma20"] = volume_ma20_for_instrument("BTC", date, db_path)
+        market["source_flags"] = json.dumps(flags.as_dict())
+        market["created_at"] = created_at()
+        upsert_daily_market(conn, date, market)
+        n_econ = upsert_econ_calendar(conn, econ.get("items", []))
+        n_positioning = upsert_positioning(
+            conn, positioning.get("items", []) + idx_flow.get("items", []) + stock_flow.get("items", [])
+        )
+        conn.commit()
+
+    return {
+        "date": date,
+        "sources_ok": flags.count("ok"),
+        "sources_fail": flags.count("fail"),
+        "sources_skip": flags.count("skip"),
+        "asset_rows": len(asset_rows),
+        "econ_events_new": n_econ,
+        "positioning_new": n_positioning,
+        "source_flags": flags.as_dict(),
+    }
+
+
 def _print_summary(s: dict[str, Any]) -> None:
     print("\n========== RINGKASAN RUN ==========")
     print(f"  date          : {s['date']}")

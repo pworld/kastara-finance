@@ -1,9 +1,10 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Dialog from 'primevue/dialog'
 import { get, post } from '../lib/api'
 import { today, daysAgo, FACET_COLOR, fmt } from '../lib/format'
+import { drawCandleChart } from '../lib/candleChart'
 import { useAppToast } from '../composables/useAppToast'
 import { useAuthStore } from '../stores/auth'
 
@@ -27,6 +28,33 @@ const dataOk = computed(() => {
 async function loadLatest() {
   const d = await get('/api/latest')
   latest.value = d.empty ? null : d
+}
+
+// ---------- Get News / Get Price (6 Agustus 2026) ----------
+// Giel minta trigger manual terpisah dari HP -- pola sama "Trigger Berita"
+// di SnapshotView.vue TAPI dipecah 2 tombol scoped (`run_news_only()` /
+// `run_price_only()`, pipeline/run_daily.py) drpd 1 tombol yang selalu
+// jalankan semua scraper (kadang cuma mau lihat berita terbaru TANPA
+// nunggu semua scraper market ikut jalan, atau sebaliknya). Sinkron
+// (blocking) sama seperti tombol desktop -- bukan background thread.
+const newsFetching = ref(false)
+const priceFetching = ref(false)
+async function fetchNewsNow() {
+  newsFetching.value = true
+  const r = await post('/api/news/fetch_now', {})
+  newsFetching.value = false
+  if (r.error) { toast(`Gagal: ${r.error}`); return }
+  const deadStr = r.rss_dead && r.rss_dead.length ? `, feed mati: ${r.rss_dead.join(', ')}` : ''
+  toast(`${r.news_inserted} berita baru, RSS ${r.rss_ok} ok${deadStr}`)
+  loadHighNews()
+}
+async function fetchPriceNow() {
+  priceFetching.value = true
+  const r = await post('/api/price/fetch_now', {})
+  priceFetching.value = false
+  if (r.error) { toast(`Gagal: ${r.error}`); return }
+  toast(`${r.asset_rows} baris market -- ${r.sources_ok} sumber ok / ${r.sources_fail} gagal`)
+  loadLatest()
 }
 
 // ---------- [WAJIB] Prediksi -- satu-satunya yang tidak bisa di-backfill ----------
@@ -53,10 +81,20 @@ async function scorePrediction(row, outcome) {
   loadDue()
 }
 
-// ---------- [INTI] Berita HIGH ----------
+// ---------- [INTI] Berita HIGH (default) / semua (toggle, 6 Agustus 2026) ----------
+// Default tetap HIGH-only (prinsip layar tunggal tidak berubah), tapi Giel
+// minta bisa lihat SEMUA berita hari ini dari HP juga -- toggle drpd ganti
+// default, biar buka /m tetap cepat/ringkas kalau tidak disentuh.
+const showAllNews = ref(false)
 const highNews = ref([])
 async function loadHighNews() {
-  highNews.value = await get('/api/news', { impact: 'HIGH', date_from: daysAgo(1), date_to: today(), limit: 30 })
+  const params = { date_from: daysAgo(1), date_to: today(), limit: showAllNews.value ? 100 : 30 }
+  if (!showAllNews.value) params.impact = 'HIGH'
+  highNews.value = await get('/api/news', params)
+}
+function toggleShowAllNews() {
+  showAllNews.value = !showAllNews.value
+  loadHighNews()
 }
 async function toggleForReading(row) {
   await post('/api/news/for_reading', { id: row.id, for_reading: !row.for_reading })
@@ -100,6 +138,11 @@ async function rejectThreadLink(threadLink) {
 // Agustus -- data-nya (trend_30d, shift_warning, opinions) SUDAH ikut di
 // /api/threads/stats (thread_stats() di writes.py), cuma belum ditampilkan
 // di sini. Ditambah di sini, bukan endpoint baru.
+// (Sempat coba tampilkan thread non-ACTIVE juga di sini krn salah duga
+// keluhan "inactive tidak jalan" soal visibility -- ternyata itu soal
+// tombol Simpan status CLOSED gagal di ThreadsView.vue desktop, sudah
+// diperbaiki di sana. Giel eksplisit minta bagian non-aktif TIDAK usah
+// ditampilkan di /m -- balik ke ACTIVE-only, sesuai prinsip layar tunggal.)
 const activeThreads = ref([])
 async function loadActiveThreads() {
   const rows = await get('/api/threads/stats')
@@ -195,10 +238,38 @@ async function saveHolding() {
   loadHoldings()
 }
 
+// ---------- Chart (6 Agustus 2026) -- reuse drawCandleChart dari ChartView.vue
+// (diekstrak ke lib/candleChart.js), viewBox SVG scale otomatis ke lebar
+// layar HP lewat CSS. Read-only murni -- TIDAK ada tombol approve/reject
+// sinyal di sini (itu endpoint keputusan, prinsip yg sama seperti di atas).
+// Dimuat SETELAH loading=false (bukan di Promise.all bareng data lain) krn
+// <svg ref> baru ada di DOM stlh v-else kartu-kartu di-render.
+const CHART_VISIBLE = 60
+const CHART_PADDING = 220
+const chartAssets = ref([])
+const chartInstrument = ref('')
+const chartEl = ref(null)
+const chartMeta = ref('')
+async function loadChart() {
+  if (!chartInstrument.value) return
+  const [rows, zones, sigs] = await Promise.all([
+    get('/api/asset_ohlcv', { instrument: chartInstrument.value, limit: CHART_VISIBLE + CHART_PADDING }),
+    get('/api/sr_zones', { instrument: chartInstrument.value }),
+    get('/api/signals', { instrument: chartInstrument.value }),
+  ])
+  await nextTick()
+  chartMeta.value = drawCandleChart(chartEl.value, rows, zones, sigs, CHART_VISIBLE)
+}
+watch(chartInstrument, loadChart)
+
 async function loadAll() {
   loading.value = true
   await Promise.all([loadLatest(), loadDue(), loadHighNews(), loadActiveThreads(), loadOngoing(), loadHoldings()])
   loading.value = false
+  await nextTick()
+  chartAssets.value = await get('/api/assets')
+  if (chartAssets.value.includes('BTC')) chartInstrument.value = 'BTC'
+  else if (chartAssets.value.length) chartInstrument.value = chartAssets.value[0]
 }
 onMounted(loadAll)
 
@@ -220,6 +291,15 @@ async function logout() {
         <button class="btn small secondary" @click="logout">Keluar</button>
       </div>
     </header>
+
+    <div class="mobile-quick-actions">
+      <button class="btn small secondary" :disabled="newsFetching" @click="fetchNewsNow">
+        {{ newsFetching ? 'Mengambil berita...' : '📰 Get News' }}
+      </button>
+      <button class="btn small secondary" :disabled="priceFetching" @click="fetchPriceNow">
+        {{ priceFetching ? 'Mengambil harga...' : '💹 Get Price' }}
+      </button>
+    </div>
 
     <p v-if="loading" class="src" style="padding:16px">Memuat...</p>
 
@@ -253,8 +333,11 @@ async function logout() {
       </section>
 
       <section class="mobile-card">
-        <div class="mobile-card-title">INTI · Berita HIGH</div>
-        <p v-if="!highNews.length" class="src">tidak ada berita HIGH hari ini/kemarin</p>
+        <div class="mobile-card-title" style="display:flex; justify-content:space-between; align-items:center">
+          <span>INTI · {{ showAllNews ? 'Semua Berita' : 'Berita HIGH' }}</span>
+          <button class="btn small secondary" @click="toggleShowAllNews">{{ showAllNews ? 'Cuma HIGH' : 'Semua berita' }}</button>
+        </div>
+        <p v-if="!highNews.length" class="src">tidak ada berita {{ showAllNews ? '' : 'HIGH ' }}hari ini/kemarin</p>
         <div v-for="n in highNews" :key="n.id" class="mobile-news-row">
           <a v-if="n.raw_url" :href="n.raw_url" target="_blank" rel="noopener">{{ n.headline }}</a>
           <span v-else>{{ n.headline }}</span>
@@ -285,6 +368,15 @@ async function logout() {
             @click="toggleForReading(n)"
           >{{ n.for_reading ? '★ Reading' : '📖 tandai for Reading' }}</button>
         </div>
+      </section>
+
+      <section class="mobile-card">
+        <div class="mobile-card-title">Chart</div>
+        <select v-if="chartAssets.length" v-model="chartInstrument" style="width:auto; margin-bottom:8px">
+          <option v-for="a in chartAssets" :key="a" :value="a">{{ a }}</option>
+        </select>
+        <svg viewBox="0 0 800 400" preserveAspectRatio="none" ref="chartEl" class="mobile-chart-svg"></svg>
+        <p v-if="chartMeta" class="src" style="margin-top:6px">{{ chartMeta }}</p>
       </section>
 
       <section class="mobile-card">
@@ -415,6 +507,14 @@ async function logout() {
   display: flex;
   gap: 8px;
 }
+.mobile-quick-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px 0;
+}
+.mobile-quick-actions button {
+  flex: 1;
+}
 .mobile-card {
   margin: 12px 16px;
   padding: 14px;
@@ -494,5 +594,12 @@ async function logout() {
 }
 .mobile-thread-block:last-child {
   border-bottom: none;
+}
+.mobile-chart-svg {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 800 / 400;
+  background: var(--bg);
+  border-radius: 6px;
 }
 </style>

@@ -52,7 +52,7 @@ const editInputs = ref({})
 function startEdit(row) {
   editingIds.value.add(row.id)
   editInputs.value[row.id] = {
-    title: row.title, status: row.status,
+    title: row.title, status: row.status, verdict: row.verdict || '',
     keywordsCsv: (row.keywords || []).join(', '), currentRead: row.current_read || '',
   }
 }
@@ -62,10 +62,21 @@ function cancelEdit(row) {
 async function saveEdit(row) {
   const input = editInputs.value[row.id]
   if (!input.title.trim()) { toast('Title wajib diisi'); return }
+  // 6 Agustus 2026: Giel lapor "tidak bisa save status inactive, tidak
+  // bisa klik simpan" -- root cause: backend WAJIB verdict saat status
+  // CLOSED (patch_thread guard, §20.1 vonis auditable), tapi form quick-
+  // edit ini dulu TIDAK PUNYA field verdict sama sekali -- klik Simpan
+  // selalu gagal diam2 (toast error gampang kelewat) begitu status
+  // diganti CLOSED. Sekarang verdict wajib diisi DI SINI JUGA sebelum
+  // kirim, bukan cuma diserahkan ke backend utk gagal.
+  if (input.status === 'CLOSED' && !input.verdict.trim()) {
+    toast('Verdict wajib diisi saat menutup thread (status=CLOSED)'); return
+  }
   const body = {
     title: input.title, status: input.status, current_read: input.currentRead,
     keywords: input.keywordsCsv.split(',').map((k) => k.trim().toLowerCase()).filter(Boolean),
   }
+  if (input.status === 'CLOSED') body.verdict = input.verdict
   const result = await post(`/api/threads/${row.id}`, body)
   if (result.error) { toast(result.error); return }
   toast('Thread diperbarui')
@@ -173,11 +184,18 @@ async function mergeThreads() {
         </Column>
         <Column field="status" header="Status" sortable>
           <template #body="{ data }">
-            <select v-if="editingIds.has(data.id)" v-model="editInputs[data.id].status" style="width:auto">
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="DORMANT">DORMANT</option>
-              <option value="CLOSED">CLOSED</option>
-            </select>
+            <template v-if="editingIds.has(data.id)">
+              <select v-model="editInputs[data.id].status" style="width:auto">
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="DORMANT">DORMANT</option>
+                <option value="CLOSED">CLOSED</option>
+              </select>
+              <input
+                v-if="editInputs[data.id].status === 'CLOSED'"
+                v-model="editInputs[data.id].verdict" type="text" placeholder="Verdict (wajib)"
+                style="width:140px; margin-top:4px; display:block"
+              >
+            </template>
             <span v-else class="badge" :class="THREAD_STATUS_CLASS[data.status]">{{ data.status }}</span>
           </template>
         </Column>

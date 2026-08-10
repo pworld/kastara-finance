@@ -586,6 +586,31 @@ def run_daily_now():
     return jsonify(summary)
 
 
+@app.post("/api/news/fetch_now")
+def news_fetch_now():
+    """6 Agustus 2026 -- tombol "Get News" di `/m`. Subset run_daily_now,
+    CUMA berita (news+tags+thread-suggest), TIDAK sentuh market/harga --
+    Giel minta trigger terpisah drpd selalu nunggu semua scraper market
+    ikut jalan cuma utk lihat berita terbaru. Sinkron (blocking)."""
+    try:
+        summary = run_daily_mod.run_news_only()
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": str(exc)}), 500
+    return jsonify(summary)
+
+
+@app.post("/api/price/fetch_now")
+def price_fetch_now():
+    """6 Agustus 2026 -- tombol "Get Price" di `/m`. Pasangan
+    news_fetch_now() -- CUMA data market/harga, TIDAK sentuh berita.
+    Sinkron (blocking)."""
+    try:
+        summary = run_daily_mod.run_price_only()
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": str(exc)}), 500
+    return jsonify(summary)
+
+
 def _run_daily_via_telegram(chat_id: str | int) -> None:
     """Jalan di background thread (bukan langsung di request webhook) --
     Telegram akan RETRY kirim update kalau webhook tidak balas cepat, dan

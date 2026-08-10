@@ -23,13 +23,14 @@ Acceptance:
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from typing import Any
 
 import feedparser
 import requests
 from bs4 import BeautifulSoup
 
-from scrapers.base import keyword_matches, today_wib
+from scrapers.base import WIB, keyword_matches, today_wib
 from scrapers.feeds_config import FEEDS, IMPACT_KEYWORDS
 
 DEFAULT_TIMEOUT = 10
@@ -55,6 +56,32 @@ def _clean_rss_summary(raw: str | None) -> str | None:
     if len(text) > RSS_SUMMARY_MAX_LEN:
         text = text[:RSS_SUMMARY_MAX_LEN].rstrip() + "…"
     return text
+
+
+def _entry_date(entry: Any, fallback: str) -> str:
+    """Giel lapor 6 Agustus 2026: "berita beberapa hari lalu dianggap hari
+    ini pas diseeding" -- root cause: dulu SEMUA entry di-stamp `target_date`
+    (tanggal SCRAPE) tanpa pernah baca tanggal terbit asli dari feed. Kalau
+    cron telat jalan (kejadian berulang di proyek ini) & baru catch-up hari
+    ini, headline yang sebenarnya terbit beberapa hari lalu (tapi masih ada
+    di window rolling RSS) ke-stamp seolah baru terbit HARI INI.
+
+    Sekarang baca `published_parsed`/`updated_parsed` (feedparser, UTC
+    struct_time standar) kalau feed sertakan, konversi ke tanggal WIB.
+    Fallback ke `target_date` HANYA kalau feed benar2 tidak sertakan tanggal
+    atau gagal di-parse -- jujur pakai tanggal scrape drpd menebak, bukan
+    dianggap bug baru."""
+    struct = getattr(entry, "published_parsed", None) or getattr(entry, "updated_parsed", None)
+    if not struct:
+        return fallback
+    try:
+        # feedparser selalu balikin published_parsed/updated_parsed dlm UTC
+        # (struct_time naive) -- WAJIB tempel tzinfo UTC eksplisit dulu
+        # sebelum .astimezone(WIB), kalau tidak Python anggap struct_time
+        # itu waktu LOKAL SISTEM (bukan UTC) & hasil konversi salah.
+        return datetime(*struct[:6], tzinfo=timezone.utc).astimezone(WIB).strftime("%Y-%m-%d")
+    except (ValueError, OverflowError, TypeError):
+        return fallback
 
 
 def score_impact(headline: str) -> str:
@@ -130,7 +157,7 @@ def fetch_all_news(target_date: str | None = None) -> tuple[list[dict[str, Any]]
             if impact_level == "HIGH":
                 rss_summary = _clean_rss_summary(getattr(entry, "summary", None) or getattr(entry, "description", None))
             articles.append({
-                "date": target_date,
+                "date": _entry_date(entry, target_date),
                 "source": name,
                 "headline": headline,
                 "raw_url": getattr(entry, "link", "") or "",

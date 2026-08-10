@@ -1,5 +1,7 @@
 """Test scrapers/news.py — health check RSS + impact scoring. Butuh network
 (live API), sama pola dengan test_econ_calendar.py/test_positioning.py."""
+import time
+
 import scrapers.news as news
 from scrapers.feeds_config import FEEDS
 
@@ -134,3 +136,58 @@ def test_rss_summary_only_populated_for_high_impact(monkeypatch):
 
     assert by_headline["Random tech gadget review"]["impact_level"] == "LOW"
     assert by_headline["Random tech gadget review"]["rss_summary"] is None
+
+
+# ---------- _entry_date (6 Agustus 2026, laporan Giel "berita beberapa
+# hari lalu dianggap hari ini pas diseeding") ----------
+# Dulu SEMUA artikel di-stamp `target_date` (tanggal scrape), abai tanggal
+# terbit asli feed. Kalau cron telat & baru catch-up hari ini, headline yg
+# sebenarnya beberapa hari lalu (tapi masih ada di window rolling RSS)
+# ke-stamp seolah baru terbit HARI INI. Fix: baca published_parsed/
+# updated_parsed (feedparser, UTC struct_time) kalau ada.
+
+class _FakeEntryWithDate:
+    def __init__(self, title, published_parsed=None, updated_parsed=None):
+        self.title = title
+        self.link = "https://x.test"
+        self.summary = None
+        if published_parsed is not None:
+            self.published_parsed = published_parsed
+        if updated_parsed is not None:
+            self.updated_parsed = updated_parsed
+
+
+def test_entry_date_uses_published_parsed_converted_to_wib():
+    # 2026-08-01 20:00 UTC -> 2026-08-02 03:00 WIB (UTC+7) -- lewat batas
+    # hari, sengaja dipilih supaya konversi tanggal beneran teruji, bukan
+    # kebetulan sama krn UTC dan WIB masih di hari yang sama.
+    struct = time.strptime("2026-08-01 20:00:00", "%Y-%m-%d %H:%M:%S")
+    entry = _FakeEntryWithDate("Test", published_parsed=struct)
+    assert news._entry_date(entry, fallback="2026-08-06") == "2026-08-02"
+
+
+def test_entry_date_falls_back_to_updated_parsed_when_no_published():
+    struct = time.strptime("2026-07-30 10:00:00", "%Y-%m-%d %H:%M:%S")
+    entry = _FakeEntryWithDate("Test", updated_parsed=struct)
+    assert news._entry_date(entry, fallback="2026-08-06") == "2026-07-30"
+
+
+def test_entry_date_falls_back_to_scrape_date_when_neither_present():
+    entry = _FakeEntryWithDate("Test")
+    assert news._entry_date(entry, fallback="2026-08-06") == "2026-08-06"
+
+
+def test_fetch_all_news_uses_real_publish_date_not_scrape_date(monkeypatch):
+    """Regression langsung utk laporan Giel -- feed dgn entry bertanggal
+    beberapa hari lalu HARUS masuk daily_news dgn tanggal ASLI itu, BUKAN
+    tanggal scrape (`target_date`), meski fetch_all_news() dipanggil HARI
+    INI (mis. cron telat lalu catch-up)."""
+    old_struct = time.strptime("2026-08-01 06:00:00", "%Y-%m-%d %H:%M:%S")
+    fake_entries = [_FakeEntryWithDate("Old headline from days ago", published_parsed=old_struct)]
+    monkeypatch.setattr(news, "FEEDS", [{"name": "Fake", "url": "https://fake.test", "category": "TEST", "enabled": True}])
+    monkeypatch.setattr(news, "check_feed_health", lambda url: ("ok", "", fake_entries))
+
+    articles, _ = news.fetch_all_news(target_date="2026-08-06")
+    assert len(articles) == 1
+    assert articles[0]["date"] == "2026-08-01"
+    assert articles[0]["date"] != "2026-08-06"

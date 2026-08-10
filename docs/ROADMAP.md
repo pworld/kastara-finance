@@ -2966,4 +2966,138 @@ TIDAK ADA endpoint baru, semua reuse API yang sudah ada.
   tidak bisa verifikasi visual isi kartu di balik login** (aturan
   kredensial) -- dibuktikan lewat compile-clean + baca kode langsung,
   bukan screenshot behind-auth.
+
+**Update -- Bug fix login-redirect + sidebar collapse + 4 perbaikan mobile
+susulan (6 Agustus 2026, sesi sama):** Giel pakai `/m` beneran dari Chrome
+Android, laporan balik 2 bug + 2 permintaan fitur.
+- **Bug: login SELALU mendarat di `/snapshot`, bukan balik ke tujuan
+  asli.** Root cause: `router/index.js` guard redirect ke `/login` TANPA
+  bawa `to.fullPath`, dan `LoginView.vue` hardcode `router.push
+  ('/snapshot')`. Efeknya buka `/m` dari HP saat belum login (mis. dari
+  ikon PWA) SELALU nyasar ke dashboard desktop stlh login -- inilah
+  jawaban keluhan "kok selalu diredirect ke halaman biasa". Fix: guard
+  simpan query `?redirect=<tujuan>`, LoginView baca & push ke situ (fallback
+  `/snapshot` kalau kosong). Diverifikasi live: `/m` -> `/login?redirect=/m`.
+- **Fitur: sidebar desktop bisa diciutkan** (`App.vue`) -- tombol «/»
+  toggle lebar 200px <-> 44px, state persist `localStorage`.
+- **Fix #1+#2 (laporan Giel "di thread inactive tidak jalan" + "cuma ada
+  tag, butuh thread juga")**: root cause `MobileView.vue` filter
+  `status==='ACTIVE'` bikin thread DORMANT/CLOSED TIDAK PERNAH muncul di
+  `/m` sama sekali (bukan cuma redup, benar2 hilang, tidak ada jalan lain
+  jangkau dari HP). Kartu "Thread" sekarang tampilkan SEMUA status --
+  ACTIVE full detail (trend/opini/tombol +Opini), non-ACTIVE ringkas
+  (judul+badge status) di sub-list "Non-aktif", tetap link ke
+  `/threads/:id`.
+  - **Fix #3 ("apa chart bisa ditampilkan di dashboard")**: `drawCandleChart`
+  diekstrak dari `ChartView.vue` ke `lib/candleChart.js` (module bersama,
+  murni pindah kode, tidak ada logic baru) supaya `/m` bisa reuse chart
+  candlestick+MA+volume+zona yang SAMA PERSIS tanpa duplikasi ~130 baris.
+  Kartu "Chart" baru di `/m`: dropdown instrumen (default BTC, sama seperti
+  desktop) + SVG scale otomatis ke lebar layar (`viewBox` + CSS
+  `aspect-ratio`). Read-only murni -- TIDAK ada tombol approve/reject
+  sinyal (endpoint keputusan, prinsip yang sama dipertahankan).
+  - **Fix #4 ("apa semua daily bisa ditampilkan di /m")**: toggle "Semua
+  berita" di kartu INTI -- default tetap HIGH-only (prinsip layar tunggal
+  tidak berubah), tapi 1 tap buka semua impact level (limit naik ke 100).
+- Verifikasi: `npm run build` bersih (365 modul -- `candleChart.js` kepisah
+  jadi chunk sendiri 3.98kB dipakai `ChartView` DAN `MobileView`, bukti
+  reuse beneran bukan copy-paste), browser dicek `/m` unauthenticated ->
+  `/login?redirect=/m` (fix redirect kerja), 0 console error. **Isi kartu
+  Chart/Thread/Portfolio TETAP tidak bisa diverifikasi visual di balik
+  login** (aturan kredensial) -- Giel perlu cek langsung di HP.
+
+**Update -- Koreksi diagnosa: bug beneran ada di ThreadsView.vue desktop,
+bukan visibility mobile (6 Agustus 2026, sesi sama):** Giel pakai fitur
+Chart/Thread/Portfolio baru di `/m`, lapor balik 2 hal.
+- **Bug asli "tidak bisa save status inactive, tidak bisa klik simpan"**:
+  ternyata BUKAN soal `/m` (salah duga sesi sebelumnya) -- akar masalah di
+  `ThreadsView.vue` DESKTOP, form quick-edit inline (kolom Status + tombol
+  Simpan di tabel). `patch_thread()` backend WAJIB `verdict` non-kosong
+  saat `status='CLOSED'` (§20.1, "vonis auditable", guard sudah ada &
+  benar dari awal) -- tapi form quick-edit TIDAK PERNAH punya field
+  verdict sama sekali (cuma dialog "Kelola Thread" terpisah yang punya).
+  Efeknya: pilih CLOSED di quick-edit, klik Simpan -> selalu gagal dgn
+  toast error yang gampang kelewat, form tidak nutup, row tetap dalam mode
+  edit -- kelihatan seperti "tombol tidak bisa diklik" padahal sebenarnya
+  klik-nya jalan tapi request-nya ditolak backend. Fix: tambah field
+  verdict inline (muncul cuma saat status=CLOSED dipilih, sama pola dgn
+  dialog Kelola), plus validasi client-side dgn pesan jelas SEBELUM kirim
+  request (bukan cuma andalkan toast error dari backend).
+- **Revert bagian "Non-aktif" di kartu Thread `/m`**: Giel eksplisit
+  "tidak perlu ditampilkan" -- balik ke ACTIVE-only murni (`activeThreads`
+  filter, `inactiveThreads` computed & import `THREAD_STATUS_CLASS` yang
+  jadi tidak terpakai dihapus). Menegaskan: keluhan "inactive tidak jalan"
+  sesi sebelumnya SELALU soal tombol Simpan desktop, bukan soal apa yang
+  ditampilkan di HP -- diagnosa awal salah arah, dikoreksi begitu Giel
+  kasih detail lebih spesifik ("tidak bisa klik simpan").
+- Verifikasi: `npm run build` bersih (0 error). Browser-check dev server
+  terhalang port 5000 kepakai proses lama (`wslrelay.exe`) di sesi ini --
+  TIDAK dipaksa lanjut krn perubahan murni di area behind-login yang
+  sudah berulang kali terverifikasi via compile-clean sepanjang sesi ini;
+  Giel perlu coba langsung save status CLOSED di dashboard utk konfirmasi.
+
+**Update -- Bug nyata: tanggal berita = tanggal SCRAPE, bukan tanggal
+TERBIT (6 Agustus 2026, sesi sama):** Giel lapor filter search di News
+kelihatannya pakai "create date" -- "berita beberapa hari lalu dianggap
+hari ini pas diseeding". Dicek: filter `/api/news` (date_from/date_to)
+SUDAH benar query kolom `date`, BUKAN `created_at` -- tapi `scrapers/
+news.py::fetch_all_news()` (dipakai `run_daily()`, JALUR CRON HARIAN --
+beda dari `scrapers/news_archive.py` yg dipakai backfill historis & SUDAH
+benar baca tanggal asli) ternyata SELALU stamp SEMUA artikel dengan
+`target_date` (tanggal pipeline dijalankan) -- TIDAK PERNAH baca tanggal
+terbit asli dari entry RSS-nya sendiri. Kalau cron telat jalan (kejadian
+berulang, alasan bot Telegram dibangun) lalu catch-up hari ini, headline
+yg sebenarnya terbit beberapa hari lalu (tapi masih ada di window rolling
+RSS feed) ke-stamp seolah baru terbit HARI INI -- jadi filter/search
+NewsView "kelihatan" salah padahal query-nya benar; datanya sendiri yang
+salah sejak masuk DB.
+- **Fix**: `_entry_date(entry, fallback)` baru -- baca `published_parsed`/
+  `updated_parsed` feedparser (UTC struct_time standar) kalau feed
+  sertakan, konversi ke tanggal WIB eksplisit (`tzinfo=timezone.utc` dulu
+  sebelum `.astimezone(WIB)` -- tanpa itu Python anggap struct_time itu
+  waktu LOKAL SISTEM, hasil salah). Fallback ke `target_date` (perilaku
+  lama) HANYA kalau feed benar2 tidak sertakan tanggal -- jujur pakai
+  tanggal scrape drpd menebak, bukan constraint baru yang mengada-ada.
+- **Keterbatasan jujur**: fix ini cuma berlaku ke depan (scrape baru
+  setelah fix di-deploy). Baris `daily_news` yang SUDAH masuk dgn tanggal
+  scrape yang salah (dari cron yang telat sebelumnya) TIDAK di-backfill/
+  dikoreksi -- tanggal terbit asli entry RSS lama itu sudah tidak
+  tersimpan di mana pun (RSS tidak retain history), jadi tidak ada
+  sumber utk mengoreksi mundur, beda dgn `scrapers/news_archive.py`
+  (backfill historis) yang memang punya akses tanggal asli dari API
+  sumbernya.
+- 4 test baru (`tests/test_news.py`): `_entry_date` pakai published_parsed
+  (konversi UTC->WIB lewat batas hari, bukan kebetulan sama), fallback ke
+  updated_parsed, fallback ke tanggal scrape kalau keduanya tidak ada, +
+  1 test regresi langsung `fetch_all_news()` dgn entry bertanggal lampau
+  memastikan `date` hasil BEDA dari `target_date`. 18/18 test_news.py hijau.
+
+**Update -- Tombol "Get News" + "Get Price" terpisah di `/m` (6 Agustus
+2026, sesi sama):** Giel minta trigger manual dari HP, tapi scoped
+(bukan 1 tombol yang selalu jalankan SEMUA scraper spt "Trigger Berita"
+di desktop Snapshot) -- kadang cuma mau lihat berita terbaru tanpa nunggu
+semua scraper market, atau sebaliknya.
+- **`pipeline/run_daily.py`**: 2 fungsi orkestrasi baru, `run_news_only()`
+  (fetch+simpan berita/tags/thread-suggest/auto-dormant SAJA) dan
+  `run_price_only()` (crypto/coinalyze/yfinance/FRED/equity/IDX-flow/
+  econ-calendar/positioning SAJA) -- **`run_daily()` TIDAK disentuh sama
+  sekali** (nol risiko ke jalur cron/Telegram/desktop yang sudah ada).
+  Keduanya reuse helper yang SAMA PERSIS dgn `run_daily()`
+  (`insert_news_dedup`, `upsert_asset_ohlcv`, `upsert_daily_market`, dst
+  -- sudah faktor terpisah dari awal) -- bukan reimplementasi, cuma subset
+  urutan langkah + transaksi SENDIRI (sengaja terpisah dari transaksi
+  `run_daily()`, supaya 2 trigger scoped ini benar2 independen).
+- **`web/app.py`**: `POST /api/news/fetch_now` dan `POST /api/price/
+  fetch_now`, pola sama persis `/api/run_daily_now` (sinkron/blocking,
+  try/except ValueError->error json) -- tidak ada lock/rate-limit (sama
+  seperti endpoint aslinya, proteksi cukup dari session auth + sifat
+  sinkron request/response).
+- **`/m`**: 2 tombol baru "📰 Get News"/"💹 Get Price" di bawah header,
+  selalu terlihat (bukan di dalam kartu tertentu) -- disabled+ubah label
+  saat sedang jalan, toast ringkasan hasil, refresh data terkait
+  (`loadHighNews()`/`loadLatest()`) begitu selesai.
+- Verifikasi: `npm run build` bersih. Endpoint baru TIDAK ditulis test unit
+  (matching konvensi proyek -- `run_daily()`/`/api/run_daily_now` sendiri
+  juga tidak ada test-nya, orkestrator live-network, verifikasi manual
+  lewat pemakaian nyata, bukan mock berlapis).
   tersimpan berlebih).
