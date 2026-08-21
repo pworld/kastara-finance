@@ -3168,4 +3168,42 @@ DEPAN, tidak beresin baris yg SUDAH terlanjur masuk -- jadi dibangun
   beda TIDAK dikolaps (guard §21.9-style, mencegah false-positive),
   repoint tags/thread-links tanpa orphan + usage_count recompute,
   idempoten. 469 test total tetap hijau.
+
+**Update -- Scroll dipertahankan setelah save/toggle/confirm di FE
+(6 Agustus 2026, sesi sama):** Giel lapor annoyance FE -- tiap klik
+Simpan/toggle/confirm di halaman list panjang, halaman lompat balik ke
+atas, harus scroll ulang. Diagnosa via 2 subagent (Explore lalu Plan)
+sblm eksekusi, per alur mode-plan: root cause SAMA di semua view --
+`save*`/`toggle*`/`confirm*` handler panggil `await post(...)` lalu
+`load*()` yang timpa SELURUH array reaktif (`rows.value = await
+get(...)`), Vue re-render seluruh DataTable, browser (scroll di level
+window/document, bukan sub-container -- `html/body/#app` tidak ada
+`overflow` rule) reset scroll ke atas krn nol scroll-position handling
+di codebase.
+- **`web/frontend/src/composables/useScrollPreserve.js` baru** (~15
+  baris, pola sama `useAppToast.js`): `preserveScroll(fn)` -- bungkus
+  fungsi async, tangkap `window.scrollY` SEBELUM reload, pulihkan lewat
+  `window.scrollTo` SETELAH DOM update (`nextTick`, bukan `setTimeout`).
+- **Definition-wrap vs call-site-wrap, dipilih per view**: `NewsView.vue`
+  (8 titik) & `TagsView.vue` (4 titik) dibungkus di CALL SITE tiap
+  handler save -- keduanya juga panggil `load*()` dari filter/checkbox
+  (`watch`/`@change`), reset scroll ke atas DI SITU tetap wajar (hasil
+  filter baru), cuma yang dari save yang harus dipertahankan. 4 view
+  lain (`ThreadsView`, `UniverseView` 9 fungsi, `ForwardView` 4 fungsi,
+  `ThreadDetailView` 2 fungsi) dibungkus di DEFINISI fungsi `load*()`
+  sekali -- terverifikasi tidak ada filter/watch yang manggil fungsi
+  load di view-view ini, jadi setara perilakunya tapi jauh lebih murah
+  (1 titik drpd sampai ~15 call site di UniverseView).
+- **Sengaja TIDAK diperluas**: `MobileView.vue` (layout tab 1-kolom,
+  dampaknya lebih kecil, `loadAll()` fan-out `Promise.all` butuh
+  penanganan beda) dan 4 view form pendek (`Synthesis`/`Snapshot`/
+  `Chart`/`Reading` -- konten sedikit, scroll-reset di situ nyaris tidak
+  kerasa). Revisit kalau Giel lapor masih ganggu di situ juga.
+- Verifikasi: `npm run build` bersih (365→366 modul, `useScrollPreserve.js`
+  kepisah jadi chunk sendiri 0.17kB dipakai 6 view -- bukti reuse, bukan
+  copy-paste; compile hard-fail kalau ada brace/paren tidak seimbang dari
+  wrap yang salah, jadi ini sinyal struktural kuat). **Tidak bisa
+  verifikasi visual behind-login** (aturan kredensial, sama sepanjang
+  sesi ini) -- Giel perlu coba langsung: save/toggle di News/Threads/
+  Universe/Forward/Tags, cek scroll tidak lompat.
   tersimpan berlebih).

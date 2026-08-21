@@ -5,6 +5,7 @@ import Dialog from 'primevue/dialog'
 import { get, post } from '../lib/api'
 import { THREAD_STATUS_CLASS, LINK_STATUS_CLASS } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
+import { preserveScroll } from '../composables/useScrollPreserve'
 
 // News Threads N-1 (Addendum B §20.5) -- timeline VERTIKAL (bukan graph),
 // link CONFIRMED urut waktu, campur daily_news/manual_articles/policy_tracker.
@@ -25,7 +26,12 @@ const editStatus = ref('')
 const editKeywordsCsv = ref('')
 const editVerdict = ref('')
 
-async function loadThread() {
+// preserveScroll: saveThreadEdit/confirmLink/rejectLink/toggleMilestone/
+// addManualLink semua panggil ulang loadThread() stlh POST -- tanpa ini,
+// timeline & ringkasan kepala thread re-render penuh & scroll lompat ke
+// atas. Aman dibungkus di definisi (cuma dipanggil onMounted + handler
+// save/aksi, tidak ada filter watch yang manggil fungsi load ini).
+const loadThread = preserveScroll(async function loadThread() {
   loading.value = true
   const result = await get(`/api/threads/${threadId}`)
   if (result.error) { toast(result.error); router.push('/threads'); return }
@@ -36,7 +42,7 @@ async function loadThread() {
   editKeywordsCsv.value = (result.keywords || []).join(', ')
   editVerdict.value = result.verdict || ''
   loading.value = false
-}
+})
 onMounted(loadThread)
 
 const confirmedLinks = computed(() => (thread.value?.links || []).filter((l) => l.link_status === 'CONFIRMED'))
@@ -168,9 +174,9 @@ const opinionForm = ref({
   testable: 'TESTABLE', my_stance: '', conflict_of_interest: '', relation_to_view: '',
 })
 
-async function loadOpinions() {
+const loadOpinions = preserveScroll(async function loadOpinions() {
   opinions.value = await get(`/api/secondary_opinions?thread_id=${threadId}`)
-}
+})
 onMounted(loadOpinions)
 
 async function addOpinion() {

@@ -5,6 +5,7 @@ import DataTable from '../components/DataTable.vue'
 import { get, post } from '../lib/api'
 import { FACET_COLOR } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
+import { preserveScroll } from '../composables/useScrollPreserve'
 
 // Tags -> kurasi lambat/reflektif kamus tag (Addendum C §21.11). BEDA dari
 // command-palette CEPAT di News/Reading (prinsip "capture cepat, curate
@@ -16,6 +17,10 @@ const tags = ref([])
 const loadingTags = ref(true)
 const orphansOnly = ref(false)
 
+// preserveScroll dibungkus di CALL SITE tiap save handler di bawah (bukan
+// di definisi ini) krn loadTags juga dipanggil dari checkbox orphansOnly
+// (@change) -- reset scroll ke atas di situ WAJAR (hasil filter baru),
+// cuma yang dari save/delete/merge yang harus dipertahankan.
 async function loadTags() {
   loadingTags.value = true
   try {
@@ -45,7 +50,7 @@ async function saveEditTag(row) {
   if (result.error) { toast(result.error); return }
   toast('Tag diperbarui')
   editingTagIds.value.delete(row.id)
-  loadTags()
+  preserveScroll(loadTags)() // lihat useScrollPreserve.js
 }
 
 const deleteForceIds = ref(new Set())
@@ -54,7 +59,7 @@ async function deleteTag(row) {
   const result = await post(`/api/tags/${row.id}/delete`, { force })
   if (result.error) { toast(result.error); return }
   toast(`Tag "${row.canonical}" dihapus`)
-  loadTags()
+  preserveScroll(loadTags)() // lihat useScrollPreserve.js
 }
 
 // Merge -- operasi yang mustahil dilakukan inline di News (§21.11).
@@ -68,7 +73,7 @@ async function mergeTags() {
   toast(`Digabung ke "${result.canonical}"`)
   mergeFrom.value = ''
   mergeInto.value = ''
-  loadTags()
+  preserveScroll(loadTags)() // lihat useScrollPreserve.js
 }
 
 // + Tag baru -- form penuh (canonical + aliases + description sekaligus),
@@ -86,7 +91,7 @@ async function createTagForm() {
   if (result.error) { toast(result.error); return }
   toast(`Tag "${result.canonical}" dibuat`)
   newTag.value = { canonical: '', aliasesCsv: '', description: '' }
-  loadTags()
+  preserveScroll(loadTags)() // lihat useScrollPreserve.js
 }
 </script>
 

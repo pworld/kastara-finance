@@ -5,6 +5,7 @@ import DataTable from '../components/DataTable.vue'
 import { get, post } from '../lib/api'
 import { fmt, today } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
+import { preserveScroll } from '../composables/useScrollPreserve'
 
 // Port dari web/static/js/panel3.js (lihat docs/migrationFE.md Fase 2).
 const { toast } = useAppToast()
@@ -34,11 +35,15 @@ const econCal = computed(() => {
   })
 })
 
-async function loadEconCalendar() {
+// preserveScroll: saveActual() panggil ulang loadEconCalendar() stlh POST --
+// tanpa ini, ganti econCalRaw.value bikin DataTable re-render & scroll
+// lompat ke atas. Aman dibungkus di definisi (cuma dipanggil onMounted +
+// saveActual, tidak ada filter watch yang manggil fungsi load ini).
+const loadEconCalendar = preserveScroll(async function loadEconCalendar() {
   loadingCal.value = true
   econCalRaw.value = await get('/api/econ_calendar')
   loadingCal.value = false
-}
+})
 onMounted(loadEconCalendar)
 
 function countdown(eventDate) {
@@ -98,9 +103,9 @@ function surprise(row) {
 const expectations = ref([])
 const exp = ref({ date: '', metric: 'cme_fedwatch_cut_prob', value: '', horizon: '' })
 
-async function loadExpectations() {
+const loadExpectations = preserveScroll(async function loadExpectations() {
   expectations.value = await get('/api/expectations', { limit: 15 })
-}
+})
 onMounted(loadExpectations)
 
 async function saveExpectation() {
@@ -120,11 +125,11 @@ const positioning = ref([])
 const loadingPos = ref(true)
 const pos = ref({ date: '', instrument: 'SBN', metric: '', value: '' })
 
-async function loadPositioning() {
+const loadPositioning = preserveScroll(async function loadPositioning() {
   loadingPos.value = true
   positioning.value = await get('/api/positioning', { limit: 200 })
   loadingPos.value = false
-}
+})
 onMounted(loadPositioning)
 
 async function savePositioning() {
@@ -147,11 +152,11 @@ const pol = ref({
   stance: '', flag: 'TESTABLE', inference: '', drift: '',
 })
 
-async function loadPolicyNotes() {
+const loadPolicyNotes = preserveScroll(async function loadPolicyNotes() {
   loadingPolicy.value = true
   policy.value = await get('/api/policy', { limit: 100 })
   loadingPolicy.value = false
-}
+})
 onMounted(loadPolicyNotes)
 
 async function savePolicyNote() {

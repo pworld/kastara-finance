@@ -8,6 +8,7 @@ import TagAutocomplete from '../components/TagAutocomplete.vue'
 import { get, post } from '../lib/api'
 import { FACET_COLOR, THREAD_STATUS_CLASS } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
+import { preserveScroll } from '../composables/useScrollPreserve'
 
 // Threads -> kelola News Threads (Addendum B §20 + Addendum C §21.11
 // komposisi/umur/facet tags). 17 Jul 2026: menu berdiri sendiri (BUKAN tab
@@ -20,7 +21,13 @@ const router = useRouter()
 const allThreads = ref([])
 const loadingThreads = ref(true)
 const statusFilter = ref('')
-async function loadThreads() {
+// preserveScroll: save*/toggle*/confirm* handler di bawah panggil ulang
+// loadThreads() stlh POST -- tanpa ini, ganti allThreads.value bikin
+// DataTable re-render penuh & browser lompat scroll ke atas. loadThreads
+// di sini CUMA dipanggil dari onMounted + handler save (tidak ada filter
+// watch yang manggil ini), jadi aman dibungkus di definisi sekali drpd
+// tiap call site.
+const loadThreads = preserveScroll(async function loadThreads() {
   loadingThreads.value = true
   try {
     allThreads.value = await get('/api/threads/stats')
@@ -31,7 +38,7 @@ async function loadThreads() {
   } finally {
     loadingThreads.value = false
   }
-}
+})
 onMounted(loadThreads)
 // Filter client-side (dataset kecil, tidak ada batas jumlah lagi) --
 // activeCount dihitung dari allThreads (BUKAN hasil filter), supaya

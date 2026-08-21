@@ -6,6 +6,7 @@ import DataTable from '../components/DataTable.vue'
 import { get, post } from '../lib/api'
 import { fmt, LANE_CLASS } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
+import { preserveScroll } from '../composables/useScrollPreserve'
 
 // Port dari web/static/js/panel8.js (lihat docs/migrationFE.md Fase 2).
 const { toast } = useAppToast()
@@ -27,11 +28,17 @@ const TABS = [
 // ---------- Universe table ----------
 const universe = ref([])
 const loadingUniverse = ref(true)
-async function loadUniverse() {
+// preserveScroll dibungkus di semua load*() definisi bawah -- banyak save
+// handler (saveIntake/saveOverride/saveOutcome/saveBankRatios/saveHolding
+// dst) manggil ulang salah satu dari ini stlh POST, ganti .value array
+// bikin DataTable re-render & scroll lompat ke atas. Tidak ada filter
+// watch yang manggil fungsi load manapun di file ini -- aman dibungkus
+// sekali di definisi drpd tiap call site (~15 call site kalau dihitung).
+const loadUniverse = preserveScroll(async function loadUniverse() {
   loadingUniverse.value = true
   universe.value = await get('/api/universe')
   loadingUniverse.value = false
-}
+})
 onMounted(loadUniverse)
 
 function flagCount(row) {
@@ -121,14 +128,14 @@ function openDetailDrawer(row) {
   loadDetail()
 }
 
-async function loadDetail() {
+const loadDetail = preserveScroll(async function loadDetail() {
   const ticker = detailTicker.value.trim()
   if (!ticker) { toast('Ticker wajib diisi'); return }
   const result = await get(`/api/emiten/${encodeURIComponent(ticker)}`)
   if (result.error) { detailError.value = result.error; detail.value = null; return }
   detailError.value = ''
   detail.value = result
-}
+})
 
 function fundamentalsHeader() {
   return detail.value?.metadata?.is_financial
@@ -159,11 +166,11 @@ const lane = ref({ newLane: 'TRADE', evidence: '' })
 const laneLog = ref([])
 const loadingLaneLog = ref(true)
 
-async function loadLaneValidationLog() {
+const loadLaneValidationLog = preserveScroll(async function loadLaneValidationLog() {
   loadingLaneLog.value = true
   laneLog.value = await get('/api/lane_validation_log')
   loadingLaneLog.value = false
-}
+})
 onMounted(loadLaneValidationLog)
 
 async function validateLane() {
@@ -202,20 +209,20 @@ async function saveBankRatios() {
   loadBankRatios()
 }
 
-async function loadBankRatios() {
+const loadBankRatios = preserveScroll(async function loadBankRatios() {
   const instrument = detailTicker.value.trim()
   if (!instrument) { toast('Ticker tidak diketahui -- buka drawer dari tabel Universe dulu'); return }
   bankRatios.value = await get('/api/fundamentals/bank_ratios', { instrument })
-}
+})
 
 // ---------- Riwayat Keputusan Intake ----------
 const intakeLog = ref([])
 const loadingIntakeLog = ref(true)
-async function loadIntakeLog() {
+const loadIntakeLog = preserveScroll(async function loadIntakeLog() {
   loadingIntakeLog.value = true
   intakeLog.value = await get('/api/intake/log')
   loadingIntakeLog.value = false
-}
+})
 onMounted(loadIntakeLog)
 
 function decisionSeverity(d) {
@@ -227,11 +234,11 @@ function decisionSeverity(d) {
 // ---------- Grader Log & Kalibrasi (Komponen D) ----------
 const graderLog = ref([])
 const loadingGraderLog = ref(true)
-async function loadGraderLog() {
+const loadGraderLog = preserveScroll(async function loadGraderLog() {
   loadingGraderLog.value = true
   graderLog.value = await get('/api/grader_log')
   loadingGraderLog.value = false
-}
+})
 onMounted(loadGraderLog)
 
 async function saveOutcome(row, field, value) {
@@ -258,11 +265,11 @@ const holdingForm = ref({
   avgPrice: '', currency: 'IDR', openedAt: '', notes: '', sopCategory: 'SAHAM_IHSG',
 })
 
-async function loadHoldings() {
+const loadHoldings = preserveScroll(async function loadHoldings() {
   loadingHoldings.value = true
   holdings.value = await get('/api/holdings')
   loadingHoldings.value = false
-}
+})
 onMounted(loadHoldings)
 
 async function saveHolding() {
@@ -287,11 +294,11 @@ async function saveHolding() {
 // ---------- Alokasi vs SOP + Per Mata Uang (view, butuh Langkah 4 dulu) ----------
 const allocation = ref(null)
 const loadingAllocation = ref(true)
-async function loadAllocation() {
+const loadAllocation = preserveScroll(async function loadAllocation() {
   loadingAllocation.value = true
   allocation.value = await get('/api/portfolio/allocation')
   loadingAllocation.value = false
-}
+})
 onMounted(loadAllocation)
 
 const holdingsByProvider = computed(() => {
@@ -339,11 +346,11 @@ async function submitConvertBook() {
 // ---------- Riwayat Konversi Book (Log & Audit tab) ----------
 const holdingConversions = ref([])
 const loadingHoldingConversions = ref(true)
-async function loadHoldingConversions() {
+const loadHoldingConversions = preserveScroll(async function loadHoldingConversions() {
   loadingHoldingConversions.value = true
   holdingConversions.value = await get('/api/holdings/conversions')
   loadingHoldingConversions.value = false
-}
+})
 onMounted(loadHoldingConversions)
 </script>
 

@@ -7,6 +7,7 @@ import TagAutocomplete from '../components/TagAutocomplete.vue'
 import { get, post } from '../lib/api'
 import { today, daysAgo, LINK_STATUS_CLASS, FACET_COLOR, LENS_LABELS } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
+import { preserveScroll } from '../composables/useScrollPreserve'
 
 // Port dari web/static/js/panel2.js (lihat docs/migrationFE.md Fase 2).
 const { toast } = useAppToast()
@@ -80,7 +81,7 @@ async function toggleForReading(row) {
   const now = !!row.for_reading
   await post('/api/news/for_reading', { id: row.id, for_reading: !now })
   toast(now ? 'Dilepas dari Reading' : 'Ditandai for Reading')
-  loadNews()
+  preserveScroll(loadNews)() // lihat useScrollPreserve.js
 }
 
 // ---------- display_subtitle (Addendum C §21.2 poin d): judul/catatan Giel
@@ -96,7 +97,7 @@ async function saveSubtitle(row) {
   await post(`/api/news/${row.id}/display_subtitle`, { display_subtitle: subtitleInputs.value[row.id] || null })
   toast('Subtitle tersimpan')
   editingSubtitleIds.value.delete(row.id)
-  loadNews()
+  preserveScroll(loadNews)() // lihat useScrollPreserve.js
 }
 
 // ---------- Faceted Tagging C-1: pasang/lepas tag per baris berita
@@ -106,19 +107,19 @@ async function onTagSelected(row, tag) {
   const result = await post('/api/content_tags', { ref_table: 'daily_news', ref_id: row.id, tag: tag.canonical })
   if (result.error) { toast(result.error); return }
   toast(`Tag ${tag.canonical} dipasang`)
-  loadNews()
+  preserveScroll(loadNews)() // lihat useScrollPreserve.js
 }
 
 async function removeTag(contentTagId) {
   await post(`/api/content_tags/${contentTagId}/remove`, {})
   toast('Tag dilepas')
-  loadNews()
+  preserveScroll(loadNews)() // lihat useScrollPreserve.js
 }
 
 async function confirmTag(contentTagId) {
   await post(`/api/content_tags/${contentTagId}/confirm`, {})
   toast('Tag diterima')
-  loadNews()
+  preserveScroll(loadNews)() // lihat useScrollPreserve.js
 }
 
 // "Telusuri Semua Tag" -- panel sekunder, jarang dibuka (§21.3), tapi
@@ -159,13 +160,13 @@ async function confirmThreadLink() {
   })
   toast(`Ditautkan ke "${stanceDialogLink.value.thread_title}" (${selectedStance.value})`)
   stanceDialogOpen.value = false
-  loadNews()
+  preserveScroll(loadNews)() // lihat useScrollPreserve.js
 }
 
 async function rejectThreadLink(threadLink) {
   await post(`/api/threads/link/${threadLink.link_id}/reject`, {})
   toast('Tautan thread dilepas')
-  loadNews()
+  preserveScroll(loadNews)() // lihat useScrollPreserve.js
 }
 
 // ---------- + Tautkan Thread manual: pasang link CONFIRMED langsung (Giel
@@ -195,7 +196,7 @@ async function addThreadLink(row) {
   if (result.error) { toast(result.error); return }
   toast('Ditautkan ke thread')
   linkPickerIds.value.delete(row.id)
-  loadNews()
+  preserveScroll(loadNews)() // lihat useScrollPreserve.js
 }
 
 // + Add Manual Article
