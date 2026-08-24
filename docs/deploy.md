@@ -326,8 +326,46 @@ utk app single-user ini). Konfirmasi 2 langkah sebelum trigger (mis. "yakin?"
 sebelum run) -- `/run_daily` dianggap aman dipicu langsung, sama seperti
 tombol "Trigger Berita (Sekarang)" di Snapshot yang juga tanpa konfirmasi.
 
+## 9. PROMPT PERSONA DI RAILWAY (10 Agustus 2026)
+
+`prompts/persona_<lens>.txt` (Panel 4, 4 Analisa AI) sengaja gitignored
+(`prompts/README.md`) -- isinya cara berpikir/analisa Giel sendiri, sama
+prinsip dengan `.env`. Konsekuensinya: `git push` TIDAK PERNAH membawa
+file-file ini ke Railway. Kalau di-upload manual ke `prompts/` biasa
+(bukan di Volume), hilang lagi begitu deploy berikutnya -- filesystem app
+di luar Volume dibangun ULANG dari image tiap deploy, cuma Volume yang
+persisten (pelajaran yang sama dgn kenapa cron service kedua ditolak §8.0).
+
+**Solusi**: `llm/persona_analysis.py` sekarang baca env var opsional
+`KASTARA_PROMPTS_DIR` -- kosong (default) = pakai `prompts/` di source
+tree seperti biasa (dev lokal, TIDAK berubah). Diisi = pakai folder itu,
+diarahkan ke Volume yang SAMA dgn `KASTARA_DB_PATH` supaya prompt
+bertahan lintas deploy.
+
+```
+[ ] 1. Set env var Railway: KASTARA_PROMPTS_DIR=/data/prompts
+       (ganti /data kalau mount path Volume-mu beda -- cek dari
+       KASTARA_DB_PATH yang sudah ada, biasanya folder yang sama)
+[ ] 2. Buat folder-nya dulu + upload 4 file prompt (SEKALI, dari mesin
+       lokal, jalan lewat railway ssh -- pola sama migrasi data
+       sebelumnya):
+       railway ssh -- "mkdir -p /data/prompts"
+       railway ssh -- "cat > /data/prompts/persona_gema.txt" < prompts/persona_gema.txt
+       railway ssh -- "cat > /data/prompts/persona_leon.txt" < prompts/persona_leon.txt
+       railway ssh -- "cat > /data/prompts/persona_akela.txt" < prompts/persona_akela.txt
+       railway ssh -- "cat > /data/prompts/persona_rivan.txt" < prompts/persona_rivan.txt
+[ ] 3. Deploy staged env var change (Railway tidak auto-apply).
+[ ] 4. Verifikasi: GET /api/persona/status di Railway harus balikin
+       semua 4 lens true. Coba "Jalankan Analisa" beneran di Panel 4.
+```
+
+Kalau nanti prompt di-edit di lokal, ulangi langkah 2 utk lens yang
+berubah (bukan proses otomatis -- personal & jarang berubah, tidak worth
+dibikin pipeline).
+
 ---
 
 *Deployment & Mobile Access Strategy v1.0 — mulai dari Tahap 1, biarkan pemakaian nyata yang menentukan Tahap 3. Pakai dulu, bangun setelah tahu.*
 *§7 (Railway) ditambahkan 31 Jul 2026 sebagai override eksplisit Giel — lihat catatan transparansi di atas.*
 *§8 (Telegram cron trigger) ditambahkan 4 Agustus 2026 setelah deploy pertama Giel menemukan constraint Volume-per-service Railway di lapangan.*
+*§9 (Prompt persona di Volume) ditambahkan 10 Agustus 2026 -- Giel minta prompt yang sudah ditulis jadi aktif & ter-upload ke produksi.*

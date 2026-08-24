@@ -29,7 +29,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PROMPTS_DIR = PROJECT_ROOT / "prompts"
+# 10 Agustus 2026: `prompts/` sengaja gitignored (lihat prompts/README.md)
+# -- di Railway, filesystem app di luar Volume dibangun ULANG dari image
+# tiap deploy, jadi file yang di-upload manual ke situ hilang lagi begitu
+# deploy berikutnya. `KASTARA_PROMPTS_DIR` (opsional) arahkan ke folder di
+# Volume yang sama dgn DB (mis. /data/prompts) supaya prompt persona
+# bertahan lintas deploy -- kosong = pakai default lama (prompts/ di
+# source tree, cocok utk dev lokal, TIDAK berubah drpd sebelumnya).
+_PROMPTS_DIR_OVERRIDE = os.getenv("KASTARA_PROMPTS_DIR", "").strip()
+PROMPTS_DIR = Path(_PROMPTS_DIR_OVERRIDE) if _PROMPTS_DIR_OVERRIDE else PROJECT_ROOT / "prompts"
 
 OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
 DEFAULT_MODEL = "anthropic/claude-sonnet-5"
