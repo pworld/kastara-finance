@@ -244,7 +244,7 @@ locked (§18).
   LLM).
 - `econ_calendar.py`: ForexFactory (unofficial JSON endpoint, free
   no-key — see
-  [§6.5](#65-economic-calendar-unofficial-source)). Future events,
+  [§6.5](#65-economic-calendar--unofficial-source)). Future events,
   UPSERT by `(event_date, event_name, country)` since forecasts can
   change as the release nears.
 
@@ -255,7 +255,7 @@ Calls every scraper → merges results → computes calculated fields
 index) → UPSERT `econ_calendar` (natural key, refresh forecast) → prints
 ok/fail/skip summary. **Idempotent**: safe to run repeatedly for the
 same date. Scheduled via **per-user crontab** (`0 0 * * *`) — see
-[README §5](../README.md#5-otomatisasi-cron).
+[README §5](../README.md#5-automation-cron).
 
 ### 5.4 `pipeline/backfill.py` — historical fetch
 CLI with a **mandatory preview before commit**: computes new vs.

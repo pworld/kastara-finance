@@ -79,7 +79,7 @@ The SECOND cron, **separate** from the flow above (different schedule, not yet i
 crontab — see README §5). Purpose: fill in `econ_calendar.actual` for HIGH-importance
 events whose forecast/previous were already populated by the morning flow
 (ForexFactory never provides `actual`, see
-[ARCHITECTURE.md §6.14](ARCHITECTURE.md#614-scrapersinvesting_calendarpy--kenapa-tidak-digabung-ke-run_daily)
+[ARCHITECTURE.md §6.14](ARCHITECTURE.md#614-scrapersinvesting_calendarpy--why-it-is-not-merged-into-run_daily)
 for why this isn't simply added to `run_daily`).
 
 ```mermaid

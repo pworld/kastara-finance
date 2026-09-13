@@ -95,7 +95,7 @@ items were gaps for a while, now addressed:
    needs `sudo service cron start` (requires an interactive password —
    outside the control of automated execution, must be run manually once by
    Giel). See full instructions in
-   [README §5](../README.md#5-otomatisasi-cron).
+   [README §5](../README.md#5-automation-cron).
 
 Total tables now **14** (11 Phase A + 3 forward-layer), up from 11.
 
@@ -337,7 +337,7 @@ fully executed.
   Lenses, approved Signal) is only complete AFTER Giel finishes Panels 4-6
   (~07:20) — `run_daily` runs at 07:00, well before that. Auto-push tied
   to `run_daily` would always be empty in the most important part. Full
-  detail: [ARCHITECTURE.md §6.12](ARCHITECTURE.md#612-telegram-daily-briefing--push-manual-sengaja-tidak-nempel-run_daily).
+  detail: [ARCHITECTURE.md §6.12](ARCHITECTURE.md#612-telegram-daily-briefing--manual-push-deliberately-not-attached-to-run_daily).
 - **`notify/telegram.py`**: `send_message()` (push via Bot API
   `sendMessage`, using plain `requests` — NO heavy new dependency) +
   `get_latest_chat_id()` (one-time setup helper via `getUpdates`).

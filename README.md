@@ -104,7 +104,7 @@ Login uses `DASHBOARD_PASSWORD`, set by you in `.env` (see §Setup).
   or add your own cron line (e.g. `0 21 * * *`, WIB).
 - **Backfill** `pipeline/backfill.py` — pulls historical data (BTC/macro), preview-before-commit.
 - **Manual article** `pipeline/add_article.py` — fills `manual_articles` for
-  historical research (RSS can't backfill — see [Manual article](#manual-article-historical-research)).
+  historical research (RSS can't backfill — see [Manual articles](#manual-articles-historical-research)).
 - **Phase A indicators** `indicators/calc.py` — `net_liquidity`, `volume_ma20`.
 - **Analysis engine** (`analysis/`, generic since Phase B), active for
   **BTC/GOLD/IHSG/SP500/USDIDR/USDJPY** (Phase F+ expansion):
