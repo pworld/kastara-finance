@@ -8,9 +8,9 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
-// Sidebar collapse (6 Agustus 2026) -- reclaim lebar layar utk konten
-// (mis. tabel lebar di Universe/Chart). Persist ke localStorage supaya
-// pilihan bertahan lintas reload, bukan reset tiap buka app.
+// Sidebar collapse (August 6, 2026) -- reclaim screen width for content
+// (e.g. wide tables in Universe/Chart). Persist to localStorage so
+// choice survives across reload, not reset every app open.
 const SIDEBAR_COLLAPSED_KEY = 'kastara_sidebar_collapsed'
 const sidebarCollapsed = ref(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1')
 function toggleSidebar() {
@@ -23,9 +23,9 @@ const navGroups = [
     items: [
       { to: '/snapshot', label: 'Snapshot' },
       { to: '/news', label: 'News' },
-      // Threads dipindah ke sini (di bawah News, 28 Jul 2026) -- konfirmasi/
-      // tolak saran tautan sudah jadi bagian ritual baca News harian, jadi
-      // menunya deket News, bukan di Pengaturan (yang kurasi lambat/reflektif).
+      // Threads moved here (below News, 28 Jul 2026) -- confirming/
+      // rejecting suggested links is now part of daily News reading ritual, so
+      // menu is near News, not in Settings (which curates slowly/reflectively).
       { to: '/threads', label: 'Threads' },
       { to: '/forward', label: 'Forward' },
       { to: '/reading', label: 'Reading' },
@@ -34,26 +34,26 @@ const navGroups = [
     ],
   },
   {
-    // Lane INVEST (ritme mingguan/kuartalan) -- dulu digabung "Universal"
-    // bareng Riwayat, dipisah biar jelas ini lane investasi saham, bukan
-    // ritual harian (lihat docs/SOP.md Bagian C).
+    // INVEST lane (weekly/quarterly rhythm) -- formerly combined "Universal"
+    // with History, separated to clarify this is the stock investment lane, not
+    // daily ritual (see docs/SOP.md Section C).
     title: 'Investing',
     items: [
       { to: '/universe', label: 'Universe' },
     ],
   },
   {
-    // Track record lintas-lane (synthesis/prediksi/jurnal/lensa) -- dibaca
-    // saat review mingguan/bulanan, bukan tiap hari.
-    title: 'Arsip',
+    // Cross-lane track record (synthesis/prediction/journal/lens) -- read
+    // during weekly/monthly review, not daily.
+    title: 'Archive',
     items: [
-      { to: '/riwayat', label: 'Riwayat' },
+      { to: '/riwayat', label: 'History' },
     ],
   },
   {
-    // Kurasi lambat/reflektif (Addendum C §21.11) -- BEDA sifat dari Daily,
-    // grup sendiri biar tidak tercampur ritual harian.
-    title: 'Pengaturan',
+    // Slow/reflective curation (Addendum C §21.11) -- DIFFERENT from Daily,
+    // own group to avoid mixing with daily ritual.
+    title: 'Settings',
     items: [
       { to: '/tags', label: 'Tags' },
     ],
@@ -75,7 +75,7 @@ async function logout() {
         <div class="brand" v-show="!sidebarCollapsed">KASTARA FINANCE</div>
         <button
           class="sidebar-toggle" @click="toggleSidebar"
-          :title="sidebarCollapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'"
+          :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         >{{ sidebarCollapsed ? '»' : '«' }}</button>
       </div>
       <nav v-show="!sidebarCollapsed">

@@ -6,12 +6,12 @@ import { get, post } from '../lib/api'
 import { today, LENS_LABELS, FACET_COLOR } from '../lib/format'
 import { useAppToast } from '../composables/useAppToast'
 
-// Port dari web/static/js/panel4.js (lihat docs/migrationFE.md Fase 2).
+// Ported from web/static/js/panel4.js (see docs/migrationFE.md Phase 2).
 const { toast } = useAppToast()
 
-// ---------- Berita for_reading Hari Ini (Addendum C §21.2/21.6: rename
-// fungsional dari "key news" -- kurasi "penting utk dibaca", beda dari tag
-// klasifikasi) + filter by tag (§21.3, "filterable by tag") ----------
+// ---------- Today's for_reading news (Addendum C §21.2/21.6: functional rename
+// from "key news" -- curated "important to read", different from tag
+// classification) + filter by tag (§21.3, "filterable by tag") ----------
 const readingNews = ref([])
 onMounted(async () => {
   readingNews.value = await get('/api/news', { date: today(), for_reading: 1, limit: 50 })
@@ -24,9 +24,9 @@ function addFilterTag(tag) {
 function removeFilterTag(canonical) {
   filterTags.value = filterTags.value.filter((c) => c !== canonical)
 }
-// Kosmetik AND semantics: berita harus punya SEMUA tag terpilih -- cukup utk
-// Reading Page (kontrak cuma minta "filterable by tag" di sini, AND/OR
-// toggle penuh ada di News page).
+// Cosmetic AND semantics: articles must have ALL selected tags -- sufficient for
+// Reading Page (contract only asks "filterable by tag" here, full AND/OR
+// toggle is on News page).
 const filteredReadingNews = computed(() => {
   if (!filterTags.value.length) return readingNews.value
   return readingNews.value.filter((r) =>
@@ -34,7 +34,7 @@ const filteredReadingNews = computed(() => {
   )
 })
 
-// ---------- 4 Analisa (AI) ----------
+// ---------- 4 Analyses (AI) ----------
 const PERSONA_ORDER = ['GEMA', 'LEON', 'AKELA', 'RIVAN']
 const personaStatus = ref({})
 const personaTexts = ref({})
@@ -55,7 +55,7 @@ onMounted(loadPersonaAnalysis)
 
 function preview(lens) {
   const text = personaTexts.value[lens]
-  if (!text) return 'Belum ada analisa.'
+  if (!text) return 'No analysis yet.'
   return text.slice(0, 140) + (text.length > 140 ? '…' : '')
 }
 
@@ -70,22 +70,22 @@ async function runPersona(lens) {
   runningLens.value = null
   if (r.error) { toast(r.error); return }
   personaTexts.value = { ...personaTexts.value, [lens]: r.text }
-  toast(`Analisa ${LENS_LABELS[lens]} selesai`)
+  toast(`${LENS_LABELS[lens]} analysis complete`)
   openPersonaModal(lens)
 }
 
-// ---------- Catatan Tambahan ----------
+// ---------- Additional Notes ----------
 const externalAi = ref('')
 const conflict = ref('')
 async function saveReading() {
   const r = await post('/api/reading/save', { date: today(), external_ai: externalAi.value, conflict: conflict.value })
-  toast(`${r.ids.length} catatan tersimpan`)
+  toast(`${r.ids.length} notes saved`)
 }
 </script>
 
 <template>
   <section>
-    <h2>Berita for Reading Hari Ini</h2>
+    <h2>Today's for_reading Articles</h2>
     <div class="panel">
       <div class="chart-head" style="margin-bottom:12px">
         <label class="src">Filter tag</label>
@@ -94,7 +94,7 @@ async function saveReading() {
         </span>
         <TagAutocomplete :excludeCanonicals="filterTags" placeholder="filter by tag..." @select="addFilterTag" />
       </div>
-      <div v-if="!filteredReadingNews.length" class="empty-inline">belum ada berita for_reading hari ini (sesuai filter) — tandai di Panel News dulu.</div>
+      <div v-if="!filteredReadingNews.length" class="empty-inline">No for_reading articles today (per filter) — mark them in News panel first.</div>
       <table v-else>
         <thead><tr><th>Impact</th><th>Headline</th><th>Sumber</th></tr></thead>
         <tbody>
@@ -110,11 +110,11 @@ async function saveReading() {
         </tbody>
       </table>
     </div>
-    <div class="src" style="margin-top:6px">Berita yang kamu tandai "for Reading" di Panel News — bahan buat nulis 4 lensa di bawah.</div>
+    <div class="src" style="margin-top:6px">Articles you marked "for Reading" in News panel — material for writing 4 lenses below.</div>
   </section>
 
   <section>
-    <h2>4 Analisa (AI)</h2>
+    <h2>4 Analyses (AI)</h2>
     <div class="panel">
       <div class="grid persona-grid">
         <div
@@ -124,34 +124,34 @@ async function saveReading() {
           <div class="label">{{ LENS_LABELS[lens] || lens }}</div>
           <div class="persona-preview">{{ preview(lens) }}</div>
           <div v-if="!personaStatus[lens]" class="src" style="color:var(--fail)">
-            Prompt belum diisi — tulis di prompts/persona_{{ lens.toLowerCase() }}.txt
+            Prompt not filled in — write it in prompts/persona_{{ lens.toLowerCase() }}.txt
           </div>
           <div class="form-row" style="margin-top:8px">
             <button
               class="btn small secondary" :disabled="runningLens === lens"
               @click="runPersona(lens)"
-            >{{ runningLens === lens ? 'Menjalankan…' : 'Jalankan Analisa' }}</button>
-            <button class="btn small" :disabled="!personaTexts[lens]" @click="openPersonaModal(lens)">Lihat Detail</button>
+            >{{ runningLens === lens ? 'Running…' : 'Run Analysis' }}</button>
+            <button class="btn small" :disabled="!personaTexts[lens]" @click="openPersonaModal(lens)">View Details</button>
           </div>
         </div>
       </div>
     </div>
-    <div class="src" style="margin-top:6px">Analisa digenerate lewat OpenRouter berdasarkan snapshot pasar + berita key hari ini. Klik "Jalankan Analisa" per kartu, lalu "Lihat Detail" utk baca hasilnya.</div>
+    <div class="src" style="margin-top:6px">Analyses generated via OpenRouter based on market snapshot + today's key news. Click "Run Analysis" per card, then "View Details" to read the results.</div>
   </section>
 
   <section>
-    <h2>Catatan Tambahan</h2>
+    <h2>Additional Notes</h2>
     <div class="panel">
       <div class="form-row">
-        <label class="field">External AI Check (opsional — paste hasil banding TradingAgents/qrak/dll, MANUAL)</label>
+        <label class="field">External AI Check (optional — paste comparison results from TradingAgents/qrak/etc., MANUAL)</label>
         <textarea v-model="externalAi"></textarea>
       </div>
       <div class="form-row">
-        <label class="field">Conflict Notes (poin yang belum sepakat antar analisa)</label>
+        <label class="field">Conflict Notes (points not yet agreed upon between analyses)</label>
         <textarea v-model="conflict"></textarea>
       </div>
       <div class="form-row" style="margin-top:4px">
-        <button class="btn" @click="saveReading">Simpan Catatan</button>
+        <button class="btn" @click="saveReading">Save Notes</button>
       </div>
     </div>
   </section>

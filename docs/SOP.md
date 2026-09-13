@@ -1,453 +1,453 @@
-# SOP PENGGUNAAN APLIKASI — Kastara Finance
-**Versi:** 1.2 · 28 Juli 2026 · Owner: Giel
-**Posisi dokumen:** mengatur KAPAN membuka panel apa dan APA yang boleh dilakukan di sana. Aturan level aset tetap di SOP masing-masing (single source of truth):
+# APPLICATION USAGE SOP — Kastara Finance
+**Version:** 1.2 · July 28, 2026 · Owner: Giel
+**Position of this document:** governs WHEN to open which panel and WHAT is allowed to be done there. Asset-level rules stay in their own SOPs (single source of truth):
 
-> **Struktur dokumen:** **Bagian A (§0–§7)** = ritme & aturan (kapan buka apa).
-> **Bagian B (§8)** = **cara BACA tiap item di tiap panel** (arti angka, naik/turun
-> artinya apa) — dipakai kalau kamu lupa "ini field apa maksudnya". **Bagian C
-> (§9)** = lane Investing (dulu sidebar "Universal") — cara baca + cara isi.
-> Kalau cuma mau ritual pagi: Bagian A cukup. Bagian B/C = kamus rujukan.
+> **Document structure:** **Part A (§0–§7)** = rhythm & rules (when to open what).
+> **Part B (§8)** = **how to READ each item in each panel** (what the numbers mean, what
+> up/down means) — used when you forget "what does this field mean". **Part C
+> (§9)** = the Investing lane (formerly the "Universal" sidebar) — how to read + how to fill in.
+> If you just want the morning ritual: Part A is enough. Part B/C are reference dictionaries.
 
-- Aturan entry/SL/TP/sizing trade → Master Plan §3 + Build Contract v1.3
-- Trigger & bracket emas, screening saham invest → Saham Emas SOP v2.0
-- Alokasi multi-aset & low-point trigger → Investment SOP v4.1
-Kalau dokumen ini terasa bertentangan dengan SOP di atas: SOP aset yang menang, dan konflik dicatat untuk direview.
-
----
-
-## 0. PRINSIP PEMAKAIAN
-
-1. **Dua lane, dua ritme, satu aplikasi.** TRADE lane = ritme harian (Panel 1–6). INVEST lane = ritme mingguan/kuartalan (Tab 8 + SOP invest). Jangan tukar ritmenya: cek posisi invest tiap hari = mengundang jadi trader di portfolio yang harusnya boring (prinsip Saham Emas SOP §0.1).
-2. **Aplikasi men-suggest, Giel memutuskan.** Tidak ada keputusan yang sah tanpa melalui gate (`giel_approved`) — dan tidak ada trade yang sah tanpa row `trade_signals` yang di-approve lebih dulu. Trade tanpa sinyal tercatat = pelanggaran SOP, apa pun hasilnya.
-3. **Data bolong = analisa ditunda, bukan ditebak.** `source_flags` merah pada field yang dibutuhkan hari itu → bagian analisa yang bergantung padanya di-skip dan dicatat, bukan diisi asumsi.
-4. **Sesi pagi adalah sesi baca & keputusan — bukan sesi riset.** Riset mendalam (backfill, intake emiten, tuning) punya slot sendiri di luar ritual pagi.
+- Entry/SL/TP/sizing rules for trades → Master Plan §3 + Build Contract v1.3
+- Gold triggers & brackets, stock investment screening → Saham Emas SOP v2.0
+- Multi-asset allocation & low-point trigger → Investment SOP v4.1
+If this document feels like it contradicts the SOPs above: the asset SOP wins, and the conflict is logged for review.
 
 ---
 
-## 1. SOP DAILY — RITUAL PAGI (±20 menit, 07.00 WIB)
+## 0. USAGE PRINCIPLES
 
-> Prasyarat otomatis: scraper jalan 00.00, dashboard siap 06.30.
+1. **Two lanes, two rhythms, one application.** TRADE lane = daily rhythm (Panel 1–6). INVEST lane = weekly/quarterly rhythm (Tab 8 + invest SOP). Don't swap their rhythms: checking invest positions every day = inviting yourself to become a trader in a portfolio that's supposed to be boring (principle from Saham Emas SOP §0.1).
+2. **The application suggests, Giel decides.** No decision is valid without passing through the gate (`giel_approved`) — and no trade is valid without an approved `trade_signals` row first. A trade without a logged signal = an SOP violation, regardless of the outcome.
+3. **Missing data = analysis postponed, not guessed.** A red `source_flags` on a field needed that day → the part of the analysis that depends on it is skipped and noted, not filled in with assumptions.
+4. **The morning session is a reading & decision session — not a research session.** Deep research (backfill, issuer intake, tuning) has its own slot outside the morning ritual.
 
-**07.00 — Panel 1 · Data Snapshot (2 menit)**
-- [ ] Cek `source_flags`: semua hijau? Kalau ada merah → catat field mana; kalau field itu dipakai analisa hari ini (mis. funding rate merah padahal mau baca BTC), tandai analisa terkait sebagai LOW_CONFIDENCE hari ini.
-- [ ] Lirik anomali besar (delta harian ekstrem) — bukan untuk disimpulkan, cukup ditandai untuk dibaca di panel berikutnya.
+---
 
-**07.02 — Panel 2 · News Briefing (3 menit)**
-- [ ] Baca headline HIGH dulu, lalu MED. Flag `key_trigger` HANYA untuk berita yang benar-benar bisa mengubah lane — bukan semua berita menarik.
-- [ ] Berita panjang yang butuh dibedah → masukkan `manual_articles` untuk sesi baca terpisah, JANGAN habiskan slot pagi.
+## 1. DAILY SOP — MORNING RITUAL (±20 minutes, 07:00 WIB)
 
-**07.05 — Panel 3 · Forward Panel (5 menit)**
-- [ ] Baca urut: Expectations (FedWatch/Dot Plot) → Positioning (COT, ETF flow, IHSG FF) → Policy Tracker terbaru → kalender: katalis HIGH berapa hari lagi?
-- [ ] Cek Disonansi Flag. Kalau aktif → wajib disebut di synthesis nanti.
-- [ ] **Output langkah ini: LANE hari ini per instrumen aktif** (bullish/bearish/netral — bias, bukan entry).
-- [ ] Posisi terbuka saham AS? → cek countdown earnings. H-1 earnings = **tutup penuh hari ini** (keputusan terkunci #3), bukan besok.
-- [ ] Event HIGH < 48 jam & ada posisi terbuka → jalankan rule SL-ke-breakeven sesuai SOP.
+> Automatic prerequisite: scraper runs at 00:00, dashboard ready by 06:30.
 
-**07.10 — Panel 4 · Reading Workspace (5 menit)**
-- [ ] Jalankan lensa persona SESUAI KEBUTUHAN, bukan ritual 4 kartu tiap hari:
-  - Ada berita key trigger / katalis dekat → jalankan lensa yang relevan (berita Fed → GEMA+AKELA; kebijakan domestik → LEON; pergerakan BTC anomali → RIVAN).
-  - Hari tenang tanpa katalis → boleh nol panggilan. Kartu kosong bukan kegagalan.
-- [ ] Hasil lensa = bahan, bukan vonis. Konflik antar lensa → tulis di Conflict Notes, jangan didamaikan paksa.
-- [ ] Output AI eksternal (kalau ada) masuk External AI Check — dibanding, tidak diikuti.
+**07:00 — Panel 1 · Data Snapshot (2 minutes)**
+- [ ] Check `source_flags`: all green? If any are red → note which field; if that field is used in today's analysis (e.g. funding rate red while about to read BTC), mark the related analysis as LOW_CONFIDENCE for today.
+- [ ] Glance at major anomalies (extreme daily deltas) — not to draw conclusions, just flag them to read in the next panel.
 
-**07.15 — Panel 5 · Chart & Sinyal (3 menit)**
-- [ ] Cek sinyal SUGGESTED. Untuk tiap sinyal, jalankan gate berurutan:
-  1. Badge lane instrumen = TRADE/BOTH? (bukan INVEST/NONE/AVOID)
-  2. Zona S&R sudah `validated_by_giel`?
-  3. Breakout + retest + volume sesuai rules (bukan wick, volume hadir)?
+**07:02 — Panel 2 · News Briefing (3 minutes)**
+- [ ] Read HIGH headlines first, then MED. Flag `key_trigger` ONLY for news that could genuinely change the lane — not every interesting piece of news.
+- [ ] Long articles that need dissecting → put into `manual_articles` for a separate reading session, DO NOT spend the morning slot on them.
+
+**07:05 — Panel 3 · Forward Panel (5 minutes)**
+- [ ] Read in order: Expectations (FedWatch/Dot Plot) → Positioning (COT, ETF flow, IHSG FF) → latest Policy Tracker → calendar: how many days until the HIGH catalyst?
+- [ ] Check the Dissonance Flag. If active → must be mentioned in the synthesis later.
+- [ ] **Output of this step: today's LANE per active instrument** (bullish/bearish/neutral — bias, not entry).
+- [ ] Open US stock position? → check the earnings countdown. Earnings D-1 = **close fully today** (locked decision #3), not tomorrow.
+- [ ] HIGH event < 48 hours away & an open position exists → run the SL-to-breakeven rule per the SOP.
+
+**07:10 — Panel 4 · Reading Workspace (5 minutes)**
+- [ ] Run persona lenses AS NEEDED, not as a ritual of 4 cards every day:
+  - Key-trigger news / nearby catalyst → run the relevant lens (Fed news → GEMA+AKELA; domestic policy → LEON; anomalous BTC movement → RIVAN).
+  - Quiet day with no catalyst → zero calls is fine. An empty card is not a failure.
+- [ ] Lens results = material, not a verdict. Conflict between lenses → write it in Conflict Notes, don't force a reconciliation.
+- [ ] External AI output (if any) goes into External AI Check — compared against, not followed.
+
+**07:15 — Panel 5 · Chart & Signal (3 minutes)**
+- [ ] Check SUGGESTED signals. For each signal, run the gates in sequence:
+  1. Instrument lane badge = TRADE/BOTH? (not INVEST/NONE/AVOID)
+  2. S&R zone already `validated_by_giel`?
+  3. Breakout + retest + volume per the rules (not a wick, volume present)?
   4. R:R ≥ 1.5?
-  5. Lane dari Panel 3 tidak bertentangan frontal? (lane bearish + sinyal long = alasan kuat untuk reject/skip, tercatat)
-  6. Kalender: tidak ada earnings (saham AS) / event HIGH yang melanggar rule hold?
-- [ ] Semua lolos → APPROVE. Ada yang gagal → REJECT dengan notes satu kalimat. **Tidak ada "approve nanti sore dipikir lagi"** — keputusan di sesi ini atau reject.
-- [ ] Approve ≠ eksekusi. Eksekusi = langkah §2 di bawah.
+  5. Lane from Panel 3 doesn't flatly contradict? (bearish lane + long signal = strong reason to reject/skip, logged)
+  6. Calendar: no earnings (US stock) / HIGH event violating the hold rule?
+- [ ] All pass → APPROVE. Any fail → REJECT with a one-sentence note. **There's no "approve later this evening after more thought"** — the decision happens this session or it's a reject.
+- [ ] Approve ≠ execution. Execution = step §2 below.
 
-**07.18 — Panel 6 · Synthesis (2 menit)**
-- [ ] Tulis synthesis 1 paragraf DENGAN TANGAN SENDIRI (bukan copy hasil lensa).
-- [ ] Set outlook per instrumen aktif.
-- [ ] Catat MAKSIMAL 1 prediksi ke `prediction_log` — hanya kalau memang ada klaim yang layak diuji. Prediksi kosong lebih baik daripada prediksi asal.
-- [ ] Ada prediksi lama jatuh tempo? Nilai sekarang (BENAR/SALAH/PARTIAL) — jangan tunda ke "nanti".
+**07:18 — Panel 6 · Synthesis (2 minutes)**
+- [ ] Write a 1-paragraph synthesis IN YOUR OWN WORDS (not copied from lens results).
+- [ ] Set the outlook per active instrument.
+- [ ] Log AT MOST 1 prediction to `prediction_log` — only if there's actually a claim worth testing. An empty prediction is better than a careless one.
+- [ ] Any old prediction due? Score it now (CORRECT/WRONG/PARTIAL) — don't defer it to "later".
 
-**07.20 — Selesai.** Opsional: kirim Daily Briefing (tombol Panel 6) kalau konten mau dipublikasikan.
+**07:20 — Done.** Optional: send the Daily Briefing (Panel 6 button) if you want to publish the content.
 
-### Yang DILARANG di sesi pagi
-- Membuka Tab 8 (Universe & Grader) — itu ritme mingguan/kuartalan. Kecuali satu hal: melihat badge lane/kuadran yang sudah tampil otomatis di Panel 5.
-- Backfill, intake emiten, tuning parameter, baca artikel panjang.
-- Approve sinyal yang gagal di salah satu gate "karena feeling bagus".
+### What is PROHIBITED during the morning session
+- Opening Tab 8 (Universe & Grader) — that's a weekly/quarterly rhythm. Except for one thing: viewing the lane/quadrant badge that's already displayed automatically in Panel 5.
+- Backfill, issuer intake, parameter tuning, reading long articles.
+- Approving a signal that failed one of the gates "because it feels right".
 
-### Mode Ringkas — sesi 5 menit (hari sibuk)
+### Quick Mode — 5-minute session (busy days)
 
-> Detail penuh + rasional: `docs/mode_ringkas_pwa_mobile_v1.md`. Prinsip:
-> aplikasi ini **habit engine**, bukan pengganti tools berat — metrik
-> kesehatannya **streak harian** (dibuka kemarin, dan kemarinnya lagi), bukan
-> kelengkapan fitur. Mode Ringkas menjaga rantai harian tidak putus di hari
-> yang cuma menyisakan 5 menit — **bukan pengganti** ritual pagi penuh di atas.
+> Full details + rationale: `docs/mode_ringkas_pwa_mobile_v1.md`. Principle:
+> this application is a **habit engine**, not a replacement for heavy tools — its health
+> metric is the **daily streak** (opened yesterday, and the day before), not
+> feature completeness. Quick Mode keeps the daily chain from breaking on a day
+> that only leaves 5 minutes — it is **not a replacement** for the full morning ritual above.
 
-**[WAJIB · ~1 menit]** — cuma ini saja = "hari tidak putus":
-- [ ] Catat 1 prediksi ATAU nilai 1 prediksi yang jatuh tempo (`prediction_log`)
-  — satu-satunya hal yang TIDAK BISA di-backfill; prediksi yang tak dicatat
-  hari ini hilang permanen.
+**[REQUIRED · ~1 minute]** — this alone = "the day isn't broken":
+- [ ] Log 1 prediction OR score 1 due prediction (`prediction_log`)
+  — the ONE thing that CANNOT be backfilled; a prediction not logged
+  today is lost permanently.
 
-**[INTI · ~2 menit]** — kalau sempat:
-- [ ] Scan data pagi 10 detik: ada anomali besar? (lihat, jangan analisa)
-- [ ] Baca berita HIGH/briefing: ada yang mengubah lane hari ini? Flag
-  `for_reading` kalau layak dibaca serius nanti.
+**[CORE · ~2 minutes]** — if there's time:
+- [ ] 10-second scan of morning data: any major anomaly? (look, don't analyze)
+- [ ] Read HIGH news/briefing: anything changing today's lane? Flag
+  `for_reading` if it deserves a serious read later.
 
-**[BONUS · ~2 menit]** — kalau benar-benar longgar:
-- [ ] Konfirmasi tag/thread SUGGESTED (klik, tak perlu mikir berat).
-- [ ] Cek posisi ONGOING: ada yang kena aturan hari ini? (earnings saham AS
-  H-1 = tutup penuh; event HIGH < 48 jam = SL breakeven.)
+**[BONUS · ~2 minutes]** — if genuinely relaxed:
+- [ ] Confirm SUGGESTED tag/thread (click, no need to think hard).
+- [ ] Check ONGOING positions: does any hit today's rule? (US stock
+  earnings D-1 = close fully; HIGH event < 48 hours = SL breakeven.)
 
-**TIDAK di Mode Ringkas** (tunggu sesi laptop): approve/reject sinyal,
-sizing, jalankan persona (biaya LLM), synthesis panjang, backfill, settings,
+**NOT in Quick Mode** (wait for the laptop session): approve/reject signals,
+sizing, running personas (LLM cost), long synthesis, backfill, settings,
 grader override.
 
-**Aturan mental (jangkar habit):** *"Hari tersibuk pun, saya catat atau
-nilai satu prediksi."* Kalau cuma itu yang sempat, hari itu tetap sukses —
-streak utuh. Semua yang lain boleh dikejar di sesi laptop berikutnya.
+**Mental rule (habit anchor):** *"Even on the busiest day, I log or
+score one prediction."* If that's all there was time for, the day is still a success —
+the streak stays intact. Everything else can be caught up in the next laptop session.
 
-**Batas jujur:** Mode Ringkas bukan pengganti sesi penuh, dan tidak
-menghasilkan keputusan trade (anti-impulsif, bukan bug). 5 hari berturut
-hanya Mode Ringkas = sinyal untuk jujur soal disiplin vs kesibukan (§7).
+**Honest limit:** Quick Mode is not a substitute for the full session, and does not
+produce trade decisions (anti-impulsivity, not a bug). 5 consecutive days
+of Quick Mode only = a signal to be honest about discipline vs. busyness (§7).
 
 ---
 
-## 2. SOP EKSEKUSI (setelah approve — di luar aplikasi)
+## 2. EXECUTION SOP (after approval — outside the application)
 
-> Aplikasi berhenti di sinyal approved + size terhitung. Eksekusi = tangan Giel di broker. (Kontrak §15 — tanpa API broker.)
+> The application stops at an approved signal + calculated size. Execution = Giel's hand at the broker. (Contract §15 — no broker API.)
 
 **Crypto (exchange):**
-- [ ] Pasang buy limit di harga entry sinyal + SL sesuai sinyal. Ukuran dari sizing engine, tanpa pembulatan ke atas.
+- [ ] Place a buy limit at the signal's entry price + SL per the signal. Size from the sizing engine, without rounding up.
 
-**Saham IDX (Stockbit) — jam pasar WIB:**
-- [ ] Ukuran = hasil kuantisasi lot (pembulatan BAWAH). Kalau sinyal berstatus skip `RISK_CAPACITY_EXCEEDED` → TIDAK dieksekusi, titik. Dilarang menggeser SL supaya lot muat.
-- [ ] Ingat buffer ARA/ARB: risiko riil > jarak SL. Kalau buffer 1.5× membuat total risiko melebihi batas per trade → skip, catat.
+**IDX Stocks (Stockbit) — WIB market hours:**
+- [ ] Size = result of lot quantization (rounded DOWN). If the signal is flagged skip `RISK_CAPACITY_EXCEEDED` → NOT executed, period. Shifting the SL to make the lot fit is prohibited.
+- [ ] Remember the ARA/ARB buffer: real risk > SL distance. If the 1.5× buffer pushes total risk beyond the per-trade limit → skip, log it.
 
-**Saham AS (IBKR) — dipasang siang/sore WIB:**
-- [ ] GTC buy limit di harga entry sinyal. Fractional boleh — presisi sizing diutamakan.
-- [ ] Cek TANGGAL EARNINGS instrumen sebelum pasang order: kalau earnings jatuh sebelum horizon swing wajar → pertimbangkan skip dari awal, karena posisi wajib ditutup penuh sebelum earnings.
+**US Stocks (IBKR) — placed midday/evening WIB:**
+- [ ] GTC buy limit at the signal's entry price. Fractional shares allowed — sizing precision takes priority.
+- [ ] Check the instrument's EARNINGS DATE before placing the order: if earnings fall before a reasonable swing horizon → consider skipping from the start, since the position must be fully closed before earnings.
 
-**Setelah eksekusi (hari yang sama):**
-- [ ] Isi `trading_journal`: entry aktual, planned_size vs actual_size, dan (kalau skip) skip_reason. Jurnal diisi HARI ITU — jurnal yang diisi mundur adalah jurnal fiksi.
-
----
-
-## 3. SOP WEEKLY — SESI SENIN (±20 menit, di luar ritual pagi)
-
-- [ ] **Emas**: jalankan cek trigger bracket per Saham Emas SOP Tab 01 (logammulia.com vs database). Ada trigger → eksekusi tranche sesuai SOP-nya. Aplikasi tidak mengatur ini — hanya tempat mencatat kalau mau.
-- [ ] **SBN foreign flow**: input manual ke Forward Panel (Layer C). Ingat aturannya: ini bacaan matamu sendiri, tidak pernah masuk slice persona.
-- [ ] **COT mingguan**: rilis CFTC sudah masuk otomatis — baca perubahan posisi besar, terutama kalau Disonansi Flag sempat aktif minggu lalu.
-- [ ] **Review posisi ONGOING** di jurnal: masih sesuai premis? SL masih di tempatnya (bukan digeser)? Earnings/event HIGH minggu depan?
-- [ ] **Tab 8 — lirik universe**: ada flag integritas baru (UMA/suspensi) pada emiten yang dipegang atau di watchlist? Emiten yang jadi AVOID saat sedang dipegang = agenda evaluasi hari itu juga, bukan menunggu kuartal.
+**After execution (same day):**
+- [ ] Fill in `trading_journal`: actual entry, planned_size vs actual_size, and (if skipped) skip_reason. The journal is filled in THAT DAY — a journal filled in retroactively is a fictional journal.
 
 ---
 
-## 4. SOP MONTHLY (±30 menit, akhir bulan)
+## 3. WEEKLY SOP — MONDAY SESSION (±20 minutes, outside the morning ritual)
 
-- [ ] **Skor prediksi**: semua prediksi jatuh tempo bulan ini ternilai. Hitung kasar hit-rate — turun terus = bahan refleksi basis prediksi, bukan alasan berhenti mencatat.
-- [ ] **Review jurnal**: baca semua trade + skip bulan ini. Cari pola pelanggaran SOP (bukan pola pasar): ada SL digeser? Ada trade tanpa sinyal? Ada approve di luar sesi pagi? Pelanggaran = tulis di lesson_learned, apa pun hasil trade-nya.
-- [ ] **Data health check**: gap tanggal & NULL rate kolom kunci (pola: field yang lama merah di source_flags). Bolong sistematis → task perbaikan scraper, bukan dibiarkan.
-- [ ] **Invest lane — setoran rutin**: jalankan alokasi bulanan per Investment SOP v4.1 (reksadana indeks via Bibit/Bareksa, dst). Aplikasi berperan satu hal saja: cek Panel 3/Tab 8 untuk konteks — TAPI low-point trigger dari SOP v4.1 yang menentukan, bukan lensa persona. Persona tidak mengatur nabung rutin.
-
----
-
-## 5. SOP QUARTERLY (±1 jam, setelah musim laporan keuangan)
-
-- [ ] **Refresh fundamental**: tarik/input kuartal terbaru untuk universe (J-4). Emiten dengan <8 kuartal tetap LOW_CONFIDENCE.
-- [ ] **Jalankan ulang grader** seluruh universe → review perubahan kuadran di Tab 8. Kuadran berubah drastis → baca komponennya, jangan cuma badge-nya.
-- [ ] **Isi grader_log outcome** untuk grade yang berumur 3/6 bulan (widget komponen D). Ini satu-satunya sesi di mana revisi bobot rubrik BOLEH dipertimbangkan — dan hanya kalau log menunjukkan pola, bukan karena satu kasus menjengkelkan.
-- [ ] **Review universe**: emiten watchlist naik ke universe? Emiten universe yang 2 kuartal berturut memburuk → turunkan lane / keluarkan, tercatat dengan alasan.
-- [ ] **Kalibrasi lane**: instrumen INVEST yang mau naik ke TRADE → wajib lewat validasi bar-replay dulu (`lane_validated_at`), bukan karena "sudah lama dipantau".
-- [ ] **Review SOP ini sendiri**: ada langkah yang tidak pernah dijalankan 3 bulan berturut? Hapus atau perbaiki — SOP yang diabaikan lebih berbahaya daripada tidak ada SOP.
+- [ ] **Gold**: run the bracket trigger check per Saham Emas SOP Tab 01 (logammulia.com vs the database). If there's a trigger → execute the tranche per its SOP. The application doesn't manage this — it's just a place to log it if you want.
+- [ ] **SBN foreign flow**: manual input into the Forward Panel (Layer C). Remember the rule: this is your own eyes' reading, it never goes into the persona slice.
+- [ ] **Weekly COT**: the CFTC release is already ingested automatically — read the changes in large positions, especially if the Dissonance Flag was active last week.
+- [ ] **Review ONGOING positions** in the journal: still consistent with the premise? Is the SL still in place (not shifted)? Earnings/HIGH event next week?
+- [ ] **Tab 8 — glance at the universe**: any new integrity flags (UMA/suspension) on an issuer you hold or are watching? An issuer that becomes AVOID while you're holding it = an agenda item for evaluation that very day, not something to wait for the quarter.
 
 ---
 
-## 6. SOP INVEST LANE — PERAN APLIKASI (ringkas)
+## 4. MONTHLY SOP (±30 minutes, end of month)
 
-Invest lane hidup di SOP v4.1 + Saham Emas SOP. Aplikasi hanya berperan sebagai:
-1. **Filter kualitas**: kandidat nabung saham individual wajib melewati grader (Tab 8) — kuadran AVOID tidak dibeli untuk lane mana pun, termasuk invest. INVESTABLE/WATCH = boleh masuk pertimbangan SOP invest.
-2. **Konteks siklus**: Panel 3 (net liquidity, DXY, foreign flow) sebagai bacaan "musim" — memperkaya keputusan tranche, TIDAK meng-override trigger objektif SOP invest. Drawdown aset riil saat dollar-strength = mekanika forced-selling, bukan alasan mengubah alokasi (prinsip financial repression yang sudah dipegang).
-3. **Intake**: emiten baru yang menarik → jalur intake Tab 8 (komponen C), grade dulu, baru masuk daftar pertimbangan. Tidak ada beli-karena-berita tanpa lewat intake.
-4. **Pencatatan**: transaksi invest dicatat (jurnal/sheet sesuai SOP asetnya) — aplikasi bukan pengganti pencatatan SOP invest yang sudah jalan.
-
-Yang DILARANG: memakai `trade_signals` untuk timing pembelian invest, dan memakai trigger invest untuk membenarkan trade. Dua lane, dua logika, satu larangan silang.
+- [ ] **Score predictions**: all predictions due this month are scored. Roughly calculate the hit-rate — if it keeps dropping, that's material for reflecting on your prediction basis, not a reason to stop logging them.
+- [ ] **Review the journal**: read all trades + skips this month. Look for patterns of SOP violations (not market patterns): any SL shifted? Any trade without a signal? Any approval outside the morning session? A violation = write it in lesson_learned, regardless of the trade's outcome.
+- [ ] **Data health check**: date gaps & NULL rate on key columns (pattern: a field that's long been red in source_flags). Systematic gaps → a scraper-fix task, not something to leave alone.
+- [ ] **Invest lane — routine contribution**: run the monthly allocation per Investment SOP v4.1 (index mutual funds via Bibit/Bareksa, etc.). The application plays exactly one role here: check Panel 3/Tab 8 for context — BUT the low-point trigger from SOP v4.1 is what decides, not the persona lens. Personas don't govern routine saving.
 
 ---
 
-## 7. PROTOKOL KONDISI TIDAK NORMAL
+## 5. QUARTERLY SOP (±1 hour, after earnings season)
 
-| Kondisi | Protokol |
+- [ ] **Refresh fundamentals**: pull/input the latest quarter for the universe (J-4). Issuers with <8 quarters remain LOW_CONFIDENCE.
+- [ ] **Re-run the grader** across the whole universe → review quadrant changes in Tab 8. A drastically changed quadrant → read its components, not just the badge.
+- [ ] **Fill in grader_log outcomes** for grades that are 3/6 months old (component D widget). This is the ONLY session where revising the rubric weights MAY be considered — and only if the log shows a pattern, not because of one annoying case.
+- [ ] **Review the universe**: any watchlist issuer moving up into the universe? Any universe issuer that has worsened for 2 consecutive quarters → downgrade its lane / remove it, logged with a reason.
+- [ ] **Lane calibration**: an INVEST instrument moving up to TRADE → must pass bar-replay validation first (`lane_validated_at`), not just because "it's been watched for a long time".
+- [ ] **Review this SOP itself**: any step that hasn't been run in 3 consecutive months? Remove or fix it — an ignored SOP is more dangerous than no SOP at all.
+
+---
+
+## 6. INVEST LANE SOP — THE APPLICATION'S ROLE (summary)
+
+The invest lane lives in SOP v4.1 + Saham Emas SOP. The application's role is only to:
+1. **Quality filter**: individual-stock saving candidates must pass the grader (Tab 8) — an AVOID quadrant is not bought for any lane, including invest. INVESTABLE/WATCH = may be considered under the invest SOP.
+2. **Cycle context**: Panel 3 (net liquidity, DXY, foreign flow) as a "season" reading — enriching the tranche decision, NOT overriding the invest SOP's objective triggers. Drawdown in real assets during dollar strength = forced-selling mechanics, not a reason to change allocation (a financial-repression principle already held).
+3. **Intake**: an interesting new issuer → the Tab 8 intake path (component C), grade it first, then it enters the consideration list. No buying-because-of-news without going through intake.
+4. **Recording**: invest transactions are recorded (journal/sheet per the asset's SOP) — the application is not a replacement for the invest SOP's existing recording process.
+
+PROHIBITED: using `trade_signals` for timing invest purchases, and using invest triggers to justify a trade. Two lanes, two logics, one cross-prohibition.
+
+---
+
+## 7. ABNORMAL CONDITION PROTOCOL
+
+| Condition | Protocol |
 |---|---|
-| Scraper gagal total (banyak merah) | Ritual pagi tetap jalan tapi TANPA keputusan sinyal baru hari itu. Perbaikan scraper = task siang, bukan panik pagi. |
-| Sinyal muncul tapi Giel sedang emosional (habis loss, revenge mood) | Reject atau biarkan tanpa keputusan sampai besok pagi. Sinyal valid akan tetap valid; kebutuhan "harus sekarang" adalah sinyal emosi, bukan sinyal pasar. |
-| Posisi kena SL | Eksekusi cut sesuai rule (close D1 di bawah zona). Isi jurnal hari itu + lesson. DILARANG membuka chart mencari entry baru di instrumen yang sama pada hari yang sama. |
-| ARB berhari-hari (tidak bisa keluar) | Pasang antrian jual tiap hari di harga terbaik yang mungkin, catat di jurnal per hari. Ini skenario yang buffer 1.5× memang antisipasi — bukan kegagalan sistem. |
-| Ingin mengubah aturan (SL, bobot, threshold) | Tulis usulan + alasan, TIDUR SATU MALAM, review saat tidak ada posisi terbuka di instrumen terkait. Perubahan hanya lewat revisi dokumen SOP/kontrak, tidak pernah lewat "pengecualian sekali ini". |
+| Total scraper failure (many red) | The morning ritual still runs but WITHOUT any new signal decisions that day. Fixing the scraper = an afternoon task, not a morning panic. |
+| A signal appears but Giel is emotional (just took a loss, revenge mood) | Reject it or leave it without a decision until tomorrow morning. A valid signal will remain valid; the feeling of "must act now" is an emotional signal, not a market signal. |
+| Position hits SL | Execute the cut per the rule (D1 close below the zone). Fill in the journal that day + lesson. Opening the chart to look for a new entry on the same instrument on the same day is PROHIBITED. |
+| ARB for several days (can't exit) | Place a sell queue every day at the best available price, log it in the journal each day. This is the exact scenario the 1.5× buffer anticipates — not a system failure. |
+| Wanting to change a rule (SL, weights, threshold) | Write the proposal + reasoning, SLEEP ON IT ONE NIGHT, review it when there's no open position in the related instrument. Changes only happen through a revision of the SOP/contract document, never through a "just this once exception". |
 
 ---
 
-# BAGIAN B — CARA BACA TIAP PANEL (kamus rujukan)
+# PART B — HOW TO READ EACH PANEL (reference dictionary)
 
-> Prinsip yang berlaku di SELURUH bagian ini: **angka = bahan, bukan vonis.**
-> Kolom "cara baca" di bawah menjelaskan arti umum sebuah gerakan — BUKAN
-> perintah beli/jual. Keputusan tetap lewat gate (§0 poin 2). Satu field naik
-> jarang berarti apa-apa sendirian; yang dicari di synthesis adalah **beberapa
-> field bercerita hal yang sama** (konfirmasi) atau **saling bertentangan**
-> (disonansi — justru itu yang menarik).
+> The principle that applies throughout this entire section: **numbers = material, not a verdict.**
+> The "how to read" column below explains the general meaning of a movement — NOT a
+> buy/sell command. Decisions still go through the gate (§0 point 2). One field
+> moving rarely means anything on its own; what you're looking for in the synthesis is
+> **several fields telling the same story** (confirmation) or **contradicting each other**
+> (dissonance — which is actually the interesting part).
 
-## 8. PANEL PER PANEL
+## 8. PANEL BY PANEL
 
-### 8.1 Panel 1 · Snapshot Pasar
-Tiap kartu = 1 angka terakhir + **delta** (perbandingan vs Hari/Minggu/Bulan/
-Tahun, pilih di dropdown atas). ▲ hijau = naik, ▼ merah = turun. Delta itu yang
-penting, bukan angka absolutnya.
+### 8.1 Panel 1 · Market Snapshot
+Each card = 1 latest number + **delta** (comparison vs Day/Week/Month/
+Year, chosen in the dropdown above). Green ▲ = up, red ▼ = down. The delta is what
+matters, not the absolute number.
 
-**Kelompok Crypto (BTC):**
+**Crypto Group (BTC):**
 
-| Item | Artinya | Cara baca gerakannya |
+| Item | Meaning | How to read its movement |
 |---|---|---|
-| **BTC Close** | Harga tutup BTC | Naik = momentum harga bullish. Konfirmasi selalu silang ke volume & funding di bawah — harga naik tanpa volume = lemah. |
-| **BTC Vol MA20** | Rata-rata volume 20 hari | Volume hari ini jauh > MA20 = partisipasi tinggi (breakout/berita). Di bawah MA20 = pasar sepi, gerakan kurang bisa dipercaya. |
-| **BTC Dominance %** | Porsi market cap BTC vs total kripto | Naik = uang lari ke BTC (risk-off di kripto / altcoin ditinggal). Turun = "altseason", risk-on. |
-| **Funding Rate** | Biaya perpetual futures | **Positif** = long bayar short → crowd LONG (rawan long-squeeze kalau ekstrem). **Negatif** = short bayar long → crowd SHORT. Ekstrem ke satu sisi = sinyal posisi terlalu ramai. |
-| **OI Agregat** | Open interest (total kontrak terbuka) | Naik + harga naik = uang baru masuk (tren sehat). Naik + harga flat = leverage menumpuk (rawan). Turun = posisi ditutup/likuidasi. |
-| **Long/Short Ratio** | Rasio akun long : short | > 1 = mayoritas long. Ekstrem tinggi = crowd satu sisi, kontrarian sering waspada. |
-| **Liquidation Long 24h** | Nominal LONG yang dipaksa tutup (harga jatuh) | Besar = kaskade jual paksa baru terjadi → sering jadi wash-out / titik pembalikan lokal. |
-| **Liquidation Short 24h** | Nominal SHORT yang dipaksa tutup (harga naik) | Besar = short-squeeze → dorongan naik sebagian "bahan bakar paksa", bukan demand organik. |
+| **BTC Close** | BTC closing price | Up = bullish price momentum. Always cross-check against volume & funding below — price up without volume = weak. |
+| **BTC Vol MA20** | 20-day average volume | Today's volume far > MA20 = high participation (breakout/news). Below MA20 = quiet market, the move is less trustworthy. |
+| **BTC Dominance %** | BTC's share of market cap vs total crypto | Up = money flowing into BTC (risk-off within crypto / altcoins abandoned). Down = "altseason", risk-on. |
+| **Funding Rate** | Perpetual futures cost | **Positive** = longs pay shorts → crowd is LONG (prone to a long-squeeze if extreme). **Negative** = shorts pay longs → crowd is SHORT. Extreme on one side = a signal positioning is too crowded. |
+| **Aggregate OI** | Open interest (total open contracts) | Up + price up = new money coming in (healthy trend). Up + price flat = leverage building up (risky). Down = positions closed/liquidated. |
+| **Long/Short Ratio** | Ratio of long : short accounts | > 1 = majority long. Extremely high = crowd on one side, contrarians often turn cautious. |
+| **Liquidation Long 24h** | Notional LONGs forced to close (price dropping) | Large = a fresh forced-selling cascade → often a wash-out / local reversal point. |
+| **Liquidation Short 24h** | Notional SHORTs forced to close (price rising) | Large = short-squeeze → part of the upward push is "forced fuel", not organic demand. |
 
-**Kelompok Makro Global:**
+**Global Macro Group:**
 
-| Item | Artinya | Cara baca gerakannya |
+| Item | Meaning | How to read its movement |
 |---|---|---|
-| **DXY** | Indeks dolar AS | Naik = dolar kuat → tekanan ke aset risiko, emas, EM (termasuk IHSG/rupiah), sering ke BTC juga. Turun = pelonggaran tekanan. Ini "gravitasi" makro paling sering dipakai. |
-| **US10Y %** | Yield obligasi AS 10 tahun | Naik = biaya modal naik, tekanan ke aset durasi panjang/growth/emas. Turun = sebaliknya. |
-| **VIX** | Indeks volatilitas ("indeks ketakutan" S&P) | > 20 mulai gelisah, > 30 = panik. Naik tajam = risk-off. Rendah & datar = pasar tenang/komplasen. |
-| **Fear & Greed** | Sentimen kripto 0–100 (+ label) | < 25 Extreme Fear, > 75 Extreme Greed. Kontrarian: greed ekstrem = hati-hati euforia; fear ekstrem = sering dekat dasar. |
-| **Net Liquidity** | Likuiditas Fed = WALCL − RRP − TGA | Naik = likuiditas mengalir ke sistem (tailwind aset risiko). Turun = pengetatan. Bacaan "musim" lambat, bukan pemicu harian. |
+| **DXY** | US dollar index | Up = strong dollar → pressure on risk assets, gold, EM (including IHSG/rupiah), often BTC too. Down = pressure easing. This is the macro "gravity" most often used. |
+| **US10Y %** | 10-year US treasury yield | Up = cost of capital rising, pressure on long-duration/growth assets/gold. Down = the opposite. |
+| **VIX** | Volatility index (S&P "fear index") | > 20 starting to get uneasy, > 30 = panic. Sharp rise = risk-off. Low & flat = calm/complacent market. |
+| **Fear & Greed** | Crypto sentiment 0–100 (+ label) | < 25 Extreme Fear, > 75 Extreme Greed. Contrarian: extreme greed = beware of euphoria; extreme fear = often near a bottom. |
+| **Net Liquidity** | Fed liquidity = WALCL − RRP − TGA | Up = liquidity flowing into the system (tailwind for risk assets). Down = tightening. A slow "seasonal" reading, not a daily trigger. |
 
-**Kelompok Ekuitas & FX:**
+**Equity & FX Group:**
 
-| Item | Artinya | Cara baca gerakannya |
+| Item | Meaning | How to read its movement |
 |---|---|---|
-| **S&P 500** | Bursa AS | Proksi risk-on/off global. Naik = selera risiko global positif. |
-| **IHSG** | Bursa Indonesia | Silangkan dengan foreign flow (Panel 3): IHSG naik + asing jual = ditopang lokal (kurang kokoh). |
-| **USD/IDR** | Rupiah per dolar | Naik = rupiah **melemah** (tekanan modal keluar). Turun = rupiah menguat. |
-| **USD/JPY** | Yen per dolar | Proksi carry trade global; lonjakan cepat sering seiring guncangan risk-off. |
-| **Gold** | Emas | Naik saat DXY & yield turun = klasik. Naik BERSAMA dolar kuat = sinyal stress/permintaan safe-haven (baca §Saham Emas SOP). |
+| **S&P 500** | US market | Proxy for global risk-on/off. Up = positive global risk appetite. |
+| **IHSG** | Indonesian market | Cross-check against foreign flow (Panel 3): IHSG up + foreigners selling = propped up by locals (less solid). |
+| **USD/IDR** | Rupiah per dollar | Up = rupiah **weakening** (capital-outflow pressure). Down = rupiah strengthening. |
+| **USD/JPY** | Yen per dollar | Proxy for global carry trade; a fast spike often coincides with a risk-off shock. |
+| **Gold** | Gold | Rising while DXY & yields fall = the classic pattern. Rising ALONGSIDE a strong dollar = a signal of stress/safe-haven demand (see the Saham Emas SOP). |
 
-**Status Sumber Data (source_flags):** buka bagian collapsible di bawah kartu.
-🟢 ok / 🟡 skip / 🟠 stale / 🔴 fail per sumber. **`stale`** (khusus
-`fred_dxy`/`fred_us10y`/`fred_vix`/dll) = fetch-nya SUKSES tapi observasi
-FRED yang didapat lebih tua dari batas wajar (`MAX_LAG_DAYS`,
-`scrapers/macro_fred.py`) — beda dari `fail`. Angka di kartu tetap tampil
-(basi masih lebih berguna drpd kosong), tapi jangan dibaca sebagai "hari
-ini" — cek tanggal observasi aslinya kalau ragu. Field yang kamu butuhkan
-hari ini merah (fail) ATAU oranye (stale) dan krusial → analisa yang
-bergantung padanya LOW_CONFIDENCE / ditunda (§0 poin 3), bukan ditebak.
+**Data Source Status (source_flags):** open the collapsible section below the card.
+🟢 ok / 🟡 skip / 🟠 stale / 🔴 fail per source. **`stale`** (specific to
+`fred_dxy`/`fred_us10y`/`fred_vix`/etc.) = the fetch SUCCEEDED but the FRED
+observation obtained is older than the reasonable limit (`MAX_LAG_DAYS`,
+`scrapers/macro_fred.py`) — different from `fail`. The number on the card is still
+shown (stale is still more useful than empty), but don't read it as
+"today" — check the actual observation date if unsure. A field you
+need today is red (fail) OR orange (stale) and is critical → the analysis
+depending on it is LOW_CONFIDENCE / postponed (§0 point 3), not guessed.
 
-> **Manual Backfill** di panel ini = alat isi lubang data historis, BUKAN bacaan
-> harian. Info gap tampil per instrument saat ganti dropdown; "Cek & Preview
-> Semua Gap" mengecek semua instrument sekaligus. Ini kerja sesi riset (§0 poin
-> 4), bukan ritual pagi.
+> **Manual Backfill** on this panel = a tool for filling historical data gaps, NOT a
+> daily reading. Gap info appears per instrument when you switch the dropdown; "Check &
+> Preview All Gaps" checks all instruments at once. This is research-session work (§0 point
+> 4), not the morning ritual.
 
 ### 8.2 Panel 2 · News
-| Kolom | Cara baca |
+| Column | How to read |
 |---|---|
-| **Impact HIGH** | Berpotensi menggerakkan lane (Fed, CPI, BI rate, geopolitik besar). Baca duluan. |
-| **Impact MED** | Konteks penting, jarang mengubah arah sendirian. |
-| **Impact LOW** | Latar belakang / noise. Lewati saat pagi. |
-| **Tombol 🚩 Key** | Kamu yang menandai. **HANYA** untuk berita yang benar-benar bisa mengubah lane — ini yang muncul di Panel 4 sebagai bahan 4 lensa. Jangan flag semua yang menarik (§1 07.02). |
+| **Impact HIGH** | Potentially lane-moving (Fed, CPI, BI rate, major geopolitics). Read first. |
+| **Impact MED** | Important context, rarely changes direction on its own. |
+| **Impact LOW** | Background / noise. Skip during the morning. |
+| **🚩 Key button** | You mark this yourself. **ONLY** for news that could genuinely change the lane — this is what appears in Panel 4 as material for the 4 lenses. Don't flag everything that's interesting (§1 07:02). |
 
-> Impact di sini rule-based (kata kunci), bukan AI — anggap sebagai penyortir
-> kasar, penilaian akhir tetap matamu. Berita panjang yang butuh dibedah →
-> `manual_articles`, bukan dihabiskan di slot pagi.
+> Impact here is rule-based (keywords), not AI — treat it as a rough
+> sorter, the final judgment is still your own eyes. Long articles that need dissecting →
+> `manual_articles`, not spent in the morning slot.
 
 ### 8.3 Panel 3 · Forward
-Ini panel "apa yang menunggu di depan". Baca urut: Calendar → Expectations →
-Positioning → Policy → Disonansi.
+This is the "what's waiting ahead" panel. Read in order: Calendar → Expectations →
+Positioning → Policy → Dissonance.
 
-**Economic Calendar** — event ekonomi mendatang (otomatis ForexFactory; `actual`
-diisi otomatis pass sore investing.com atau manual).
+**Economic Calendar** — upcoming economic events (automatic via ForexFactory; `actual`
+is filled automatically by the evening investing.com pass or manually).
 
-| Kolom | Cara baca |
+| Column | How to read |
 |---|---|
-| **Importance HIGH** ("bintang 3") | Katalis kelas-berat (CPI, FOMC, NFP, RDG BI). Default filter tabel = HIGH saja. Toggle "HIGH + MED" kalau perlu lihat semua. |
-| **Countdown (H-n)** | Berapa hari lagi. Ini **sumbu waktu** trade: "katalis apa, berapa hari lagi". Event HIGH < 48 jam + ada posisi → rule SL-ke-breakeven (§1 07.05). |
-| **Forecast vs Previous** | Ekspektasi konsensus vs rilis sebelumnya. Arah perubahan = ekspektasi pasar. |
-| **Actual** | Hasil rilis. **Yang menggerakkan pasar adalah Actual vs Forecast**, bukan Actual sendirian. Actual jauh di atas forecast (mis. **Core CPI** aktual 0.4% vs forecast 0.2%) = inflasi lebih panas dari dugaan → hawkish → tekanan ke aset risiko. "Core" = tanpa pangan & energi (inti tren inflasi). |
+| **Importance HIGH** ("3-star") | Heavy-class catalysts (CPI, FOMC, NFP, BI board meeting). Default table filter = HIGH only. Toggle "HIGH + MED" to see everything. |
+| **Countdown (D-n)** | How many days away. This is the trade's **time axis**: "what catalyst, how many days away". HIGH event < 48 hours + an open position → SL-to-breakeven rule (§1 07:05). |
+| **Forecast vs Previous** | Consensus expectation vs the previous release. Direction of change = the market's expectation. |
+| **Actual** | The released result. **What moves the market is Actual vs Forecast**, not Actual alone. Actual far above forecast (e.g. **Core CPI** actual 0.4% vs forecast 0.2%) = inflation hotter than expected → hawkish → pressure on risk assets. "Core" = excluding food & energy (the core inflation trend). |
 
 **Expectations (Layer B — manual):**
-- **CME FedWatch cut probability** — peluang (0–1) pasar atas pemangkasan suku
-  bunga di rapat berikut. 0.72 = pasar hargai 72% peluang cut. Naik = ekspektasi
-  makin dovish.
-- **Fed Dot Plot median** — proyeksi median FOMC untuk suku bunga. Baca sebagai
-  arah jangka menengah.
-- *Diisi manual* — API resmi berbayar (lihat catatan panel).
+- **CME FedWatch cut probability** — market probability (0–1) of a rate cut at
+  the next meeting. 0.72 = the market prices in a 72% chance of a cut. Rising = expectations
+  turning more dovish.
+- **Fed Dot Plot median** — the FOMC's median interest-rate projection. Read as
+  the medium-term direction.
+- *Filled manually* — the official API is paid (see the panel note).
 
-**Positioning (Layer C):** siapa memegang posisi apa.
-- **COT** (otomatis) — posisi net spekulan di BTC/DXY/GOLD/SP500. Net-long
-  ekstrem = crowd satu sisi.
-- **BTC ETF net flow** (otomatis) — arus masuk/keluar ETF. Positif berhari-hari =
-  demand institusi.
-- **IHSG foreign flow** (otomatis) — `foreign_net_buy_value` positif = asing net
-  beli. Silang ke IHSG di Panel 1.
-- **SBN foreign flow** (manual, mingguan) — asing di obligasi negara. Ini
-  **bacaan matamu sendiri, TIDAK pernah masuk slice persona** (§3).
+**Positioning (Layer C):** who holds what position.
+- **COT** (automatic) — speculators' net positions in BTC/DXY/GOLD/SP500. Extreme
+  net-long = crowd on one side.
+- **BTC ETF net flow** (automatic) — ETF inflows/outflows. Positive for several days =
+  institutional demand.
+- **IHSG foreign flow** (automatic) — positive `foreign_net_buy_value` = foreigners are
+  net buying. Cross-check against IHSG in Panel 1.
+- **SBN foreign flow** (manual, weekly) — foreigners in government bonds. This is
+  **your own eyes' reading, NEVER goes into the persona slice** (§3).
 
-**Policy Tracker (Layer A):** apa yang pejabat bank sentral katakan.
-| Kolom | Cara baca |
+**Policy Tracker (Layer A):** what central bank officials say.
+| Column | How to read |
 |---|---|
-| **Literal statement** | Yang BENAR-BENAR dikatakan (kutipan). Fakta. |
-| **Stance score −2..+2** | Nilaian kamu: −2 sangat dovish (longgar) … +2 sangat hawkish (ketat). |
-| **Inference** | Pembacaan arah/niat — **subjektif, tebakanmu**. |
-| **Flag TESTABLE / SPEKULATIF** | Jujur: inference ini bisa diuji nanti (TESTABLE) atau cuma dugaan (SPEKULATIF). |
-| **Drift note** | Berubah dari pernyataan sebelumnya? Perubahan nada = sinyal. |
+| **Literal statement** | What was ACTUALLY said (a quote). Fact. |
+| **Stance score −2..+2** | Your own assessment: −2 very dovish (loose) … +2 very hawkish (tight). |
+| **Inference** | A reading of direction/intent — **subjective, your own guess**. |
+| **TESTABLE / SPECULATIVE flag** | Be honest: can this inference be tested later (TESTABLE) or is it just a guess (SPECULATIVE)? |
+| **Drift note** | Changed from the previous statement? A tone shift is a signal. |
 
-**Disonansi Flag:** membandingkan **stance Policy Tracker** vs **positioning COT
-DXY**. `SEARAH` = retorika & posisi sejalan. `DISONANSI` = bertentangan (mis.
-pejabat hawkish tapi posisi taruhan dolar melemah) — **wajib disebut di
-synthesis** (§1 07.05). Butuh stance_score terisi + ≥ 2 baris COT DXY, kalau
-belum → "belum cukup data".
+**Dissonance Flag:** compares **Policy Tracker stance** vs **DXY COT
+positioning**. `ALIGNED` = rhetoric & positioning move together. `DISSONANCE` = they conflict
+(e.g. officials hawkish but dollar-bet positioning weakening) — **must be mentioned in the
+synthesis** (§1 07:05). Requires stance_score filled in + ≥ 2 DXY COT rows; if
+not yet available → "not enough data yet".
 
 ### 8.4 Panel 4 · Reading
-| Bagian | Cara baca / pakai |
+| Section | How to read / use |
 |---|---|
-| **Berita Key Hari Ini** | Yang kamu flag 🚩 di Panel 2. Bahan mentah untuk 4 lensa. Kosong = flag dulu di Panel 2. |
-| **4 Analisa (AI)** | 4 lensa persona (label: Global & Capital Flow, Policy & Sistem Domestik, Dinamika Pasar & Waktu, Fundamental & Realist). Klik "Jalankan" per kartu SESUAI KEBUTUHAN — bukan ritual 4 kartu tiap hari (§1 07.10). Hari tenang = boleh nol. |
-| **Hasil lensa** | **Bahan, bukan vonis.** Lensa saling bertentangan = normal → tulis di Conflict Notes, jangan didamaikan paksa. |
-| **External AI Check** | Paste hasil banding AI luar (opsional). Dibanding, TIDAK diikuti. |
-| **Conflict Notes** | Poin yang belum sepakat antar lensa. Ini justru bahan paling berharga untuk synthesis. |
+| **Today's Key News** | What you flagged 🚩 in Panel 2. Raw material for the 4 lenses. Empty = flag it in Panel 2 first. |
+| **4 Analyses (AI)** | The 4 persona lenses (labels: Global & Capital Flow, Domestic Policy & System, Market Dynamics & Timing, Fundamentals & Realist). Click "Run" per card AS NEEDED — not a ritual of 4 cards every day (§1 07:10). Quiet day = zero is fine. |
+| **Lens results** | **Material, not a verdict.** Lenses contradicting each other is normal → write it in Conflict Notes, don't force a reconciliation. |
+| **External AI Check** | Paste external AI comparison results (optional). Compared against, NOT followed. |
+| **Conflict Notes** | Points the lenses haven't agreed on. This is actually the most valuable material for the synthesis. |
 
-> Kartu bertanda "Prompt belum diisi" = file `prompts/persona_*.txt` kosong;
-> lensa itu tak bisa jalan sampai promptnya ditulis.
+> A card marked "Prompt not yet filled in" = the `prompts/persona_*.txt` file is empty;
+> that lens can't run until the prompt is written.
 
 ### 8.5 Panel 5 · Chart
-**Membaca chart candlestick:**
-- **Candle hijau** = close ≥ open (naik), **merah** = turun. Sumbu (wick) = high–low, badan = open–close.
-- **Garis MA** — MA50 (kuning), MA100 (ungu), MA200 (pink). Harga di atas MA200 = struktur jangka panjang bullish; MA pendek memotong ke atas MA panjang = momentum menguat. Legenda warna ada di header chart.
-- **Volume bar** (bawah) + garis biru = volume MA20. Breakout **wajib** disertai volume di atas MA20 — kalau tidak, curigai.
-- **Zona S&R** — kotak **hijau = SUPPORT**, **merah = RESISTANCE**. Meta chart menampilkan berapa zona aktif (dekat harga). Zona hanya sah jadi gate sinyal kalau sudah kamu validasi (`validated_by_giel`).
-- **Marker sinyal** — lingkaran **isi hijau = BREAKOUT**, lingkaran **kosong biru = RETEST**, di titik entry.
+**Reading the candlestick chart:**
+- **Green candle** = close ≥ open (up), **red** = down. Wick = high–low, body = open–close.
+- **MA lines** — MA50 (yellow), MA100 (purple), MA200 (pink). Price above MA200 = bullish long-term structure; a short MA crossing above a longer MA = strengthening momentum. Color legend is in the chart header.
+- **Volume bars** (bottom) + blue line = MA20 volume. A breakout **must** be accompanied by volume above MA20 — if not, be suspicious.
+- **S&R zones** — box **green = SUPPORT**, **red = RESISTANCE**. The chart meta shows how many zones are active (near the price). A zone only counts as a valid signal gate once you've validated it (`validated_by_giel`).
+- **Signal markers** — **filled green circle = BREAKOUT**, **empty blue circle = RETEST**, at the entry point.
 
-**Rentang** (dropdown): 1 bulan … Semua. **Lane badge** di header (TRADE/BOTH/
-INVEST/NONE) = boleh-tidaknya instrument ini di-trade.
+**Range** (dropdown): 1 month … All. **Lane badge** in the header (TRADE/BOTH/
+INVEST/NONE) = whether this instrument may be traded.
 
-**Tabel Sinyal (Breakout/Retest):**
-| Kolom | Cara baca |
+**Signal Table (Breakout/Retest):**
+| Column | How to read |
 |---|---|
-| **Tipe** | BREAKOUT (tembus zona) / RETEST (uji ulang zona). |
-| **Entry / SL / TP1** | Harga saran dari engine. |
-| **R:R** | Risk-reward. **Gate wajib ≥ 1.5** (§1 07.15). Di bawah itu = reject. |
-| **Status** | pending / APPROVED / REJECTED. Approve/Reject di sini menjalankan gate 6 langkah (§1 07.15). **Approve ≠ eksekusi.** |
+| **Type** | BREAKOUT (zone broken through) / RETEST (zone re-tested). |
+| **Entry / SL / TP1** | Suggested prices from the engine. |
+| **R:R** | Risk-reward. **Mandatory gate ≥ 1.5** (§1 07:15). Below that = reject. |
+| **Status** | pending / APPROVED / REJECTED. Approve/Reject here runs the 6-step gate (§1 07:15). **Approve ≠ execution.** |
 
-**Context Charts (30 hari):** mini-line DXY, S&P 500, US10Y, Fear & Greed —
-konteks makro cepat tanpa pindah panel. Hijau = naik periode, merah = turun.
+**Context Charts (30 days):** mini-lines for DXY, S&P 500, US10Y, Fear & Greed —
+quick macro context without switching panels. Green = up over the period, red = down.
 
 ### 8.6 Panel 6 · Synthesis
-Di sinilah semua bacaan di atas jadi SATU keputusan. Urutan mengisi:
+This is where all the readings above become ONE decision. Fill-in order:
 
-| Bagian | Cara isi |
+| Section | How to fill it in |
 |---|---|
-| **Synthesis Harian** | 1 paragraf **tulis tangan sendiri** (bukan copy hasil lensa). Ganti tanggal untuk baca/edit hari lain. |
-| **Outlook per Instrumen** | Set Bullish/Bearish/Neutral per instrument aktif. Ini bias, bukan entry. |
-| **Trading Journal** | Catat trade HARI ITU (jurnal mundur = fiksi, §2). Tombol **Hitung Ukuran** = sizing engine (khusus universe Phase J+): kasih Entry+SL, keluar `suggested_units`. `SKIP — RISK_CAPACITY_EXCEEDED` = budget tak cukup 1 lot → **tidak dieksekusi**, jangan geser SL. Catatan buffer ARA/ARB 1.5× muncul kalau diterapkan (risiko riil > jarak SL). |
-| **Prediction Log** | MAKS 1 prediksi/hari, hanya kalau ada klaim layak diuji. Isi claim + target date + basis. Prediksi kosong > prediksi asal. |
-| **Skor Prediksi Jatuh Tempo** | Prediksi lama jatuh tempo → nilai BENAR/SALAH/PARTIAL sekarang, jangan tunda. |
-| **Daily Briefing → Telegram** | Opsional, setelah Panel 4–6 terisi. Merakit dari data yang SUDAH ada, tidak generate sendiri. |
+| **Daily Synthesis** | 1 paragraph **written by hand yourself** (not copied from lens results). Change the date to read/edit another day. |
+| **Outlook per Instrument** | Set Bullish/Bearish/Neutral per active instrument. This is bias, not entry. |
+| **Trading Journal** | Log the trade THAT DAY (a retroactive journal = fiction, §2). The **Calculate Size** button = the sizing engine (Phase J+ universe only): give it Entry+SL, it outputs `suggested_units`. `SKIP — RISK_CAPACITY_EXCEEDED` = budget insufficient for 1 lot → **not executed**, don't shift the SL. A note on the 1.5× ARA/ARB buffer appears if applied (real risk > SL distance). |
+| **Prediction Log** | MAX 1 prediction/day, only if there's a claim worth testing. Fill in the claim + target date + basis. An empty prediction > a careless one. |
+| **Due Prediction Score** | An old prediction comes due → score it CORRECT/WRONG/PARTIAL now, don't defer it. |
+| **Daily Briefing → Telegram** | Optional, after Panels 4–6 are filled in. Assembled from data that ALREADY exists, not generated on its own. |
 
-**Checklist "apa yang harus saya analisa" saat sampai di synthesis:**
-1. **Arah makro** (Panel 1): DXY & yield naik/turun? Itu gravitasi hari ini.
-2. **Katalis di depan** (Panel 3): event HIGH berapa hari lagi? Actual vs forecast tadi malam mengubah apa?
-3. **Posisi crowd** (Panel 1 funding/LS + Panel 3 COT): ada yang terlalu ramai satu sisi?
-4. **Disonansi** (Panel 3): retorika vs posisi bertentangan? Kalau ya, itu headline synthesis.
-5. **Struktur harga** (Panel 5): harga di mana relatif MA200 & zona? Ada sinyal valid?
-6. **Konflik lensa** (Panel 4): apa yang belum sepakat? Jangan disembunyikan.
-7. Tarik jadi 1 paragraf + outlook. Kalau data kunci merah/bolong → tulis
-   ketidakpastiannya, jangan dipoles.
+**Checklist of "what should I analyze" when you reach the synthesis:**
+1. **Macro direction** (Panel 1): DXY & yields up/down? That's today's gravity.
+2. **Catalysts ahead** (Panel 3): how many days until the HIGH event? Did last night's actual vs forecast change anything?
+3. **Crowd positioning** (Panel 1 funding/LS + Panel 3 COT): is anything too crowded on one side?
+4. **Dissonance** (Panel 3): rhetoric vs positioning conflicting? If so, that's the synthesis headline.
+5. **Price structure** (Panel 5): where is the price relative to MA200 & the zones? Any valid signal?
+6. **Lens conflict** (Panel 4): what hasn't been agreed on? Don't hide it.
+7. Pull it into 1 paragraph + outlook. If key data is red/missing → write down
+   the uncertainty, don't polish it over.
 
 ---
 
-# BAGIAN C — LANE INVESTING (sidebar "Investing" & "Arsip")
+# PART C — INVESTING LANE ("Investing" & "Archive" sidebar)
 
-> Sidebar dulu bernama **"Universal"** (membingungkan) → sekarang dipisah jadi
-> **"Investing"** (halaman Universe — lane saham investasi) dan **"Arsip"**
-> (halaman Riwayat — track record lintas-lane). Keduanya **ritme mingguan/
-> kuartalan**, bukan harian (§0 poin 1). Dilarang dibuka saat ritual pagi
-> kecuali melihat badge lane/kuadran (§1 "Yang DILARANG").
+> The sidebar used to be called **"Universal"** (confusing) → now split into
+> **"Investing"** (the Universe page — the stock-investment lane) and **"Archive"**
+> (the History page — cross-lane track record). Both are **weekly/
+> quarterly rhythm**, not daily (§0 point 1). Prohibited to open during the morning
+> ritual except to view the lane/quadrant badge (§1 "What is PROHIBITED").
 
-## 9. HALAMAN "INVESTING" (Universe & Grader)
+## 9. THE "INVESTING" PAGE (Universe & Grader)
 
-### 9.1 Cara BACA tabel Universe
-| Kolom | Cara baca |
+### 9.1 How to READ the Universe table
+| Column | How to read |
 |---|---|
-| **Ticker / Sektor / Market** | Identitas emiten (IDX/US). |
-| **Lane** | TRADE / BOTH / INVEST / NONE — boleh dipakai lane mana. Instrumen baru **hanya boleh INVEST/NONE** sampai lolos validasi bar-replay (§9.5). |
-| **Divalidasi** | Tanggal lane di-sign-off bar-replay. Kosong = belum pernah → jangan di-TRADE-kan. |
-| **Kuadran** | Hasil grader dua-sumbu (lihat §9.3). "belum digrade" = jalankan Uji Kelayakan dulu. |
-| **Score** | `fund_score` mentah (fundamental). Baca komponennya di Detail, jangan cuma angkanya. |
-| **Flags** | Jumlah flag integritas (UMA/suspensi dll). > 0 = ada catatan, buka detail. |
+| **Ticker / Sector / Market** | Issuer identity (IDX/US). |
+| **Lane** | TRADE / BOTH / INVEST / NONE — which lane(s) it may be used in. New instruments **may only be INVEST/NONE** until they pass bar-replay validation (§9.5). |
+| **Validated** | Date the lane was signed off via bar-replay. Empty = never done → don't TRADE it. |
+| **Quadrant** | The two-axis grader result (see §9.3). "not yet graded" = run the Eligibility Test first. |
+| **Score** | Raw `fund_score` (fundamental). Read its components in Detail, not just the number. |
+| **Flags** | Number of integrity flags (UMA/suspension etc.). > 0 = there's a note, open the detail. |
 
-### 9.2 Cara ISI — alur intake emiten baru (urut)
-1. **+ Intake Kandidat (Gelombang 1)** — metadata dasar (ticker, market,
-   sektor, mcap, free float, lot size, finansial?, batas harian ARA/ARB?). Lane
-   dari sini **wajib INVEST/NONE**. Ini cuma mendaftarkan, belum menilai.
-2. **Uji Kelayakan (Gelombang 2)** — 3 langkah berurutan:
-   - **1. Cek Integritas (UMA)** — scrape flag UMA IDX. `UMA_ACTIVE` = ada
-     peringatan aktivitas tak wajar → hati-hati.
-   - **2. Jalankan Grade** — hitung `fund_score` + kuadran + flags.
-   - **3. Catat Keputusan** — Masuk Universe / Watchlist / Tolak + **alasan
-     wajib**. Tercatat di Riwayat Keputusan Intake.
-3. **Rubrik sama dengan universe existing** — tidak ada jalur istimewa.
+### 9.2 How to FILL IN — new issuer intake flow (in order)
+1. **+ Intake Candidate (Wave 1)** — basic metadata (ticker, market,
+   sector, mcap, free float, lot size, is it financial?, daily ARA/ARB limit?). Lane
+   from here **must be INVEST/NONE**. This only registers it, doesn't grade it yet.
+2. **Eligibility Test (Wave 2)** — 3 sequential steps:
+   - **1. Integrity Check (UMA)** — scrape the IDX UMA flag. `UMA_ACTIVE` = an
+     active unusual-activity warning → be careful.
+   - **2. Run Grade** — compute `fund_score` + quadrant + flags.
+   - **3. Log Decision** — Add to Universe / Watchlist / Reject + **reason
+     required**. Logged in the Intake Decision History.
+3. **Same rubric as the existing universe** — no special-case path.
 
-### 9.3 Membaca Kuadran Grader
-Dua sumbu: **fund_score** (kualitas fundamental) × **integrity flags** (bersih/
-bermasalah).
-- **INVESTABLE** — fundamental kuat + bersih. Boleh masuk pertimbangan SOP invest.
-- **WATCH** — layak dipantau, belum penuh syarat.
-- **SPECULATIVE** — ada daya tarik tapi flag/kualitas belum meyakinkan.
-- **AVOID** — **tidak dibeli untuk lane mana pun**, termasuk invest (§6 poin 1).
-  Emiten yang jadi AVOID saat sedang dipegang = agenda evaluasi hari itu juga.
+### 9.3 Reading the Grader Quadrant
+Two axes: **fund_score** (fundamental quality) × **integrity flags** (clean/
+problematic).
+- **INVESTABLE** — strong fundamentals + clean. May be considered under the invest SOP.
+- **WATCH** — worth monitoring, not yet fully qualified.
+- **SPECULATIVE** — has some appeal but flags/quality aren't convincing yet.
+- **AVOID** — **not bought for any lane**, including invest (§6 point 1).
+  An issuer that becomes AVOID while being held = an agenda item for evaluation that very day.
 
-Mesin memberi kuadran; kalau kamu tak setuju → **Override** (butuh alasan).
-Override tampil sebagai badge terpisah, kuadran mesin tetap tersimpan.
+The engine gives the quadrant; if you disagree → **Override** (requires a reason).
+The override shows as a separate badge, the engine's quadrant is still saved.
 
-### 9.4 Detail Emiten (Komponen B)
-Tabel fundamental adaptif:
-- **Emiten biasa:** Revenue, Net Income, OCF (operating cash flow), FCF (free
-  cash flow) per kuartal.
-- **Emiten finansial (bank):** Net Income, **CAR** (kecukupan modal, makin tinggi
-  makin kuat), **NPL** (kredit macet, makin rendah makin sehat), **NIM** (margin
-  bunga bersih), **LDR** (rasio pinjaman:simpanan).
-- **Confidence** per baris: < 8 kuartal = LOW_CONFIDENCE (data terlalu pendek).
+### 9.4 Issuer Detail (Component B)
+Adaptive fundamentals table:
+- **Regular issuer:** Revenue, Net Income, OCF (operating cash flow), FCF (free
+  cash flow) per quarter.
+- **Financial issuer (bank):** Net Income, **CAR** (capital adequacy, the higher
+  the stronger), **NPL** (non-performing loans, the lower the healthier), **NIM** (net interest
+  margin), **LDR** (loan-to-deposit ratio).
+- **Confidence** per row: < 8 quarters = LOW_CONFIDENCE (data too short).
 
-### 9.5 Validasi Lane (Bar-Replay Sign-off)
-"Engine teruji di BTC ≠ teruji di BBRI" (Kontrak §13.1). Lane naik ke TRADE/BOTH
-**hanya** setelah kamu mereview chart historis emiten itu SENDIRI (bar-replay
-manual, di Panel 5), lalu **merekam** kesimpulannya di sini. Form ini cuma
-MEREKAM — tidak ada validasi otomatis. Evidence wajib diisi (apa yang dicek &
-kesimpulannya). Riwayatnya tampil di "Riwayat Validasi Lane".
+### 9.5 Lane Validation (Bar-Replay Sign-off)
+"An engine tested on BTC ≠ tested on BBRI" (Contract §13.1). A lane moves up to TRADE/BOTH
+**only** after you yourself have reviewed that issuer's historical chart
+(manual bar-replay, in Panel 5), then **recorded** the conclusion here. This form only
+RECORDS — there's no automatic validation. Evidence is required (what was checked &
+the conclusion). Its history shows in "Lane Validation History".
 
-### 9.6 Rasio Bank (Manual)
-CAR/NPL/NIM/LDR **tidak ada di yfinance** → isi manual dari laporan resmi
-(OJK/laporan tahunan). Tidak akan tertimpa backfill otomatis. Khusus emiten
-finansial.
+### 9.6 Bank Ratios (Manual)
+CAR/NPL/NIM/LDR **aren't available in yfinance** → filled in manually from official
+reports (OJK/annual reports). Won't be overwritten by automatic backfill. Specific to
+financial issuers.
 
-### 9.7 Grader Log & Kalibrasi (Komponen D)
-Widget "Nilai Outcome" untuk grade berumur 3/6 bulan (pola sama Skor Prediksi).
-**Revisi bobot rubrik grader HANYA lewat log ini** (kalau log menunjukkan POLA,
-bukan karena satu kasus menjengkelkan) — sesi quarterly §5.
+### 9.7 Grader Log & Calibration (Component D)
+The "Score Outcome" widget for grades that are 3/6 months old (same pattern as the Prediction Score).
+**Revising the grader rubric weights ONLY through this log** (if the log shows a PATTERN,
+not because of one annoying case) — the quarterly session §5.
 
-## 10. HALAMAN "ARSIP" (Riwayat) — cara baca
-Track record, dibaca saat review (§3/§4), bukan diisi (isian terjadi di panel
-asalnya). 4 sub-tab:
-- **Synthesis** — arsip kesimpulan harian. Baca pola pikirmu dari waktu ke waktu.
-- **Prediksi** — track record klaim + hasil (BENAR/SALAH/PARTIAL) + lesson.
-  Hit-rate turun terus = bahan refleksi basis prediksi (§4).
-- **Trading Journal** — semua entry & SKIP. Cari pola **pelanggaran SOP** (SL
-  digeser? trade tanpa sinyal? approve di luar sesi pagi?), bukan pola pasar (§4).
-- **4 Lensa** — arsip hasil persona per tanggal.
+## 10. THE "ARCHIVE" PAGE (History) — how to read
+Track record, read during review (§3/§4), not filled in here (entry happens in
+the source panel). 4 sub-tabs:
+- **Synthesis** — archive of daily conclusions. Read your own thinking patterns over time.
+- **Predictions** — track record of claims + outcomes (CORRECT/WRONG/PARTIAL) + lesson.
+  A steadily declining hit-rate = material for reflecting on your prediction basis (§4).
+- **Trading Journal** — every entry & SKIP. Look for patterns of **SOP violations** (SL
+  shifted? trade without a signal? approval outside the morning session?), not market patterns (§4).
+- **4 Lenses** — archive of persona results by date.
 
 ---
 
-*SOP Penggunaan Aplikasi v1.1 — Bagian A (ritme) + Bagian B (cara baca panel) +
-Bagian C (lane Investing). Direview bersama SOP quarterly (§5 poin terakhir).
-Dokumen ini mengatur ritme & literasi panel; aturan aset tetap di SOP masing-masing.*
+*Application Usage SOP v1.1 — Part A (rhythm) + Part B (how to read panels) +
+Part C (Investing lane). Reviewed together with the quarterly SOP (§5 last point).
+This document governs panel rhythm & literacy; asset rules stay in their own SOPs.*

@@ -8,18 +8,18 @@ import { drawCandleChart } from '../lib/candleChart'
 import { useAppToast } from '../composables/useAppToast'
 import { useAuthStore } from '../stores/auth'
 
-// Mode Ringkas / PWA (docs/mode_ringkas_pwa_mobile_v1.md BAGIAN A+B) -- layar
-// TUNGGAL, scroll vertikal, tombol besar, aksi WAJIB paling atas/dekat jempol.
-// Endpoint 100% REUSE dari web/writes.py yang sudah ada (§B.4) -- tidak ada
-// API baru di sini. Endpoint keputusan (approve sinyal, sizing, backfill,
-// settings, jalankan persona) SENGAJA tidak dipanggil sama sekali dari view
-// ini -- itu prinsipnya, bukan lupa.
+// Quick Mode / PWA (see docs/mode_ringkas_pwa_mobile_v1.md SECTION A+B) -- single
+// screen, vertical scroll, large buttons, mandatory actions at top/thumb reach.
+// Endpoints 100% REUSE from existing web/writes.py (§B.4) -- no new
+// APIs here. Decision endpoints (approve signal, sizing, backfill,
+// settings, run persona) are DELIBERATELY never called from this view
+// -- it's by design, not oversight.
 const { toast } = useAppToast()
 const auth = useAuthStore()
 const router = useRouter()
 const loading = ref(true)
 
-// ---------- Header: status data hari ini ----------
+// ---------- Header: today's data status ----------
 const latest = ref(null)
 const dataOk = computed(() => {
   if (!latest.value?.source_flags) return null
@@ -30,34 +30,34 @@ async function loadLatest() {
   latest.value = d.empty ? null : d
 }
 
-// ---------- Get News / Get Price (6 Agustus 2026) ----------
-// Giel minta trigger manual terpisah dari HP -- pola sama "Trigger Berita"
-// di SnapshotView.vue TAPI dipecah 2 tombol scoped (`run_news_only()` /
-// `run_price_only()`, pipeline/run_daily.py) drpd 1 tombol yang selalu
-// jalankan semua scraper (kadang cuma mau lihat berita terbaru TANPA
-// nunggu semua scraper market ikut jalan, atau sebaliknya). Sinkron
-// (blocking) sama seperti tombol desktop -- bukan background thread.
+// ---------- Get News / Get Price (August 6, 2026) ----------
+// Giel requested separate manual triggers on mobile -- pattern same as "Trigger News"
+// in SnapshotView.vue BUT split into 2 scoped buttons (`run_news_only()` /
+// `run_price_only()`, pipeline/run_daily.py) instead of 1 button that always
+// runs all scrapers (sometimes want to see latest news WITHOUT waiting for all
+// market scrapers to run, or vice versa). Sync (blocking) same as desktop button
+// -- not a background thread.
 const newsFetching = ref(false)
 const priceFetching = ref(false)
 async function fetchNewsNow() {
   newsFetching.value = true
   const r = await post('/api/news/fetch_now', {})
   newsFetching.value = false
-  if (r.error) { toast(`Gagal: ${r.error}`); return }
-  const deadStr = r.rss_dead && r.rss_dead.length ? `, feed mati: ${r.rss_dead.join(', ')}` : ''
-  toast(`${r.news_inserted} berita baru, RSS ${r.rss_ok} ok${deadStr}`)
+  if (r.error) { toast(`Failed: ${r.error}`); return }
+  const deadStr = r.rss_dead && r.rss_dead.length ? `, dead feeds: ${r.rss_dead.join(', ')}` : ''
+  toast(`${r.news_inserted} new articles, RSS ${r.rss_ok} ok${deadStr}`)
   loadHighNews()
 }
 async function fetchPriceNow() {
   priceFetching.value = true
   const r = await post('/api/price/fetch_now', {})
   priceFetching.value = false
-  if (r.error) { toast(`Gagal: ${r.error}`); return }
-  toast(`${r.asset_rows} baris market -- ${r.sources_ok} sumber ok / ${r.sources_fail} gagal`)
+  if (r.error) { toast(`Failed: ${r.error}`); return }
+  toast(`${r.asset_rows} market rows -- ${r.sources_ok} sources ok / ${r.sources_fail} failed`)
   loadLatest()
 }
 
-// ---------- [WAJIB] Prediksi -- satu-satunya yang tidak bisa di-backfill ----------
+// ---------- [MANDATORY] Prediction -- the only one that can't be backfilled ----------
 const duePredictions = ref([])
 const showPredictForm = ref(false)
 const p = ref({ horizon: '1w', confidence: '', targetDate: '', claim: '', basis: '' })
@@ -66,25 +66,25 @@ async function loadDue() {
   duePredictions.value = await get('/api/prediction/due')
 }
 async function savePrediction() {
-  if (!p.value.claim.trim() || !p.value.targetDate) { toast('Claim & target date wajib diisi'); return }
+  if (!p.value.claim.trim() || !p.value.targetDate) { toast('Claim & target date required'); return }
   await post('/api/prediction/add', {
     date_made: today(), horizon: p.value.horizon, claim: p.value.claim,
     confidence: p.value.confidence || null, basis: p.value.basis, target_date: p.value.targetDate,
   })
-  toast('Prediksi dicatat -- hari ini aman, streak jalan')
+  toast('Prediction logged -- today is safe, streak continues')
   p.value = { horizon: p.value.horizon, confidence: '', targetDate: '', claim: '', basis: '' }
   showPredictForm.value = false
 }
 async function scorePrediction(row, outcome) {
   await post('/api/prediction/score', { id: row.id, outcome })
-  toast(`Prediksi dinilai: ${outcome}`)
+  toast(`Prediction scored: ${outcome}`)
   loadDue()
 }
 
-// ---------- [INTI] Berita HIGH (default) / semua (toggle, 6 Agustus 2026) ----------
-// Default tetap HIGH-only (prinsip layar tunggal tidak berubah), tapi Giel
-// minta bisa lihat SEMUA berita hari ini dari HP juga -- toggle drpd ganti
-// default, biar buka /m tetap cepat/ringkas kalau tidak disentuh.
+// ---------- [CORE] HIGH news (default) / all (toggle, August 6, 2026) ----------
+// Default remains HIGH-only (single-screen principle unchanged), but Giel
+// requested ability to see ALL today's articles from mobile too -- toggle instead
+// of changing default, so opening /m stays fast/concise if not touched.
 const showAllNews = ref(false)
 const highNews = ref([])
 async function loadHighNews() {

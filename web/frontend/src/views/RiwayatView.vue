@@ -5,13 +5,13 @@ import DataTable from '../components/DataTable.vue'
 import { get } from '../lib/api'
 import { LENS_LABELS } from '../lib/format'
 
-// Port dari web/static/js/panel7.js (lihat docs/migrationFE.md Fase 2).
+// Ported from web/static/js/panel7.js (see docs/migrationFE.md Phase 2).
 const activeSub = ref('synthesis')
 const subtabs = [
   { key: 'synthesis', label: 'Synthesis' },
-  { key: 'prediksi', label: 'Prediksi' },
+  { key: 'prediksi', label: 'Predictions' },
   { key: 'journal', label: 'Trading Journal' },
-  { key: 'lensa', label: '4 Lensa' },
+  { key: 'lensa', label: '4 Lenses' },
 ]
 
 const synthesisLog = ref([])
@@ -21,8 +21,8 @@ const lensaHistory = ref([])
 const loading = ref(true)
 
 function outcomeSeverity(outcome) {
-  if (outcome === 'BENAR') return 'LOW'
-  if (outcome === 'SALAH') return 'HIGH'
+  if (outcome === 'CORRECT') return 'LOW'
+  if (outcome === 'WRONG') return 'HIGH'
   return 'MED'
 }
 
@@ -49,13 +49,13 @@ onMounted(async () => {
 
   <div v-if="activeSub === 'synthesis'" class="subpanel active">
     <section>
-      <h2>Riwayat Synthesis Harian</h2>
+      <h2>Daily Synthesis History</h2>
       <div class="panel">
-        <p v-if="loading" class="src">Memuat...</p>
-        <DataTable v-else :rows="synthesisLog" :searchFields="['notes']" emptyMessage="belum ada synthesis tersimpan">
-          <Column field="date" header="Tanggal" sortable><template #body="{ data }"><span class="src">{{ data.date }}</span></template></Column>
+        <p v-if="loading" class="src">Loading...</p>
+        <DataTable v-else :rows="synthesisLog" :searchFields="['notes']" emptyMessage="No synthesis saved yet">
+          <Column field="date" header="Date" sortable><template #body="{ data }"><span class="src">{{ data.date }}</span></template></Column>
           <Column field="notes" header="Synthesis" />
-          <Column field="created_at" header="Disimpan" sortable><template #body="{ data }"><span class="src">{{ data.created_at || '' }}</span></template></Column>
+          <Column field="created_at" header="Saved" sortable><template #body="{ data }"><span class="src">{{ data.created_at || '' }}</span></template></Column>
         </DataTable>
       </div>
     </section>
@@ -63,19 +63,19 @@ onMounted(async () => {
 
   <div v-if="activeSub === 'prediksi'" class="subpanel active">
     <section>
-      <h2>Jurnal Prediksi (track record)</h2>
+      <h2>Prediction Journal (track record)</h2>
       <div class="panel">
-        <p v-if="loading" class="src">Memuat...</p>
-        <DataTable v-else :rows="predictions" :searchFields="['claim', 'basis', 'lesson']" emptyMessage="belum ada prediksi">
-          <Column field="date_made" header="Dibuat" sortable><template #body="{ data }"><span class="src">{{ data.date_made }}</span></template></Column>
+        <p v-if="loading" class="src">Loading...</p>
+        <DataTable v-else :rows="predictions" :searchFields="['claim', 'basis', 'lesson']" emptyMessage="No predictions yet">
+          <Column field="date_made" header="Created" sortable><template #body="{ data }"><span class="src">{{ data.date_made }}</span></template></Column>
           <Column field="target_date" header="Target" sortable><template #body="{ data }"><span class="src">{{ data.target_date }}</span></template></Column>
           <Column field="claim" header="Claim" />
           <Column field="horizon" header="Horizon" sortable><template #body="{ data }"><span class="src">{{ data.horizon }}</span></template></Column>
           <Column field="confidence" header="Conf" sortable><template #body="{ data }"><span class="src">{{ data.confidence ?? '-' }}%</span></template></Column>
-          <Column field="outcome" header="Hasil" sortable>
+          <Column field="outcome" header="Outcome" sortable>
             <template #body="{ data }">
               <span v-if="data.outcome" class="badge" :class="outcomeSeverity(data.outcome)">{{ data.outcome }}</span>
-              <span v-else class="src">belum</span>
+              <span v-else class="src">Not yet</span>
             </template>
           </Column>
           <Column header="Lesson"><template #body="{ data }">{{ data.lesson || '-' }}</template></Column>
@@ -86,15 +86,15 @@ onMounted(async () => {
 
   <div v-if="activeSub === 'journal'" class="subpanel active">
     <section>
-      <h2>Jurnal Trading (entry)</h2>
+      <h2>Trading Journal (entry)</h2>
       <div class="panel">
-        <p v-if="loading" class="src">Memuat...</p>
+        <p v-if="loading" class="src">Loading...</p>
         <DataTable
           v-else :rows="journal"
           :searchFields="['instrument', 'setup_type', 'personal_notes', 'lesson_learned']"
-          emptyMessage="belum ada entri trading journal"
+          emptyMessage="No trading journal entries yet"
         >
-          <Column field="date" header="Tanggal" sortable><template #body="{ data }"><span class="src">{{ data.date }}</span></template></Column>
+          <Column field="date" header="Date" sortable><template #body="{ data }"><span class="src">{{ data.date }}</span></template></Column>
           <Column field="instrument" header="Instrument" sortable />
           <Column field="setup_type" header="Setup" sortable><template #body="{ data }"><span class="src">{{ data.setup_type || '-' }}</span></template></Column>
           <Column header="Entry/SL/TP1">
@@ -107,7 +107,7 @@ onMounted(async () => {
             </template>
           </Column>
           <Column field="outcome" header="Outcome" sortable><template #body="{ data }">{{ data.outcome || '-' }}</template></Column>
-          <Column header="Catatan"><template #body="{ data }">{{ data.personal_notes || '-' }}</template></Column>
+          <Column header="Notes"><template #body="{ data }">{{ data.personal_notes || '-' }}</template></Column>
           <Column header="Lesson"><template #body="{ data }"><span class="src">{{ data.lesson_learned || '-' }}</span></template></Column>
         </DataTable>
       </div>
@@ -116,13 +116,13 @@ onMounted(async () => {
 
   <div v-if="activeSub === 'lensa'" class="subpanel active">
     <section>
-      <h2>Riwayat 4 Lensa (Reading)</h2>
+      <h2>4 Lenses History (Reading)</h2>
       <div class="panel">
-        <p v-if="loading" class="src">Memuat...</p>
-        <DataTable v-else :rows="lensaHistory" :searchFields="['lens', 'notes']" emptyMessage="belum ada catatan reading">
-          <Column field="date" header="Tanggal" sortable><template #body="{ data }"><span class="src">{{ data.date }}</span></template></Column>
-          <Column field="lens" header="Lensa" sortable><template #body="{ data }">{{ LENS_LABELS[data.lens] || data.lens }}</template></Column>
-          <Column field="notes" header="Catatan" />
+        <p v-if="loading" class="src">Loading...</p>
+        <DataTable v-else :rows="lensaHistory" :searchFields="['lens', 'notes']" emptyMessage="No reading notes yet">
+          <Column field="date" header="Date" sortable><template #body="{ data }"><span class="src">{{ data.date }}</span></template></Column>
+          <Column field="lens" header="Lens" sortable><template #body="{ data }">{{ LENS_LABELS[data.lens] || data.lens }}</template></Column>
+          <Column field="notes" header="Notes" />
         </DataTable>
       </div>
     </section>

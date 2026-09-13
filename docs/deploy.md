@@ -1,371 +1,371 @@
 # Kastara Finance — Deployment & Mobile Access Strategy
-**Versi:** 1.0 · 12 Juli 2026 · Owner: Giel
-**Posisi dokumen:** mengatur DI MANA sistem berjalan dan FUNGSI MANA yang boleh diakses dari perangkat apa. Bukan spesifikasi UI detail — itu turunan setelah keputusan di sini diambil.
-**Acuan:** Master Plan v1.6 (§0 spine, §5 pipeline), SOP Penggunaan Aplikasi v1.0 (§1 ritual pagi, §7 protokol), ARCHITECTURE.md §6.1 (SQLite single-writer).
+**Version:** 1.0 · July 12, 2026 · Owner: Giel
+**Position of this document:** governs WHERE the system runs and WHICH functions may be accessed from which device. Not a detailed UI spec — that's a derivative once the decisions here are made.
+**References:** Master Plan v1.6 (§0 spine, §5 pipeline), Application Usage SOP v1.0 (§1 morning ritual, §7 protocol), ARCHITECTURE.md §6.1 (SQLite single-writer).
 
 ---
 
-## 0. PRINSIP — INI BUKAN SOAL UKURAN LAYAR
+## 0. PRINCIPLE — THIS ISN'T ABOUT SCREEN SIZE
 
-Pertanyaan yang benar bukan *"Telegram atau mobile-friendly?"* tapi **"fungsi mana yang boleh keluar dari meja kerja?"**
+The right question isn't *"Telegram or mobile-friendly?"* but **"which function is allowed to leave the desk?"**
 
-Sebagian fungsi sengaja dirancang butuh ritual, bukan kecepatan. Memindahkannya ke HP bukan peningkatan aksesibilitas — itu **penghapusan friksi yang justru disengaja.**
+Some functions are deliberately designed to need ritual, not speed. Moving them to a phone isn't an accessibility improvement — it's a **removal of friction that was actually intentional.**
 
 ```
-FRIKSI YANG DISENGAJA (jangan dihapus):
-├── Gate 6 langkah approve sinyal  → dirancang 3 menit sadar di sesi pagi
-├── Grade override + alasan wajib   → dirancang reflektif
-├── Backfill preview-before-commit  → dirancang hati-hati
-└── Settings/kurasi kamus tag       → dirancang lambat (§21.11 kontrak)
+DELIBERATE FRICTION (do not remove):
+├── 6-step signal-approve gate  → designed as a conscious 3 minutes in the morning session
+├── Grade override + mandatory reason   → designed to be reflective
+├── Backfill preview-before-commit  → designed to be careful
+└── Settings/tag dictionary curation       → designed to be slow (contract §21.11)
 
-FRIKSI YANG TIDAK PERLU (boleh dihapus):
-├── Harus duduk di meja cuma untuk BACA briefing
-├── Harus nunggu pulang cuma untuk SIMPAN artikel yang ketemu
-└── Harus buka laptop cuma untuk LIHAT timeline thread
+UNNECESSARY FRICTION (may be removed):
+├── Having to sit at the desk just to READ a briefing
+├── Having to wait until getting home just to SAVE an article you found
+└── Having to open the laptop just to VIEW a thread timeline
 ```
 
-**Aturan turunan:** yang boleh ke HP adalah **membaca** dan **menangkap** (capture). Yang tidak boleh adalah **memutuskan**.
+**Derived rule:** what's allowed on the phone is **reading** and **capturing**. What's not allowed is **deciding**.
 
 ---
 
-## 1. MATRIKS FUNGSI × PERANGKAT
+## 1. FUNCTION × DEVICE MATRIX
 
-| Fungsi | Telegram | Mobile Web | Desktop | Alasan |
+| Function | Telegram | Mobile Web | Desktop | Reason |
 |---|---|---|---|---|
-| Baca Daily Briefing | ✅ utama | ✅ | ✅ | Push, nol infra, sudah ada (`send_briefing.py`) |
-| Cek status scraper / data pagi | ✅ ringkas | ✅ | ✅ | Read-only murni |
-| Simpan artikel dari luar (kirim URL) | ✅ utama | — | ✅ | **Use case HP paling nyata** → `manual_articles` |
-| Baca timeline thread | — | ✅ | ✅ | Butuh layout, tidak butuh keputusan |
-| Baca output persona terakhir | — | ✅ | ✅ | Read-only |
-| Baca jurnal / posisi ONGOING | — | ✅ | ✅ | Read-only |
-| Konfirmasi tag SUGGESTED | — | ✅ ringan | ✅ | Reversible, bukan keputusan uang |
-| Konfirmasi link thread + stance | — | ⚠️ boleh | ✅ | Reversible; tapi stance idealnya tidak terburu-buru |
-| Set `for_reading` | — | ✅ | ✅ | Kurasi ringan, reversible |
-| **Approve/reject sinyal** | ❌ | ❌ | ✅ **ONLY** | Gate 6 langkah = ritual sadar (SOP §1) |
-| **Sizing / eksekusi** | ❌ | ❌ | ✅ ONLY | Keputusan uang |
-| **Grade override** | ❌ | ❌ | ✅ ONLY | Reflektif + alasan wajib |
+| Read the Daily Briefing | ✅ primary | ✅ | ✅ | Push, zero infra, already exists (`send_briefing.py`) |
+| Check scraper status / morning data | ✅ summary | ✅ | ✅ | Purely read-only |
+| Save an article from outside (send a URL) | ✅ primary | — | ✅ | **The most genuine phone use case** → `manual_articles` |
+| Read the thread timeline | — | ✅ | ✅ | Needs layout, doesn't need a decision |
+| Read the latest persona output | — | ✅ | ✅ | Read-only |
+| Read the journal / ONGOING positions | — | ✅ | ✅ | Read-only |
+| Confirm a SUGGESTED tag | — | ✅ light | ✅ | Reversible, not a money decision |
+| Confirm a thread link + stance | — | ⚠️ allowed | ✅ | Reversible; but stance ideally isn't rushed |
+| Set `for_reading` | — | ✅ | ✅ | Light curation, reversible |
+| **Approve/reject a signal** | ❌ | ❌ | ✅ **ONLY** | 6-step gate = conscious ritual (SOP §1) |
+| **Sizing / execution** | ❌ | ❌ | ✅ ONLY | Money decision |
+| **Grade override** | ❌ | ❌ | ✅ ONLY | Reflective + mandatory reason |
 | **Backfill / seed** | ❌ | ❌ | ✅ ONLY | Preview-before-commit |
-| **Settings (kamus tag, merge, status thread)** | ❌ | ❌ | ✅ ONLY | Kurasi lambat (§21.11) |
-| **Jalankan persona (biaya LLM)** | ❌ | ⚠️ opsional | ✅ | Hemat biaya + hindari klik iseng |
+| **Settings (tag dictionary, merge, thread status)** | ❌ | ❌ | ✅ ONLY | Slow curation (§21.11) |
+| **Run persona (LLM cost)** | ❌ | ⚠️ optional | ✅ | Cost savings + avoid idle clicks |
 
-**Catatan penegakan:** untuk fungsi ✅ ONLY, endpoint keputusan **tidak di-render sama sekali** di view mobile — bukan disembunyikan lewat CSS. Kalau tombolnya tidak ada, tidak ada godaan.
-
----
-
-## 2. KEPUTUSAN: TELEGRAM *DAN* MOBILE WEB (bukan salah satu)
-
-Keduanya punya peran berbeda dan tidak tumpang tindih:
-
-**Telegram = jalur PUSH & CAPTURE**
-- Sudah ada (`notify/telegram.py`, `send_briefing.py`) — nol infra baru.
-- Cocok untuk: briefing pagi, alert data gagal, kirim URL artikel ke bot.
-- **Batas:** jangan bangun "dashboard di Telegram" (inline keyboard untuk approve, dst). Chat bukan tempat mengambil keputusan berisiko, dan bot command yang banyak justru lebih ribet daripada web.
-
-**Mobile Web = jalur BACA MENDALAM**
-- Satu view terpisah `/m`, **bukan** membuat ketujuh tab responsif.
-- Isi cukup 3 hal: (a) feed berita hari ini + konfirmasi tag/thread ringan, (b) timeline thread aktif, (c) output persona terakhir + jurnal posisi ONGOING.
-- Alasan view terpisah: memoles 7 tab jadi responsif = effort besar di komponen 70% (commodity) — lihat Competitive Mapping §C1. View `/m` minimal jauh lebih murah dan lebih tepat guna.
+**Enforcement note:** for ✅ ONLY functions, the decision endpoint is **not rendered at all** in the mobile view — not merely hidden via CSS. If the button doesn't exist, there's no temptation.
 
 ---
 
-## 3. DEPLOYMENT & KEAMANAN (bagian paling kritis)
+## 2. DECISION: TELEGRAM *AND* MOBILE WEB (not either/or)
 
-> **Peringatan:** `web/app.py` saat ini **tidak punya autentikasi**, dan sejak Phase C punya endpoint tulis. Mengeksposnya ke internet publik apa adanya = siapa pun yang menemukan URL bisa menulis ke database.
+The two have different, non-overlapping roles:
 
-### 3.1 Rekomendasi: jaringan privat, bukan expose publik
+**Telegram = the PUSH & CAPTURE channel**
+- Already exists (`notify/telegram.py`, `send_briefing.py`) — zero new infra.
+- Good for: morning briefing, data-failure alerts, sending an article URL to the bot.
+- **Limit:** don't build a "dashboard in Telegram" (inline keyboard for approve, etc.). Chat isn't the place to make risky decisions, and a large set of bot commands ends up more cumbersome than the web anyway.
 
-| Opsi | Cara kerja | Kelebihan | Kekurangan |
+**Mobile Web = the DEEP READING channel**
+- One separate view `/m`, **not** making all seven tabs responsive.
+- Content is just 3 things: (a) today's news feed + light tag/thread confirmation, (b) active thread timeline, (c) latest persona output + ONGOING position journal.
+- Reason for a separate view: polishing all 7 tabs to be responsive = a big effort on the 70% (commodity) component — see Competitive Mapping §C1. A minimal `/m` view is much cheaper and better targeted.
+
+---
+
+## 3. DEPLOYMENT & SECURITY (the most critical section)
+
+> **Warning:** `web/app.py` currently has **no authentication**, and since Phase C has write endpoints. Exposing it to the public internet as-is means anyone who finds the URL can write to the database.
+
+### 3.1 Recommendation: a private network, not a public exposure
+
+| Option | How it works | Pros | Cons |
 |---|---|---|---|
-| **Tailscale / WireGuard** ⭐ | App tetap di mesin sendiri; HP masuk lewat VPN mesh privat | **Nol port terbuka**, nol kode auth, satu sore setup, gratis untuk pribadi | Perlu app VPN aktif di HP |
-| Cloudflare Tunnel + Access | Tunnel keluar; auth di layer Cloudflare | Tidak perlu VPN di HP; auth email/SSO | Trafik lewat pihak ketiga; setup lebih ribet |
-| VPS + reverse proxy + auth sendiri | Pindah app ke VPS | Selalu online walau laptop mati | **Perlu bangun auth**, HTTPS, hardening — beban paling besar |
-| ~~Expose port + basic auth~~ | Port forward router | — | ❌ **HINDARI.** Rawan, mudah salah konfigurasi |
+| **Tailscale / WireGuard** ⭐ | The app stays on your own machine; the phone connects via a private VPN mesh | **Zero open ports**, zero auth code, one evening to set up, free for personal use | Needs an active VPN app on the phone |
+| Cloudflare Tunnel + Access | Outbound tunnel; auth at the Cloudflare layer | No VPN needed on the phone; email/SSO auth | Traffic goes through a third party; more setup hassle |
+| VPS + reverse proxy + own auth | Move the app to a VPS | Always online even if the laptop is off | **Requires building auth**, HTTPS, hardening — the biggest burden |
+| ~~Expose port + basic auth~~ | Router port forward | — | ❌ **AVOID.** Risky, easy to misconfigure |
 
-**Keputusan yang disarankan:** mulai **Tailscale**. Alasan: menyelesaikan masalah akses HP tanpa menulis satu baris kode auth, dan tanpa memindahkan database. Kalau nanti butuh selalu-online (laptop sering mati), baru pertimbangkan VPS — dan saat itu auth jadi prasyarat, bukan opsional.
+**Recommended decision:** start with **Tailscale**. Reason: it solves the phone-access problem without writing a single line of auth code, and without moving the database. If always-online becomes necessary later (laptop often off), then consider a VPS — and at that point auth becomes a prerequisite, not optional.
 
-### 3.2 Aturan keras: SATU DATABASE
+### 3.2 Hard rule: ONE DATABASE
 ```
-❌ JANGAN: DB lokal jalan sendiri + DB VPS jalan sendiri, lalu disinkronkan.
-✅ SELALU: satu file DB, satu lokasi. Pindah = pindah semua.
+❌ DON'T: run a local DB on its own + a VPS DB on its own, then sync them.
+✅ ALWAYS: one DB file, one location. Moving = moving everything.
 ```
-Asumsi **single-writer** di ARCHITECTURE.md §6.1 dan FLOW.md §5 langsung runtuh kalau ada dua salinan aktif. Konflik SQLite menyakitkan dan sering baru ketahuan setelah data korup berhari-hari.
+The **single-writer** assumption in ARCHITECTURE.md §6.1 and FLOW.md §5 immediately collapses if two active copies exist. SQLite conflicts are painful and often only discovered after days of corrupted data.
 
-**Kalau nanti pindah ke VPS:** cron scraper ikut pindah (jangan scraper lokal menulis ke DB VPS lewat jaringan). Ini juga trigger yang tercatat untuk meninjau ulang SQLite → Postgres (ARCHITECTURE §6.1).
+**If moving to a VPS later:** the scraper cron moves too (don't have a local scraper writing to the VPS DB over the network). This is also a logged trigger for revisiting SQLite → Postgres (ARCHITECTURE §6.1).
 
-### 3.3 Checklist sebelum akses dari luar
+### 3.3 Checklist before accessing from outside
 ```
-[ ] Tailscale terpasang di mesin host + HP, koneksi terverifikasi
-[ ] Flask bind ke interface Tailscale / localhost — BUKAN 0.0.0.0 publik
-[ ] Backup DB otomatis sebelum mulai akses jarak jauh (file SQLite, salin harian)
-[ ] Verifikasi: dari jaringan luar TANPA VPS/VPN, dashboard TIDAK bisa dibuka
-[ ] .env (API key OpenRouter, dst) tidak ikut ter-expose di direktori statis
+[ ] Tailscale installed on the host machine + phone, connection verified
+[ ] Flask bound to the Tailscale interface / localhost — NOT public 0.0.0.0
+[ ] Automatic DB backup before starting remote access (SQLite file, copied daily)
+[ ] Verify: from an outside network WITHOUT the VPS/VPN, the dashboard CANNOT be opened
+[ ] .env (OpenRouter API key, etc.) is not exposed within a static directory
 ```
 
 ---
 
-## 4. URUTAN EKSEKUSI (paling murah dulu)
+## 4. EXECUTION ORDER (cheapest first)
 
 ```
-TAHAP 1 — AKSES (satu sore, NOL kode)
+STAGE 1 — ACCESS (one evening, ZERO code)
 [ ] Tailscale setup + checklist §3.3
-[ ] Buka dashboard desktop apa adanya dari HP
-[ ] PAKAI 1–2 minggu. Catat: fungsi apa yang benar-benar dibutuhkan di luar?
-    (jangan menebak — biarkan pemakaian yang memberi tahu)
+[ ] Open the desktop dashboard as-is from the phone
+[ ] USE for 1–2 weeks. Note: which functions are genuinely needed outside?
+    (don't guess — let actual usage tell you)
 
-TAHAP 2 — TELEGRAM (kecil, tinggi manfaat)
-[ ] Briefing pagi via Telegram (sudah ada — pastikan jadwalnya pas)
-[ ] Bot handler: kirim URL → simpan ke manual_articles
-[ ] (opsional) Alert kalau scraper gagal total
+STAGE 2 — TELEGRAM (small, high value)
+[ ] Morning briefing via Telegram (already exists — make sure the schedule is right)
+[ ] Bot handler: send URL → save to manual_articles
+[ ] (optional) Alert on total scraper failure
 
-TAHAP 3 — VIEW /m (hanya untuk yang TERBUKTI sering dipakai di Tahap 1)
-[ ] Route /m read-only: feed berita, timeline thread, persona terakhir, jurnal
-[ ] Konfirmasi tag/thread + for_reading (light write, reversible)
-[ ] Endpoint keputusan TIDAK di-render di view ini
-[ ] Test: pastikan tidak ada jalur approve/backfill/settings yang bocor ke /m
+STAGE 3 — /m VIEW (only for what's PROVEN to be used often in Stage 1)
+[ ] Read-only /m route: news feed, thread timeline, latest persona, journal
+[ ] Tag/thread confirmation + for_reading (light write, reversible)
+[ ] Decision endpoints NOT rendered in this view
+[ ] Test: make sure no approve/backfill/settings path leaks into /m
 
-TAHAP 4 — VPS (hanya kalau perlu selalu-online)
-[ ] Prasyarat: auth beneran, HTTPS, backup otomatis
-[ ] DB + cron pindah SEMUA (aturan §3.2)
-[ ] Tinjau ulang SQLite → Postgres kalau muncul writer paralel
+STAGE 4 — VPS (only if always-online is needed)
+[ ] Prerequisite: real auth, HTTPS, automatic backup
+[ ] Move DB + cron ALL together (rule §3.2)
+[ ] Revisit SQLite → Postgres if a parallel writer emerges
 ```
 
 ---
 
-## 5. RISIKO YANG DIPANTAU
+## 5. RISKS BEING MONITORED
 
-| Risiko | Tanda awal | Mitigasi |
+| Risk | Early sign | Mitigation |
 |---|---|---|
-| **Ritual pagi terkikis** | Mulai "cukup baca briefing di HP" lalu skip sesi desktop | Briefing = pengingat, bukan pengganti. Kalau 3 hari berturut sesi desktop terlewat, itu bukan masalah UI — itu masalah disiplin (SOP §7) |
-| **Keputusan merembes ke HP** | Muncul keinginan "approve cepat dari HP saja" | Endpoint tidak ada di /m. Kalau tergoda menambahkannya, baca ulang SOP §7 + Visi Pengalaman Bagian 4 |
-| **Dua database** | "Sementara pakai DB lokal dulu" saat VPS bermasalah | Aturan §3.2 — tidak ada pengecualian |
-| **Expose tanpa sadar** | Flask bind 0.0.0.0 + port forward "sementara" | Checklist §3.3 dijalankan tiap kali deployment berubah |
-| **Effort bocor ke 70%** | Menghabiskan minggu memoles UI mobile | View /m minimal saja. Polish UI = ranah TradingView (Competitive Mapping §C1) |
+| **Morning ritual erodes** | Starting to think "reading the briefing on the phone is enough" and skipping the desktop session | The briefing is a reminder, not a replacement. If the desktop session is missed 3 days in a row, that's not a UI problem — it's a discipline problem (SOP §7) |
+| **Decisions creep onto the phone** | The urge appears to "just approve quickly from the phone" | The endpoint doesn't exist on /m. If tempted to add it, re-read SOP §7 + Experience Vision Part 4 |
+| **Two databases** | "Let's use the local DB for now" while the VPS has issues | Rule §3.2 — no exceptions |
+| **Unintentional exposure** | Flask bound to 0.0.0.0 + a "temporary" port forward | Checklist §3.3 run every time the deployment changes |
+| **Effort leaking into the 70%** | Spending a week polishing the mobile UI | Keep the /m view minimal. UI polish is TradingView's territory (Competitive Mapping §C1) |
 
 ---
 
-## 6. KAITAN SOP
+## 6. RELATION TO THE SOP
 
-Tambahan ke SOP Penggunaan Aplikasi v1.0:
-- **§1 (ritual pagi):** tetap desktop. Briefing Telegram boleh dibaca lebih dulu, tapi tidak menggantikan sesi.
-- **§3 (weekly):** cek backup DB berjalan; verifikasi akses luar masih tertutup dari jaringan publik.
-- **§7 (protokol tidak normal):** tambah baris — *"Muncul keinginan approve sinyal dari HP → itu sinyal emosi/terburu-buru, bukan kebutuhan fitur. Tunggu sesi pagi berikutnya."*
+Additions to Application Usage SOP v1.0:
+- **§1 (morning ritual):** still desktop. The Telegram briefing may be read first, but it doesn't replace the session.
+- **§3 (weekly):** check that the DB backup is running; verify outside access is still closed off from the public network.
+- **§7 (abnormal protocol):** add a line — *"The urge to approve a signal from the phone appears → that's an emotional/rushed signal, not a feature need. Wait for the next morning session."*
 
 ---
 
-## 7. RAILWAY DEPLOYMENT (override, 31 Jul 2026)
+## 7. RAILWAY DEPLOYMENT (override, July 31, 2026)
 
-> **Catatan transparansi:** Giel eksplisit minta deploy langsung ke Railway
-> (cloud publik) — bukan Tailscale dulu seperti urutan §4 di atas. Ini
-> keputusan sadar Giel sendiri, bukan retraksi rekomendasi §3/§4 — kalau
-> nanti butuh akses "nol setup, satu sore" lagi di konteks lain, §3/§4 tetap
-> berlaku. Auth (§Auth `web/app.py`) sudah ada sejak migrasi Vue, jadi
-> prasyarat "auth beneran" utk expose publik (§3.1 baris VPS) sudah
-> terpenuhi lebih dulu — bukan ditambah khusus utk Railway.
+> **Transparency note:** Giel explicitly asked to deploy straight to Railway
+> (public cloud) — not Tailscale first as in the §4 sequence above. This is
+> Giel's own conscious decision, not a retraction of the §3/§4 recommendation — if
+> "zero-setup, one evening" access is needed again in another context later, §3/§4 still
+> apply. Auth (§Auth `web/app.py`) has existed since the Vue migration, so the
+> "real auth" prerequisite for public exposure (§3.1's VPS row) was already
+> met beforehand — not added specifically for Railway.
 
-### 7.1 Keputusan: tetap SQLite, bukan Postgres
+### 7.1 Decision: stay on SQLite, not Postgres
 
-Trigger pindah Postgres di ARCHITECTURE §6.1 ada 3: banyak user concurrent,
-banyak proses penulis bersamaan, atau butuh hosting cloud managed. Railway
-menyalakan alasan ketiga, tapi **tidak butuh migrasi DB** — cukup attach
-**Railway Volume** (disk persisten) ke service dan arahkan `KASTARA_DB_PATH`
-ke sana. App ini tetap single-user/single-writer (cron pipeline + 1 sesi
-browser Giel), jadi tidak ada alasan nyata untuk Postgres (concurrent write,
-managed backup/replikasi) — itu semua biaya tanpa manfaat riil di sini.
+There are 3 triggers for moving to Postgres in ARCHITECTURE §6.1: many concurrent
+users, many simultaneous writer processes, or needing managed cloud hosting. Railway
+switches on the third reason, but **doesn't require a DB migration** — just attach a
+**Railway Volume** (persistent disk) to the service and point `KASTARA_DB_PATH`
+at it. This app remains single-user/single-writer (pipeline cron + 1 browser
+session for Giel), so there's no real reason for Postgres (concurrent write,
+managed backup/replication) — that's all cost with no real benefit here.
 
-### 7.2 Yang sudah disiapkan di repo (31 Jul 2026)
+### 7.2 What's already been prepared in the repo (July 31, 2026)
 
-- **`Dockerfile`** (multi-stage): stage 1 (`node:22-alpine`) build
-  `web/frontend/` → `dist/`; stage 2 (`python:3.12-slim`) install
-  `requirements.txt` + copy source + copy `dist/` dari stage 1. `CMD`
-  jalankan `gunicorn web.app:app --bind 0.0.0.0:$PORT --workers 2
-  --timeout 300` — timeout digenerouskan krn `/api/run_daily_now` (trigger
-  pipeli hari-ini dari Snapshot) bisa lama (fetch semua sumber eksternal).
-- **`.dockerignore`** — exclude `.venv/`, `node_modules/`, `*.db`,
+- **`Dockerfile`** (multi-stage): stage 1 (`node:22-alpine`) builds
+  `web/frontend/` → `dist/`; stage 2 (`python:3.12-slim`) installs
+  `requirements.txt` + copies the source + copies `dist/` from stage 1. `CMD`
+  runs `gunicorn web.app:app --bind 0.0.0.0:$PORT --workers 2
+  --timeout 300` — the timeout is generous because `/api/run_daily_now`
+  (triggers today's pipeline from the Snapshot) can take a while (fetching all
+  external sources).
+- **`.dockerignore`** — excludes `.venv/`, `node_modules/`, `*.db`,
   `kastara-finance-data/`, `.git/`, `.env`, `prompts/persona_*.txt`, `logs/`,
-  dan `*.md` (docs tidak dibaca app saat runtime).
-- **`requirements.txt`** — tambah `gunicorn`.
-- **`web/app.py`** — `init_db()` dipindah ke level modul (bukan cuma di
-  `main()`) — WAJIB, karena gunicorn import modul langsung tanpa pernah
-  eksekusi `if __name__ == "__main__"`. Tanpa ini, Volume kosong di deploy
-  pertama akan gagal di query API pertama (tabel belum ada). Idempotent,
-  jadi tidak masalah tetap dipanggil tiap start proses.
-- **`tests/test_web_app.py`** — set `KASTARA_DB_PATH` ke file temp SEBELUM
-  import `web.app` (perubahan di atas berarti import modul ini sekarang
-  memicu `init_db()` — tanpa guard ini, test akan diam-diam kena ke DB
-  produksi asli lewat `.env` lokal Giel).
-- **Diverifikasi lokal**: `docker build` sukses, container dijalankan
-  (`docker run` + env var dummy), `/` (SPA) 200, `/api/auth/login` +
-  `/api/auth/status` + `/api/latest` (authenticated) semua jalan benar
-  end-to-end di dalam image. Image test dihapus setelah verifikasi
-  (bukan ditinggal di disk).
+  and `*.md` (docs aren't read by the app at runtime).
+- **`requirements.txt`** — adds `gunicorn`.
+- **`web/app.py`** — `init_db()` moved to module level (not just inside
+  `main()`) — REQUIRED, because gunicorn imports the module directly without ever
+  executing `if __name__ == "__main__"`. Without this, an empty Volume on the first
+  deploy would fail on the first API query (tables don't exist yet). It's idempotent,
+  so it's fine to keep calling it on every process start.
+- **`tests/test_web_app.py`** — sets `KASTARA_DB_PATH` to a temp file BEFORE
+  importing `web.app` (the change above means importing this module now
+  triggers `init_db()` — without this guard, tests would silently hit
+  Giel's real production DB via his local `.env`).
+- **Verified locally**: `docker build` succeeds, the container runs
+  (`docker run` + dummy env vars), `/` (SPA) returns 200, `/api/auth/login` +
+  `/api/auth/status` + `/api/latest` (authenticated) all work correctly
+  end-to-end inside the image. The test image was deleted after verification
+  (not left sitting on disk).
 
-### 7.3 Langkah setup Railway (belum dieksekusi — butuh akun/login Giel sendiri)
+### 7.3 Railway setup steps (not yet executed — needs Giel's own account/login)
 
 ```
-[ ] 1. Buat project baru di Railway, hubungkan repo ini (atau railway up
-       dari CLI kalau tidak lewat GitHub).
-[ ] 2. Attach Volume ke service, mount path mis. /data.
+[ ] 1. Create a new project on Railway, connect this repo (or railway up
+       from the CLI if not going through GitHub).
+[ ] 2. Attach a Volume to the service, mount path e.g. /data.
 [ ] 3. Set environment variables (Settings -> Variables):
        - KASTARA_DB_PATH=/data/kastara-finance.db
-       - DASHBOARD_PASSWORD=<isi sendiri, JANGAN aku yang isi -- kredensial>
-       - FLASK_SECRET_KEY=<isi sendiri, string acak panjang -- WAJIB diisi
-         eksplisit di Railway, beda dari lokal yang boleh auto-generate;
-         kalau kosong, tiap redeploy invalidate semua sesi login>
+       - DASHBOARD_PASSWORD=<fill in yourself, I should NOT fill this in -- credential>
+       - FLASK_SECRET_KEY=<fill in yourself, a long random string -- MUST be
+         set explicitly on Railway, unlike local where it may auto-generate;
+         if left empty, every redeploy invalidates all login sessions>
        - FRED_API_KEY, OPENROUTER_API_KEY, TELEGRAM_BOT_TOKEN,
          TELEGRAM_CHAT_ID, COINALYZE_API_KEY, RISK_CAPITAL_IDR,
-         RISK_CAPITAL_USD (sama seperti .env lokal, lihat .env.example)
-[ ] 4. Deploy pertama kali (Volume masih kosong) -- pastikan container hidup
-       & /api/auth/status merespons (schema kosong ter-buat otomatis lewat
-       init_db() level-modul di atas).
-[ ] 5. Fresh start (keputusan Giel 4 Agustus 2026) -- DB lokal lama TIDAK
-       diupload, tetap jadi data dev di mesin lokal. Volume Railway mulai
-       kosong, init_db() level-modul otomatis buat 30 tabel fresh.
-[ ] 6. ~~Tambah service KEDUA (cron)~~ -- TIDAK DIPAKAI. Lihat §8: Railway
-       Volume cuma bisa attach ke SATU service (dikonfirmasi dari docs
-       Railway sendiri, 4 Agustus 2026) -- service kedua akan punya Volume
-       terpisah = DB terpisah, melanggar aturan §3.2 "SATU DATABASE".
-       Gantinya: trigger manual via Telegram bot (§8).
-[ ] 7. Verifikasi: login dari browser publik, cek /m + PWA install dari HP
-       (start_url sudah /m, lihat ROADMAP.md 31 Jul 2026), cek Trigger
-       Berita dari Snapshot benar-benar mengisi data.
+         RISK_CAPITAL_USD (same as the local .env, see .env.example)
+[ ] 4. First deploy (Volume still empty) -- make sure the container is alive
+       & /api/auth/status responds (an empty schema is created automatically via
+       the module-level init_db() above).
+[ ] 5. Fresh start (Giel's decision, August 4, 2026) -- the old local DB is NOT
+       uploaded, it stays as dev data on the local machine. The Railway Volume starts
+       empty, the module-level init_db() automatically creates 30 fresh tables.
+[ ] 6. ~~Add a SECOND service (cron)~~ -- NOT USED. See §8: a Railway
+       Volume can only attach to ONE service (confirmed from Railway's own
+       docs, August 4, 2026) -- a second service would get a separate Volume
+       = a separate DB, violating the §3.2 "ONE DATABASE" rule.
+       Instead: manual trigger via the Telegram bot (§8).
+[ ] 7. Verify: log in from a public browser, check /m + PWA install from the phone
+       (start_url is already /m, see ROADMAP.md July 31, 2026), check that the News
+       Trigger from the Snapshot actually fills in data.
 ```
 
-### 7.4 Yang TIDAK dikerjakan di sesi ini
+### 7.4 What was NOT done in this session
 
-Migrasi Postgres (dianggap tidak perlu, §7.1). Upload DB lokal lama ke
-Railway (fresh start dipilih, §7.3 langkah 5). Cron via service Railway
-terpisah (tidak bisa krn constraint Volume, §8).
+Postgres migration (deemed unnecessary, §7.1). Uploading the old local DB to
+Railway (fresh start chosen instead, §7.3 step 5). Cron via a separate Railway
+service (not possible due to the Volume constraint, §8).
 
----
+## 8. DAILY CRON via TELEGRAM (not a second service, August 4, 2026)
 
-## 8. CRON HARIAN via TELEGRAM (bukan service kedua, 4 Agustus 2026)
+### 8.0 Why not a regular Railway Cron Job
 
-### 8.0 Kenapa bukan Railway Cron Job biasa
+The original plan in §7.3 step 7 (a second service dedicated to cron, custom start command
+`python -m pipeline.run_daily`, Railway Cron Schedule) **cannot be used**
+for this app: verified directly against Railway's docs during execution (August 4, 2026) --
+**one Volume can only attach to one service**. A second service would
+automatically need its own Volume (a separate, empty SQLite DB) -- that
+violates the hard rule §3.2 "ONE DATABASE, moving = moving everything", not
+merely duplicate data but 2 sources of truth silently diverging.
 
-Rencana awal §7.3 langkah 7 (service kedua khusus cron, custom start command
-`python -m pipeline.run_daily`, Railway Cron Schedule) **tidak bisa dipakai**
-utk app ini: dicek langsung ke docs Railway saat eksekusi (4 Agustus 2026) --
-**satu Volume cuma bisa attach ke satu service**. Service kedua akan
-otomatis butuh Volume-nya sendiri (DB SQLite terpisah, kosong) -- itu
-melanggar aturan keras §3.2 "SATU DATABASE, pindah = pindah semua", bukan
-sekadar duplikasi data tapi 2 sumber kebenaran yang diam-diam divergen.
+### 8.1 Solution: manual trigger via a Telegram bot (2-way, webhook, 3 commands)
 
-### 8.1 Solusi: trigger manual via bot Telegram (2 arah, webhook, 3 command)
+Instead of a Railway Cron Job (which needs a second service), the daily pipeline is triggered
+via a Telegram command that calls an endpoint on the SAME SERVICE (which
+already has the real Volume/DB) -- not a separate process, not long-polling.
+- **`POST /api/telegram/webhook`** (`web/app.py`) -- exempt from session
+  auth (Telegram calls it, not Giel's browser), but gated by 2 layers:
+  (1) the message's `chat_id` MUST be in the `TELEGRAM_CHAT_IDS` allowlist (plural,
+  comma-separated -- falls back to the single `TELEGRAM_CHAT_ID` if not yet set,
+  silently ignored if not on the list, no info leaked to an
+  unknown sender), (2) an optional secret token header
+  `X-Telegram-Bot-Api-Secret-Token` (if `TELEGRAM_WEBHOOK_SECRET`
+  is set) -- an extra defense beyond just chat_id.
+- **3 commands** (per Giel's spec "Telegram Bot Commands v1.0", August 5-6, 2026):
+  - `/start` -- list of commands.
+  - `/status` -- reads the latest `daily_market` (when run_daily last ran) +
+    the latest date for `asset_ohlcv`/`daily_news` EACH SEPARATELY (not
+    assumed to be in sync) + upcoming `econ_calendar` events + pending
+    `trade_signals` awaiting approval + SUGGESTED thread links waiting for review.
+  - `/run_daily` -> runs `run_daily_mod.run_daily()` in a **background
+    thread** (not directly in the handler) -- Telegram retries sending the update
+    if the webhook doesn't reply quickly, and `run_daily()` can take a while (fetching
+    all external sources). The handler replies with a quick ack ("⏳ run_daily
+    started..."), then sends a follow-up message (SAME format as `/status`)
+    once the process is actually done, reusing `notify/telegram.py::send_message()`.
+    Gated by a **lock file** (`$TMPDIR/kastara_run_daily.lock`, containing
+    PID+timestamp, stale after >30 minutes taken over -- prevents 2 concurrent runs,
+    SQLite single-writer §6.1) + a **5-minute rate limit** between triggers
+    (a separate file, prevents SEQUENTIAL spam-triggering right after the
+    previous run finishes).
+- **Other commands were DELIBERATELY not built** (`approve/reject signal`,
+  `backfill`, `settings/grader override`) -- per spec §1: those are operations
+  that need a gate/conscious ritual (anti-impulsivity, deliberate friction), not
+  idempotent pipeline operations like `run_daily`/`run_analysis` (well,
+  `run_analysis` also hasn't been built as a command -- marked "allowed" in
+  the spec but not among the 3 commands actually specified, so it hasn't
+  been implemented yet, can be added later if proven necessary).
+- **Why STILL webhook, not long-polling+systemd** (the original spec draft
+  wanted a separate VPS): Railway is ALREADY an always-on host -- that
+  prerequisite of the spec is already met. Long-polling+systemd would need a 2nd
+  process running continuously, which on Railway means a 2nd service -- hitting
+  the exact same Volume-only-1-service blocker that killed the cron-service
+  plan above (§8.0). A webhook on the same service avoids this problem
+  entirely.
 
-Daripada Railway Cron Job (butuh service kedua), pipeline harian di-trigger
-lewat command Telegram yang memanggil endpoint di SERVICE YANG SAMA (yang
-sudah punya Volume/DB asli) -- bukan proses terpisah, bukan long-polling.
-- **`POST /api/telegram/webhook`** (`web/app.py`) -- exempt dari session
-  auth (Telegram yang panggil, bukan browser Giel), tapi digerbangi 2 lapis:
-  (1) `chat_id` pesan HARUS masuk allowlist `TELEGRAM_CHAT_IDS` (jamak,
-  koma-pisah -- fallback ke `TELEGRAM_CHAT_ID` tunggal kalau blm di-set,
-  abaikan diam-diam kalau tidak masuk daftar, tidak bocorkan info ke
-  pengirim asing), (2) opsional secret token header
-  `X-Telegram-Bot-Api-Secret-Token` (kalau `TELEGRAM_WEBHOOK_SECRET`
-  diisi) -- pertahanan tambahan drpd cuma chat_id.
-- **3 command** (spec Giel "Telegram Bot Commands v1.0", 5-6 Agustus 2026):
-  - `/start` -- daftar command.
-  - `/status` -- baca `daily_market` terbaru (kapan run_daily terakhir) +
-    tanggal terbaru `asset_ohlcv`/`daily_news` MASING-MASING (bukan
-    diasumsikan sinkron) + event `econ_calendar` mendatang + sinyal
-    `trade_signals` pending approve + thread link SUGGESTED nunggu review.
-  - `/run_daily` -> jalankan `run_daily_mod.run_daily()` di **background
-    thread** (bukan langsung di handler) -- Telegram retry kirim update
-    kalau webhook tidak balas cepat, dan `run_daily()` bisa lama (fetch
-    semua sumber eksternal). Handler balas ack cepat ("⏳ run_daily
-    dimulai..."), baru kirim pesan susulan (format SAMA seperti `/status`)
-    setelah proses beneran selesai, reuse `notify/telegram.py::send_message()`.
-    Digerbangi **lock file** (`$TMPDIR/kastara_run_daily.lock`, isi
-    PID+timestamp, stale >30 menit diambil alih -- cegah 2 run bersamaan,
-    SQLite single-writer §6.1) + **rate limit 5 menit** antar-trigger
-    (file terpisah, cegah spam trigger BERURUTAN stlh run sebelumnya
-    selesai).
-- **Command lain SENGAJA tidak dibangun** (`approve/reject sinyal`,
-  `backfill`, `settings/grader override`) -- per spec §1: itu operasi yang
-  butuh gate/ritual sadar (anti-impulsif, friksi yang disengaja), bukan
-  operasi pipa idempoten seperti `run_daily`/`run_analysis` (well,
-  `run_analysis` juga belum dibangun sbg command -- ditandai "boleh" di
-  spec tapi tidak masuk 3 command yang benar2 dispesifikasikan, jadi belum
-  diimplementasikan, bisa ditambah nanti kalau terbukti perlu).
-- **Kenapa TETAP webhook, bukan long-polling+systemd** (draft awal spec
-  minta VPS terpisah): Railway SUDAH jadi host always-on -- prasyarat spec
-  itu sendiri sudah terpenuhi. Long-polling+systemd butuh proses ke-2 yang
-  jalan terus, yang di Railway berarti service ke-2 -- kena blocker Volume-
-  cuma-1-service yang SAMA PERSIS yang menggagalkan rencana cron-service
-  di atas (§8.0). Webhook di service yang sama menghindari masalah ini
-  sepenuhnya.
-
-### 8.2 Setup (aksi manual, butuh token/domain asli Giel)
+### 8.2 Setup (manual action, needs Giel's real token/domain)
 
 ```
-[ ] 1. Set env var di Railway (Settings -> Variables), sama seperti .env:
-       TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (sudah ada dari Daily Briefing
-       kalau sudah pernah setup lokal). Tambah juga:
-       TELEGRAM_WEBHOOK_SECRET=<string acak, rekomendasi tapi opsional>
-       TELEGRAM_CHAT_IDS=<opsional, koma-pisah kalau mau >1 chat_id boleh
-       trigger bot -- kalau kosong fallback ke TELEGRAM_CHAT_ID tunggal>
-[ ] 2. Setelah service live & domain publik ada (§7.3 langkah 4/7), daftar-
-       kan webhook ke Telegram SEKALI (dari mesin lokal, ganti <TOKEN>/
+[ ] 1. Set env vars on Railway (Settings -> Variables), same as .env:
+       TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (already there from the Daily Briefing
+       if set up locally before). Also add:
+       TELEGRAM_WEBHOOK_SECRET=<random string, recommended but optional>
+       TELEGRAM_CHAT_IDS=<optional, comma-separated if you want >1 chat_id able
+       to trigger the bot -- falls back to the single TELEGRAM_CHAT_ID if empty>
+[ ] 2. After the service is live & has a public domain (§7.3 step 4/7), register
+       the webhook with Telegram ONCE (from the local machine, replace <TOKEN>/
        <URL>/<SECRET>):
        curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
-         -d "url=https://<domain-railway-kamu>/api/telegram/webhook" \
-         -d "secret_token=<SECRET, sama dgn TELEGRAM_WEBHOOK_SECRET>"
-[ ] 3. Verifikasi: kirim "/run_daily" dari akun Telegram-mu ke bot -- balasan
-       ack harus muncul dalam hitungan detik, lalu ringkasan hasil beberapa
-       saat kemudian (durasi run_daily() beneran, network fetch semua sumber).
-[ ] 4. Cek `curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo` kalau
-       mau pastikan webhook ter-register benar (lihat field "url" & tidak
-       ada "last_error_message").
+         -d "url=https://<your-railway-domain>/api/telegram/webhook" \
+         -d "secret_token=<SECRET, same as TELEGRAM_WEBHOOK_SECRET>"
+[ ] 3. Verify: send "/run_daily" from your Telegram account to the bot -- an ack
+       reply should appear within seconds, then a result summary a
+       while later (the actual duration of run_daily(), fetching all sources over the network).
+[ ] 4. Check `curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo` if you
+       want to confirm the webhook is registered correctly (check the "url" field & that there's
+       no "last_error_message").
 ```
 
-### 8.3 Yang TIDAK dikerjakan
+### 8.3 What was NOT done
 
-Command Telegram lain selain `/run_daily`. Rate-limiting/anti-spam di
-endpoint webhook (dianggap tidak perlu -- gerbang chat_id sudah cukup ketat
-utk app single-user ini). Konfirmasi 2 langkah sebelum trigger (mis. "yakin?"
-sebelum run) -- `/run_daily` dianggap aman dipicu langsung, sama seperti
-tombol "Trigger Berita (Sekarang)" di Snapshot yang juga tanpa konfirmasi.
+Telegram commands other than `/run_daily`. Rate-limiting/anti-spam on the
+webhook endpoint (deemed unnecessary -- the chat_id gate is already strict enough
+for this single-user app). A 2-step confirmation before triggering (e.g. "are you sure?"
+before running) -- `/run_daily` is considered safe to trigger directly, same
+as the "Trigger News (Now)" button on the Snapshot, which also has no confirmation.
 
-## 9. PROMPT PERSONA DI RAILWAY (10 Agustus 2026)
+## 9. PERSONA PROMPTS ON RAILWAY (August 10, 2026)
 
-`prompts/persona_<lens>.txt` (Panel 4, 4 Analisa AI) sengaja gitignored
-(`prompts/README.md`) -- isinya cara berpikir/analisa Giel sendiri, sama
-prinsip dengan `.env`. Konsekuensinya: `git push` TIDAK PERNAH membawa
-file-file ini ke Railway. Kalau di-upload manual ke `prompts/` biasa
-(bukan di Volume), hilang lagi begitu deploy berikutnya -- filesystem app
-di luar Volume dibangun ULANG dari image tiap deploy, cuma Volume yang
-persisten (pelajaran yang sama dgn kenapa cron service kedua ditolak §8.0).
+`prompts/persona_<lens>.txt` (Panel 4, 4 AI Analyses) is deliberately gitignored
+(`prompts/README.md`) -- its content is Giel's own way of thinking/analyzing, the
+same principle as `.env`. Consequence: `git push` NEVER carries these
+files to Railway. If uploaded manually into the regular `prompts/`
+(not on the Volume), they disappear again on the next deploy -- the app's
+filesystem outside the Volume is rebuilt from the image on every deploy,
+only the Volume persists (the same lesson behind why the second cron service
+was rejected in §8.0).
 
-**Solusi**: `llm/persona_analysis.py` sekarang baca env var opsional
-`KASTARA_PROMPTS_DIR` -- kosong (default) = pakai `prompts/` di source
-tree seperti biasa (dev lokal, TIDAK berubah). Diisi = pakai folder itu,
-diarahkan ke Volume yang SAMA dgn `KASTARA_DB_PATH` supaya prompt
-bertahan lintas deploy.
+**Solution**: `llm/persona_analysis.py` now reads the optional env var
+`KASTARA_PROMPTS_DIR` -- empty (default) = use `prompts/` in the source
+tree as usual (local dev, UNCHANGED). Set = use that folder,
+pointed at the SAME Volume as `KASTARA_DB_PATH` so the prompts
+survive across deploys.
 
 ```
-[ ] 1. Set env var Railway: KASTARA_PROMPTS_DIR=/data/prompts
-       (ganti /data kalau mount path Volume-mu beda -- cek dari
-       KASTARA_DB_PATH yang sudah ada, biasanya folder yang sama)
-[ ] 2. Buat folder-nya dulu + upload 4 file prompt (SEKALI, dari mesin
-       lokal, jalan lewat railway ssh -- pola sama migrasi data
-       sebelumnya):
+[ ] 1. Set the Railway env var: KASTARA_PROMPTS_DIR=/data/prompts
+       (change /data if your Volume mount path differs -- check against
+       the existing KASTARA_DB_PATH, usually the same folder)
+[ ] 2. Create the folder first + upload the 4 prompt files (ONCE, from the
+       local machine, run via railway ssh -- same pattern as the earlier
+       data migration):
        railway ssh -- "mkdir -p /data/prompts"
        railway ssh -- "cat > /data/prompts/persona_gema.txt" < prompts/persona_gema.txt
        railway ssh -- "cat > /data/prompts/persona_leon.txt" < prompts/persona_leon.txt
        railway ssh -- "cat > /data/prompts/persona_akela.txt" < prompts/persona_akela.txt
        railway ssh -- "cat > /data/prompts/persona_rivan.txt" < prompts/persona_rivan.txt
-[ ] 3. Deploy staged env var change (Railway tidak auto-apply).
-[ ] 4. Verifikasi: GET /api/persona/status di Railway harus balikin
-       semua 4 lens true. Coba "Jalankan Analisa" beneran di Panel 4.
+[ ] 3. Deploy the staged env var change (Railway doesn't auto-apply).
+[ ] 4. Verify: GET /api/persona/status on Railway should return all 4 lenses
+       as true. Try actually running "Run Analysis" in Panel 4.
 ```
 
-Kalau nanti prompt di-edit di lokal, ulangi langkah 2 utk lens yang
-berubah (bukan proses otomatis -- personal & jarang berubah, tidak worth
-dibikin pipeline).
+If a prompt is edited locally later, repeat step 2 for the lens that
+changed (not an automated process -- it's personal & rarely changes, not worth
+turning into a pipeline).
 
 ---
 
-*Deployment & Mobile Access Strategy v1.0 — mulai dari Tahap 1, biarkan pemakaian nyata yang menentukan Tahap 3. Pakai dulu, bangun setelah tahu.*
-*§7 (Railway) ditambahkan 31 Jul 2026 sebagai override eksplisit Giel — lihat catatan transparansi di atas.*
-*§8 (Telegram cron trigger) ditambahkan 4 Agustus 2026 setelah deploy pertama Giel menemukan constraint Volume-per-service Railway di lapangan.*
-*§9 (Prompt persona di Volume) ditambahkan 10 Agustus 2026 -- Giel minta prompt yang sudah ditulis jadi aktif & ter-upload ke produksi.*
+*Deployment & Mobile Access Strategy v1.0 — start from Stage 1, let real usage determine Stage 3. Use it first, build after you know.*
+*§7 (Railway) added July 31, 2026 as Giel's explicit override — see the transparency note above.*
+*§8 (Telegram cron trigger) added August 4, 2026 after Giel's first deploy uncovered Railway's Volume-per-service constraint in practice.*
+*§9 (Persona prompts on Volume) added August 10, 2026 -- Giel asked for the already-written prompts to be made active & uploaded to production.*

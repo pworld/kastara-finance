@@ -215,7 +215,7 @@ const loadBankRatios = preserveScroll(async function loadBankRatios() {
   bankRatios.value = await get('/api/fundamentals/bank_ratios', { instrument })
 })
 
-// ---------- Riwayat Keputusan Intake ----------
+// ---------- Intake Decision History ----------
 const intakeLog = ref([])
 const loadingIntakeLog = ref(true)
 const loadIntakeLog = preserveScroll(async function loadIntakeLog() {
@@ -226,12 +226,12 @@ const loadIntakeLog = preserveScroll(async function loadIntakeLog() {
 onMounted(loadIntakeLog)
 
 function decisionSeverity(d) {
-  if (d === 'TOLAK') return 'HIGH'
+  if (d === 'REJECT') return 'HIGH'
   if (d === 'WATCHLIST') return 'MED'
   return 'LOW'
 }
 
-// ---------- Grader Log & Kalibrasi (Komponen D) ----------
+// ---------- Grader Log & Calibration (Component D) ----------
 const graderLog = ref([])
 const loadingGraderLog = ref(true)
 const loadGraderLog = preserveScroll(async function loadGraderLog() {
@@ -244,7 +244,7 @@ onMounted(loadGraderLog)
 async function saveOutcome(row, field, value) {
   if (!value) return
   await post(`/api/grader_log/${row.id}/outcome`, { [field]: value })
-  toast('Outcome tersimpan')
+  toast('Outcome saved')
   loadGraderLog()
 }
 
@@ -366,7 +366,7 @@ onMounted(loadHoldingConversions)
   <section>
     <h2>Universe — Saham Individual</h2>
     <div class="panel">
-      <p v-if="loadingUniverse" class="src">Memuat...</p>
+      <p v-if="loadingUniverse" class="src">Loading...</p>
       <DataTable
         v-else :rows="universe" :dataKey="'instrument'"
         :searchFields="['instrument', 'sector', 'market']"
@@ -483,12 +483,12 @@ onMounted(loadHoldingConversions)
       </div>
       <div class="form-row" style="margin-top:8px">
         <button class="btn small secondary" @click="saveBankRatios">Simpan Rasio Bank</button>
-        <button class="btn small secondary" @click="loadBankRatios">Lihat Riwayat Ticker Ini</button>
+        <button class="btn small secondary" @click="loadBankRatios">View History of This Ticker</button>
       </div>
       <div style="overflow-x:auto">
       <table style="margin-top:12px">
         <thead><tr><th>Kuartal</th><th>CAR</th><th>NPL</th><th>NIM</th><th>LDR</th><th>Sumber</th></tr></thead>
-        <tbody v-if="!bankRatios"><tr><td colspan="6" class="src">klik "Lihat Riwayat" utk tampilkan</td></tr></tbody>
+        <tbody v-if="!bankRatios"><tr><td colspan="6" class="src">Click "View History" to display</td></tr></tbody>
         <tbody v-else>
           <tr v-for="r in bankRatios" :key="r.quarter_end">
             <td class="src">{{ r.quarter_end }}</td><td>{{ r.car ?? '-' }}</td><td>{{ r.npl_gross ?? '-' }}</td>
@@ -715,16 +715,16 @@ onMounted(loadHoldingConversions)
   </section>
 
   <section>
-    <h2>Riwayat Keputusan Intake</h2>
+    <h2>Intake Decision History</h2>
     <div class="panel">
-      <p v-if="loadingIntakeLog" class="src">Memuat...</p>
-      <DataTable v-else :rows="intakeLog" :searchFields="['instrument', 'decision', 'reason']" emptyMessage="belum ada keputusan intake">
-        <Column field="decided_at" header="Tanggal" sortable><template #body="{ data }"><span class="src">{{ data.decided_at }}</span></template></Column>
+      <p v-if="loadingIntakeLog" class="src">Loading...</p>
+      <DataTable v-else :rows="intakeLog" :searchFields="['instrument', 'decision', 'reason']" emptyMessage="No intake decisions yet">
+        <Column field="decided_at" header="Date" sortable><template #body="{ data }"><span class="src">{{ data.decided_at }}</span></template></Column>
         <Column field="instrument" header="Ticker" sortable />
-        <Column field="decision" header="Keputusan" sortable>
+        <Column field="decision" header="Decision" sortable>
           <template #body="{ data }"><span class="badge" :class="decisionSeverity(data.decision)">{{ data.decision }}</span></template>
         </Column>
-        <Column field="reason" header="Alasan" />
+        <Column field="reason" header="Reason" />
       </DataTable>
     </div>
   </section>
@@ -732,13 +732,13 @@ onMounted(loadHoldingConversions)
 
   <template v-if="activeTab === 'log'">
   <section>
-    <h2>Riwayat Validasi Lane</h2>
+    <h2>Lane Validation History</h2>
     <div class="panel">
-      <p v-if="loadingLaneLog" class="src">Memuat...</p>
-      <DataTable v-else :rows="laneLog" :searchFields="['instrument', 'evidence']" emptyMessage="belum ada validasi lane">
-        <Column field="validated_at" header="Tanggal" sortable><template #body="{ data }"><span class="src">{{ data.validated_at }}</span></template></Column>
+      <p v-if="loadingLaneLog" class="src">Loading...</p>
+      <DataTable v-else :rows="laneLog" :searchFields="['instrument', 'evidence']" emptyMessage="No lane validations yet">
+        <Column field="validated_at" header="Date" sortable><template #body="{ data }"><span class="src">{{ data.validated_at }}</span></template></Column>
         <Column field="instrument" header="Ticker" sortable />
-        <Column header="Lane Lama → Baru">
+        <Column header="Old Lane → New Lane">
           <template #body="{ data }">
             <span class="src">{{ data.old_lane || '-' }} → </span>
             <span class="badge" :class="LANE_CLASS[data.new_lane] || 'lane-none'">{{ data.new_lane }}</span>
@@ -750,35 +750,35 @@ onMounted(loadHoldingConversions)
   </section>
 
   <section>
-    <h2>Riwayat Konversi Book</h2>
+    <h2>Book Conversion History</h2>
     <div class="panel">
-      <p class="src">Satu-satunya jalur ubah book (TRADE↔INVEST) -- alasan
-        wajib, dan `pnl_check` catat apakah posisi terverifikasi untung
-        atau tidak bisa diverifikasi saat konversi terjadi (§4.4).</p>
-      <p v-if="loadingHoldingConversions" class="src">Memuat...</p>
-      <DataTable v-else :rows="holdingConversions" :searchFields="['instrument', 'reason']" emptyMessage="belum ada konversi book">
-        <Column field="converted_at" header="Tanggal" sortable><template #body="{ data }"><span class="src">{{ data.converted_at }}</span></template></Column>
+      <p class="src">Only path to change book (TRADE↔INVEST) -- reason
+        required, and `pnl_check` records whether position P&amp;L was verified
+        or couldn't be verified when conversion occurred (§4.4).</p>
+      <p v-if="loadingHoldingConversions" class="src">Loading...</p>
+      <DataTable v-else :rows="holdingConversions" :searchFields="['instrument', 'reason']" emptyMessage="No book conversions yet">
+        <Column field="converted_at" header="Date" sortable><template #body="{ data }"><span class="src">{{ data.converted_at }}</span></template></Column>
         <Column field="instrument" header="Ticker" sortable />
-        <Column header="Book Lama → Baru">
+        <Column header="Old Book → New Book">
           <template #body="{ data }">
             <span class="src">{{ data.from_book }} → </span>
             <span class="badge" :class="LANE_CLASS[data.to_book] || 'lane-none'">{{ data.to_book }}</span>
           </template>
         </Column>
-        <Column field="reason" header="Alasan" />
-        <Column field="pnl_check" header="P&amp;L saat konversi"><template #body="{ data }"><span class="src">{{ data.pnl_check }}</span></template></Column>
+        <Column field="reason" header="Reason" />
+        <Column field="pnl_check" header="P&amp;L at conversion"><template #body="{ data }"><span class="src">{{ data.pnl_check }}</span></template></Column>
       </DataTable>
     </div>
   </section>
 
   <section>
-    <h2>Grader Log &amp; Kalibrasi (Komponen D)</h2>
+    <h2>Grader Log &amp; Calibration (Component D)</h2>
     <div class="panel">
-      <p class="src">Revisi bobot rubrik grader HANYA lewat log ini (bukan
-        per kasus) — widget "Nilai Outcome" utk grade yang sudah berumur
-        3/6 bulan, pola sama Skor Prediksi Panel 6.</p>
-      <p v-if="loadingGraderLog" class="src">Memuat...</p>
-      <DataTable v-else :rows="graderLog" :searchFields="['instrument', 'reason']" emptyMessage="belum ada grader log">
+      <p class="src">Revise grader rubric weights ONLY through this log (not
+        per case) — "Score Outcome" widget for grades that are 3/6 months
+        old, pattern same as Prediction Score on Panel 6.</p>
+      <p v-if="loadingGraderLog" class="src">Loading...</p>
+      <DataTable v-else :rows="graderLog" :searchFields="['instrument', 'reason']" emptyMessage="No grader log yet">
         <Column field="date" header="Tanggal" sortable><template #body="{ data }"><span class="src">{{ data.date }}</span></template></Column>
         <Column field="instrument" header="Ticker" sortable />
         <Column header="Grade Lama → Baru"><template #body="{ data }"><span class="src">{{ data.old_grade || '-' }} → {{ data.new_grade }}</span></template></Column>

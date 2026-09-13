@@ -1,155 +1,161 @@
 # Kastara Finance — Data Layer + Analysis Engine + Dashboard + Equity Expansion
 
-Personal finance/trading intelligence stack. **Mesin men-suggest, Giel
-memutuskan** — tidak ada execution/trading logic otomatis di mana pun.
+Personal finance/trading intelligence stack. **The engine suggests, Giel
+decides** — there is no automatic execution/trading logic anywhere.
 
-**Status per Juli 2026 (detail lengkap di [`docs/ROADMAP.md`](docs/ROADMAP.md)):**
-- **Phase A** ✅ — kumpulkan data mentah makro/berita ke SQLite lokal (no paid API).
-- **Phase B** ✅ — engine S&R + breakout/retest + R:R (BTC).
-- **Phase C** ✅ — dashboard **write-enabled**, sekarang **8 panel/tab**.
-- **Phase D** ✅ — forward layer (FedWatch/Dot Plot manual, COT + BTC ETF flow
-  otomatis, Policy Tracker, Disonansi Flag).
-- **Phase E** ✅ — Daily Briefing → Telegram (push satu arah, manual trigger).
-- **Phase F+** ✅ — engine direplikasi ke GOLD/IHSG/SP500/USDIDR/USDJPY, +
-  4 Analisa Persona (Panel 4, OpenRouter, shared-core + slice v4).
-- **Phase J+** 🔶 — **ekspansi ekuitas (saham individual)**, universe = **BBCA +
-  TSLA**. Build Contract v1.3 selesai di sisi kode (universe OHLCV, fundamentals,
-  bank ratios, earnings, foreign-flow per-saham, Emiten Grader, sizing engine
-  2.5% + buffer ARA/ARB, fraksi-harga zone calibration, lane-validation
-  sign-off, Tab 8 Universe & Grader). Sisa = keputusan manual Giel (bar-replay,
-  kalibrasi §13 final, prompt persona J-9) — bukan pekerjaan kode.
+**Status as of July 2026 (full detail in [`docs/ROADMAP.md`](docs/ROADMAP.md)):**
+- **Phase A** ✅ — collect raw macro/news data into a local SQLite DB (no paid API).
+- **Phase B** ✅ — S&R + breakout/retest + R:R engine (BTC).
+- **Phase C** ✅ — **write-enabled** dashboard, now **8 panels/tabs**.
+- **Phase D** ✅ — forward layer (manual FedWatch/Dot Plot, automatic COT +
+  BTC ETF flow, Policy Tracker, Dissonance Flag).
+- **Phase E** ✅ — Daily Briefing → Telegram (one-way push, manual trigger).
+- **Phase F+** ✅ — engine replicated to GOLD/IHSG/SP500/USDIDR/USDJPY, +
+  4 Persona Analyses (Panel 4, OpenRouter, shared-core + slice v4).
+- **Phase J+** 🔶 — **equity expansion (individual stocks)**, universe = **BBCA +
+  TSLA**. Build Contract v1.3 is done on the code side (universe OHLCV,
+  fundamentals, bank ratios, earnings, per-stock foreign flow, Emiten Grader,
+  sizing engine 2.5% + ARA/ARB buffer, price-fraction zone calibration,
+  lane-validation sign-off, Tab 8 Universe & Grader). What remains is Giel's own
+  manual decisions (bar-replay, final §13 calibration, J-9 persona prompt) — not
+  code work.
 
-> **Berikutnya:** migrasi frontend vanilla HTML/CSS/JS → **Vue 3 + Vite** (rencana
-> di [`docs/migrationFE.md`](docs/migrationFE.md)) supaya bisa menambah
-> login/sidebar/dll tanpa beban stack mentah. Backend/API tidak berubah.
+> **Next up:** migrate the frontend from vanilla HTML/CSS/JS → **Vue 3 + Vite**
+> (plan in [`docs/migrationFE.md`](docs/migrationFE.md)) so login/sidebar/etc.
+> can be added without the burden of the raw stack. Backend/API unchanged.
 
-> Scope Phase A dikunci di `plan.txt`. Execution plan Phase B-E
-> (`plan_b.txt`-`plan_e.txt`) dihapus setelah masing-masing selesai
-> dieksekusi — ringkasan hasilnya ada di `docs/ROADMAP.md`.
+> Phase A scope is locked in `plan.txt`. The Phase B-E execution plans
+> (`plan_b.txt`-`plan_e.txt`) were deleted once each was executed — their
+> summarized results live in `docs/ROADMAP.md`.
 
-Default password adalah 12345 gunakan untuk login
+Login uses `DASHBOARD_PASSWORD`, set by you in `.env` (see §Setup).
 
-📄 **Dokumen lengkap ada di [`docs/`](docs/):**
-[ARCHITECTURE.md](docs/ARCHITECTURE.md) (desain teknis & rationale),
-[FLOW.md](docs/FLOW.md) (alur data, diagram),
-[ROADMAP.md](docs/ROADMAP.md) (status tiap phase),
-[SOP.md](docs/SOP.md) (kapan buka panel apa + **cara baca tiap item panel**),
-[Master Plan.md](docs/Master%20Plan.md) (strategi, v1.6),
-[migrationFE.md](docs/migrationFE.md) (rencana migrasi FE → Vue).
+📄 **Full documentation lives in [`docs/`](docs/):**
+[ARCHITECTURE.md](docs/ARCHITECTURE.md) (technical design & rationale),
+[FLOW.md](docs/FLOW.md) (data flow, diagrams),
+[ROADMAP.md](docs/ROADMAP.md) (status per phase),
+[SOP.md](docs/SOP.md) (when to open which panel + **how to read each panel item**),
+[Master Plan.md](docs/Master%20Plan.md) (strategy, v1.6),
+[migrationFE.md](docs/migrationFE.md) (FE → Vue migration plan).
 
 ---
 
-## 1. Apa yang dikerjakan
+## 1. What this does
 
-- **SQLite** `kastara-finance.db` dengan **27 tabel** (`db/schema.sql`) — 11
-  tabel Phase A + 3 forward-layer (Phase D) + 7 ekuitas Phase J+
+- **SQLite** `kastara-finance.db` with **27 tables** (`db/schema.sql`) — 11
+  Phase A tables + 3 forward-layer (Phase D) + 7 equity Phase J+
   (`instrument_metadata`, `fundamentals_quarterly`, `earnings_calendar`,
   `sector_benchmark`, `emiten_grade`, `grader_log`, `intake_log`) + 1
   `lane_validation_log` (bar-replay sign-off) + 3 News Threads (Addendum B
   §20, N-1: `news_threads`, `news_thread_links`, `thread_relations`
   schema-only) + 2 Faceted Tagging (Addendum C §21, C-1: `tag_dictionary`,
-  `content_tags`; `daily_news` juga dapat 2 kolom baru lewat migrasi kolom —
-  `display_subtitle`, `for_reading`). `db/connection.py::EXPECTED_TABLES`
-  adalah daftar otoritatifnya.
-- **Scraper** modular (tiap source bisa jalan sendiri):
+  `content_tags`; `daily_news` also gets 2 new columns via a column
+  migration — `display_subtitle`, `for_reading`). `db/connection.py::EXPECTED_TABLES`
+  is the authoritative list.
+- **Modular scrapers** (each source can run standalone):
   - `scrapers/crypto.py` — CoinGecko + Binance + Alternative.me (BTC OHLCV,
-    dominance, funding, OI, Fear & Greed). *Binance ke-block? otomatis fallback
-    CoinGecko untuk OHLC.*
+    dominance, funding, OI, Fear & Greed). *Binance blocked? automatic fallback
+    to CoinGecko for OHLC.*
   - `scrapers/macro_yf.py` — yfinance (S&P 500, IHSG, Gold, USD/IDR, USD/JPY).
   - `scrapers/macro_fred.py` — FRED (DXY, US10Y, VIX, WALCL, RRP, TGA, HY spread).
-    Butuh `FRED_API_KEY`.
-  - `scrapers/news.py` — RSS (7 feed aktif: Fed FOMC, CNBC Finance/Economy/
-    Indonesia, Investing ID, ANTARA, Bisnis.com — daftar di
-    `scrapers/feeds_config.py`) + scoring rule-based HIGH/MED/LOW (bukan
-    AI). `check_feed_health()` per feed tiap run — feed mati kelihatan
-    langsung di `source_flags`/log, bukan backlog tersembunyi.
-  - `scrapers/econ_calendar.py` — ForexFactory (event ekonomi masa depan:
-    FOMC/CPI/dll), endpoint JSON gratis tidak resmi. Forecast/previous ikut
-    tersimpan; `actual` (hasil rilis) sumber ini tidak pernah menyediakan
-    kolom itu — diisi manual ATAU otomatis lewat pass kedua di bawah.
-  - `scrapers/investing_calendar.py` — pass KEDUA, HANYA importance HIGH
-    (bintang 3), isi `actual` yang tidak dipunyai ForexFactory. investing.com
-    via `curl_cffi` (Cloudflare, pola sama `idx_foreign_flow.py`) — TAPI jauh
-    lebih agresif rate-limit, jadi SENGAJA cuma 1x GET/run, dijadwalkan
-    terpisah dari `run_daily` lewat `pipeline/run_investing_actual.py`
-    (cron sore/malam sendiri, bukan ditambah ke cron pagi — lihat
-    [ROADMAP.md](docs/ROADMAP.md) soal kenapa "grab semua cron 2x" tidak
-    dipakai). Matching ke baris `econ_calendar` existing pakai fuzzy-match
-    nama event (`difflib`) + `country`/`event_date` window, SKIP kalau
-    ambigu — konservatif, tidak pernah menebak.
+    Needs `FRED_API_KEY`.
+  - `scrapers/news.py` — RSS (7 active feeds: Fed FOMC, CNBC Finance/Economy/
+    Indonesia, Investing ID, ANTARA, Bisnis.com — list in
+    `scrapers/feeds_config.py`) + rule-based HIGH/MED/LOW scoring (not
+    AI). `check_feed_health()` runs per feed every run — a dead feed shows up
+    immediately in `source_flags`/logs, instead of becoming a hidden backlog.
+  - `scrapers/econ_calendar.py` — ForexFactory (future economic events:
+    FOMC/CPI/etc.), free unofficial JSON endpoint. Forecast/previous are
+    stored; `actual` (release result) is never provided by this source —
+    filled manually OR automatically via the second pass below.
+  - `scrapers/investing_calendar.py` — SECOND pass, HIGH importance
+    (3-star) ONLY, fills in `actual` values ForexFactory doesn't have. Uses
+    `curl_cffi` against investing.com (Cloudflare, same pattern as
+    `idx_foreign_flow.py`) — BUT rate-limits much more aggressively, so it's
+    DELIBERATELY only 1 GET per run, scheduled separately from `run_daily`
+    via `pipeline/run_investing_actual.py` (its own evening/night cron,
+    not added to the morning cron — see [ROADMAP.md](docs/ROADMAP.md) for
+    why "grab everything twice per cron" wasn't used). Matches against
+    existing `econ_calendar` rows via fuzzy event-name matching (`difflib`)
+    + a `country`/`event_date` window, SKIPPING on ambiguity — conservative,
+    never guesses.
   - `scrapers/positioning.py` (Phase D) — COT report (CFTC Socrata API,
-    gratis tanpa key: BTC/DXY/GOLD/SP500 net-long spekulan) + BTC ETF net
-    flow (farside.co.uk, HTML scrape tak-resmi, butuh header browser-
-    realistis krn situs di belakang Cloudflare — lihat
+    free, no key needed: BTC/DXY/GOLD/SP500 speculator net-long) + BTC ETF net
+    flow (farside.co.uk, unofficial HTML scrape, needs realistic browser
+    headers since the site sits behind Cloudflare — see
     [ARCHITECTURE.md §6.11](docs/ARCHITECTURE.md#611-scraperspositioningpy--cloudflare-butuh-header-browser-realistis)).
-  - `scrapers/coinalyze.py` (Track B) — OI agregat lintas-exchange +
-    liquidation long/short 24h + long/short ratio (Coinalyze REST, free key).
-  - `scrapers/idx_foreign_flow.py` (Track C) — IHSG foreign flow level pasar
-    (F2F/F2D/D2F + net), idx.co.id via `curl_cffi` (Cloudflare TLS fingerprint).
-  - `scrapers/idx_stock_foreign_flow.py` (J-8) — foreign flow **per-saham**
-    (volume beli/jual/net asing) dari `TradingSummary/GetStockSummary`.
-  - `scrapers/idx_uma.py` (J-11) — cek flag integritas UMA (Unusual Market
-    Activity) per emiten, input Emiten Grader.
-  - `scrapers/equity_universe.py` (J-2) — OHLCV harian saham universe (yfinance
-    `.JK`/US) untuk instrumen di `instrument_metadata`.
-- **Pipeline** `pipeline/run_daily.py` — orchestrator harian, idempotent (UPSERT).
-  Sejak Addendum B N-1, sekalian panggil `web.writes.suggest_thread_links()`
-  setelah ingest berita (auto-suggest News Threads, rule-based, SELALU cuma
-  SUGGESTED — lihat [ROADMAP.md](docs/ROADMAP.md)).
-- **Pipeline (sore/malam, terpisah)** `pipeline/run_investing_actual.py` —
-  cron KEDUA, isi `actual` HIGH-importance dari investing.com (lihat
-  `scrapers/investing_calendar.py`). Belum ada di crontab — jalankan manual
-  atau tambah baris cron sendiri (contoh: `0 21 * * *`, WIB).
-- **Backfill** `pipeline/backfill.py` — tarik data historis (BTC/macro), preview-before-commit.
-- **Manual article** `pipeline/add_article.py` — isi `manual_articles` untuk riset
-  historis (RSS tidak bisa backfill — lihat [Artikel manual](#artikel-manual-riset-historis)).
-- **Indikator Phase A** `indicators/calc.py` — `net_liquidity`, `volume_ma20`.
-- **Analysis engine** (`analysis/`, generic sejak Phase B), aktif utk
+  - `scrapers/coinalyze.py` (Track B) — cross-exchange aggregate OI +
+    24h long/short liquidation + long/short ratio (Coinalyze REST, free key).
+  - `scrapers/idx_foreign_flow.py` (Track C) — market-level IHSG foreign flow
+    (F2F/F2D/D2F + net), via idx.co.id using `curl_cffi` (Cloudflare TLS fingerprint).
+  - `scrapers/idx_stock_foreign_flow.py` (J-8) — **per-stock** foreign flow
+    (buy/sell/net foreign volume) from `TradingSummary/GetStockSummary`.
+  - `scrapers/idx_uma.py` (J-11) — checks UMA (Unusual Market
+    Activity) integrity flags per ticker, feeds into the Emiten Grader.
+  - `scrapers/equity_universe.py` (J-2) — daily OHLCV for universe stocks
+    (yfinance `.JK`/US) for instruments in `instrument_metadata`.
+- **Pipeline** `pipeline/run_daily.py` — daily orchestrator, idempotent (UPSERT).
+  Since Addendum B N-1, it also calls `web.writes.suggest_thread_links()`
+  right after ingesting news (rule-based News Threads auto-suggest, ALWAYS
+  SUGGESTED-only — see [ROADMAP.md](docs/ROADMAP.md)).
+- **Pipeline (evening/night, separate)** `pipeline/run_investing_actual.py` —
+  SECOND cron, fills in HIGH-importance `actual` values from investing.com
+  (see `scrapers/investing_calendar.py`). Not in crontab yet — run manually
+  or add your own cron line (e.g. `0 21 * * *`, WIB).
+- **Backfill** `pipeline/backfill.py` — pulls historical data (BTC/macro), preview-before-commit.
+- **Manual article** `pipeline/add_article.py` — fills `manual_articles` for
+  historical research (RSS can't backfill — see [Manual article](#manual-article-historical-research)).
+- **Phase A indicators** `indicators/calc.py` — `net_liquidity`, `volume_ma20`.
+- **Analysis engine** (`analysis/`, generic since Phase B), active for
   **BTC/GOLD/IHSG/SP500/USDIDR/USDJPY** (Phase F+ expansion):
-  - `analysis/sr_zones.py` — deteksi zona support/resistance (swing
+  - `analysis/sr_zones.py` — support/resistance zone detection (swing
     high/low + clustering + touch count).
-  - `analysis/signals.py` — deteksi breakout/retest + R:R calculator.
-  - `pipeline/run_analysis.py` — orchestrator, tulis ke `sr_zones` +
-    `trade_signals`. **Suggestion only** — `approved` selalu 0 dari kode.
-    Tanpa `--instrument`, proses ke-6 instrument sekaligus.
-  - `tools/review_signal.py` — CLI approve/reject sinyal by id eksplisit.
-  - `pipeline/seed_context_weight.py` — seed pembobotan driver per aset
-    (persis contoh Master Plan §4.3, mis. GOLD: real_yield/dxy/geopolitik).
+  - `analysis/signals.py` — breakout/retest detection + R:R calculator.
+  - `pipeline/run_analysis.py` — orchestrator, writes to `sr_zones` +
+    `trade_signals`. **Suggestion only** — `approved` is always 0 from the code.
+    Without `--instrument`, processes all 6 instruments at once.
+  - `tools/review_signal.py` — CLI to approve/reject a signal by explicit id.
+  - `pipeline/seed_context_weight.py` — seeds per-asset driver weighting
+    (exactly the Master Plan §4.3 example, e.g. GOLD: real_yield/dxy/geopolitics).
 - **Telegram Daily Briefing Phase E** (`notify/`, `pipeline/`):
-  - `notify/telegram.py` — `send_message()` (push satu arah, bukan bot
-    dua-arah) + `get_latest_chat_id()` (helper setup sekali pakai).
-  - `pipeline/compose_briefing.py` — rakit teks briefing dari data yang
-    SUDAH kamu isi manual (4 lensa, sinyal approved) — tidak generate
-    apa pun sendiri.
-  - `pipeline/send_briefing.py` — CLI, dipicu manual (lihat
-    [Daily Briefing](#daily-briefing-ke-telegram-phase-e)).
-- **Ekspansi ekuitas Phase J+** (saham individual, universe **BBCA + TSLA** —
-  Build Contract v1.3, detail per J-step di `docs/ROADMAP.md`):
-  - `analysis/grader.py` — Emiten Grader dua-sumbu (fund_score × integrity
-    flags → kuadran INVESTABLE/WATCH/SPECULATIVE/AVOID), log ke `emiten_grade`/
+  - `notify/telegram.py` — `send_message()` (one-way push, not a two-way
+    bot) + `get_latest_chat_id()` (one-time setup helper).
+  - `pipeline/compose_briefing.py` — assembles the briefing text from data
+    you've ALREADY filled in manually (4 lenses, approved signals) — it
+    doesn't generate anything itself.
+  - `pipeline/send_briefing.py` — CLI, manually triggered (see
+    [Daily Briefing to Telegram](#daily-briefing-to-telegram-phase-e)).
+- **Equity expansion Phase J+** (individual stocks, universe **BBCA + TSLA** —
+  Build Contract v1.3, per-J-step detail in `docs/ROADMAP.md`):
+  - `analysis/grader.py` — two-axis Emiten Grader (fund_score × integrity
+    flags → INVESTABLE/WATCH/SPECULATIVE/AVOID quadrant), logs to `emiten_grade`/
     `grader_log`.
-  - `analysis/sizing.py` — position sizing MAX_RISK 2.5% (locked), kuantisasi
-    lot pembulatan-bawah, skip `RISK_CAPACITY_EXCEEDED` (tanpa geser SL), buffer
-    **ARA/ARB 1.5×** (§18, locked) via `has_daily_limit`.
-  - `analysis/calibration.py` — toleransi zona S&R per-market dari **fraksi
-    harga IDX** resmi (Peraturan No. II-A BEI); dipakai `run_analysis` khusus
-    instrumen `market='IDX'` (**DRAFT** pending validasi bar-replay Giel, §13.1).
-  - `pipeline/backfill_fundamentals.py` — fundamentals kuartalan (yfinance);
-    rasio bank CAR/NPL/NIM/LDR diisi **manual** (Panel 8), tak tertimpa scraper.
-  - `web/writes.py::validate_lane()` — satu-satunya jalur yang mengisi
-    `lane_validated_at` / menaikkan lane ke TRADE, murni manual (bar-replay
-    sign-off), log ke `lane_validation_log`.
-  - Tab 8 **Universe & Grader** (Panel 8) — intake kandidat, uji kelayakan,
-    detail emiten + override kuadran, rasio bank, validasi lane, grader log.
+  - `analysis/sizing.py` — position sizing, MAX_RISK 2.5% (locked), round-down
+    lot quantization, `RISK_CAPACITY_EXCEEDED` skip (without moving the SL), **1.5×
+    ARA/ARB buffer** (§18, locked) via `has_daily_limit`.
+  - `analysis/calibration.py` — per-market S&R zone tolerance derived from the
+    official **IDX price fraction** (BEI Regulation No. II-A); used by
+    `run_analysis` specifically for `market='IDX'` instruments (**DRAFT**
+    pending Giel's bar-replay validation, §13.1).
+  - `pipeline/backfill_fundamentals.py` — quarterly fundamentals (yfinance);
+    bank ratios CAR/NPL/NIM/LDR are filled **manually** (Panel 8), never
+    overwritten by the scraper.
+  - `web/writes.py::validate_lane()` — the ONLY path that can set
+    `lane_validated_at` / promote a lane to TRADE, purely manual (bar-replay
+    sign-off), logged to `lane_validation_log`.
+  - Tab 8 **Universe & Grader** (Panel 8) — candidate intake, eligibility
+    check, ticker detail + quadrant override, bank ratios, lane validation,
+    grader log.
 
-Semua scraper **tahan API-fail**: kalau satu source mati, ditandai `fail` di
-`source_flags` dan pipeline tetap lanjut (tidak crash, tidak silent).
+Every scraper is **API-failure resistant**: if one source goes down, it's
+flagged `fail` in `source_flags` and the pipeline keeps going (no crash, no
+silent failure).
 
 ---
 
 ## 2. Setup
 
-Butuh Python 3.11+.
+Needs Python 3.11+.
 
 ```bash
 # 1. virtualenv
@@ -159,346 +165,351 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 # 2. dependencies
 pip install -r requirements.txt
 
-# 3. konfigurasi (opsional, hanya untuk FRED & Telegram)
+# 3. configuration (optional, only needed for FRED & Telegram)
 cp .env.example .env
-# edit .env, isi FRED_API_KEY (gratis: https://fred.stlouisfed.org/docs/api/api_key.html)
+# edit .env, fill in FRED_API_KEY (free: https://fred.stlouisfed.org/docs/api/api_key.html)
 ```
 
-FRED opsional — tanpa key, series FRED akan di-`skip` (bukan error), sisanya
-tetap jalan.
+FRED is optional — without a key, FRED series are `skip`ped (not an error),
+everything else keeps running.
 
-**Setup Telegram (opsional, untuk Daily Briefing Phase E):**
-1. Chat ke `@BotFather` di Telegram, kirim `/newbot`, ikuti instruksi -> dapat `TELEGRAM_BOT_TOKEN`.
-2. Kirim 1 pesan apa saja (mis. `/start`) ke bot barumu dari akun Telegram-mu sendiri.
-3. `python -m notify.telegram` -> print `chat_id` dari update terakhir.
-4. Isi `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_CHAT_ID` di `.env`.
+**Telegram setup (optional, for Daily Briefing Phase E):**
+1. Message `@BotFather` on Telegram, send `/newbot`, follow the prompts -> get a `TELEGRAM_BOT_TOKEN`.
+2. Send any message (e.g. `/start`) to your new bot from your own Telegram account.
+3. `python -m notify.telegram` -> prints the `chat_id` from the latest update.
+4. Fill in `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `.env`.
 
-Tanpa setup ini, tombol "Kirim ke Telegram" / `pipeline.send_briefing` tetap
-menampilkan teks briefing-nya, cuma `sent: false` (tidak benar-benar terkirim).
+Without this setup, the "Send to Telegram" button / `pipeline.send_briefing`
+still displays the briefing text, just with `sent: false` (not actually sent).
 
-**Setup OpenRouter (opsional, untuk Panel 4 "4 Analisa (AI)"):**
-1. Daftar di https://openrouter.ai, generate API key.
-2. Isi `OPENROUTER_API_KEY` (dan opsional `OPENROUTER_MODEL`, default
-   `anthropic/claude-sonnet-5` — cek model id yang masih aktif di
-   https://openrouter.ai/models, model lama sering di-deprecate) di `.env`.
-3. Tulis system prompt tiap persona di `prompts/persona_<gema|leon|akela|rivan>.txt`
-   (lihat `prompts/README.md`) — file ini TIDAK dibuat otomatis & TIDAK
-   di-commit. Tanpa ini, tombol "Jalankan Analisa" akan kasih tahu di UI
-   kalau prompt-nya belum diisi.
+**OpenRouter setup (optional, for Panel 4 "4 Analyses (AI)"):**
+1. Sign up at https://openrouter.ai, generate an API key.
+2. Fill in `OPENROUTER_API_KEY` (and optionally `OPENROUTER_MODEL`, default
+   `anthropic/claude-sonnet-5` — check which model ids are still active at
+   https://openrouter.ai/models, older models get deprecated often) in `.env`.
+3. Write each persona's system prompt in `prompts/persona_<gema|leon|akela|rivan>.txt`
+   (see `prompts/README.md`) — these files are NOT created automatically and are
+   NOT committed. Without this, the "Run Analysis" button will tell you in
+   the UI that the prompt hasn't been filled in yet.
 
-**Setup Coinalyze (opsional, untuk Panel 1 OI agregat/liquidation/L-S ratio):**
-1. Daftar gratis di https://coinalyze.net, generate API key.
-2. Isi `COINALYZE_API_KEY` di `.env`.
+**Coinalyze setup (optional, for Panel 1 aggregate OI/liquidation/L-S ratio):**
+1. Sign up for free at https://coinalyze.net, generate an API key.
+2. Fill in `COINALYZE_API_KEY` in `.env`.
 
-Tanpa ini, 4 field baru (OI Agregat, Long/Short Ratio, Liquidation Long/Short 24h)
-di kategori "Crypto (BTC)" Panel 1 tetap `n/a` (di-`skip`, bukan error) — sisanya
-tetap jalan seperti biasa.
+Without this, the 4 new fields (Aggregate OI, Long/Short Ratio, 24h Long/Short
+Liquidation) in Panel 1's "Crypto (BTC)" category stay `n/a` (`skip`ped, not an
+error) — everything else keeps working as normal.
 
-**IHSG Foreign Flow (Panel 3 Positioning) — otomatis, TANPA setup:** sumbernya
-idx.co.id (bukan API resmi publik), tidak butuh API key. Satu catatan teknis:
-scraper-nya (`scrapers/idx_foreign_flow.py`) pakai `curl_cffi` (bukan `requests`
-biasa) karena idx.co.id di belakang Cloudflare bot-management yang mendeteksi
-TLS fingerprint Python — kalau field ini kosong terus di Panel 3, cek dulu apa
-`curl_cffi` ke-install (`pip show curl_cffi`) sebelum curiga API-nya berubah.
+**IHSG Foreign Flow (Panel 3 Positioning) — automatic, NO setup needed:** the
+source is idx.co.id (not a public official API), no API key required. One
+technical note: the scraper (`scrapers/idx_foreign_flow.py`) uses `curl_cffi`
+(not plain `requests`) because idx.co.id sits behind Cloudflare bot-management
+that detects Python's TLS fingerprint — if this field stays empty in Panel 3,
+check that `curl_cffi` is installed (`pip show curl_cffi`) before suspecting
+the API itself changed.
 
 ---
 
-## 3. Cara pakai
+## 3. Usage
 
-### Inisialisasi DB (otomatis dipanggil pipeline, tapi bisa manual)
+### DB initialization (called automatically by the pipeline, but can be run manually)
 ```bash
 python -m db.connection
-# -> bikin kastara-finance.db + 27 tabel
+# -> creates kastara-finance.db + 27 tables
 ```
 
-### Jalankan pipeline harian
+### Run the daily pipeline
 ```bash
-python -m pipeline.run_daily              # tanggal hari ini (WIB)
-python -m pipeline.run_daily 2026-06-24   # tanggal tertentu
-python -m pipeline.run_investing_actual   # Evening Cron
+python -m pipeline.run_daily              # today's date (WIB)
+python -m pipeline.run_daily 2026-06-24   # a specific date
+python -m pipeline.run_investing_actual   # Evening cron
 ```
-Idempotent — aman dijalankan berkali-kali untuk tanggal sama (UPSERT, bukan
-duplikat). Akhir run mencetak ringkasan `source ok / fail / skip` per API.
+Idempotent — safe to run multiple times for the same date (UPSERT, not
+duplicated). Prints a `source ok / fail / skip` summary per API at the end of
+each run.
 
-### Backfill data historis (preview dulu, baru commit)
+### Backfill historical data (preview first, then commit)
 ```bash
 python -m pipeline.backfill --instrument BTC   --from 2025-01-01 --to 2025-06-01
 python -m pipeline.backfill --instrument SP500 --from 2025-01-01 --to 2025-06-01
-python -m pipeline.backfill --instrument DXY   --from 2025-01-01 --to 2025-06-01  # butuh FRED_API_KEY
-python -m pipeline.backfill --instrument BTC   --from 2025-01-01 --to 2025-06-01 --yes  # skip konfirmasi
+python -m pipeline.backfill --instrument DXY   --from 2025-01-01 --to 2025-06-01  # needs FRED_API_KEY
+python -m pipeline.backfill --instrument BTC   --from 2025-01-01 --to 2025-06-01 --yes  # skip confirmation
 ```
-Instrument yang didukung:
+Supported instruments:
 - yfinance / asset_ohlcv: `BTC` `SP500` `IHSG` `GOLD` `USDIDR` `USDJPY`
 - FRED / daily_market: `DXY` `US10Y` `VIX` `WALCL` `RRP` `TGA` `HY`
 
-Backfill selalu menampilkan **preview** (berapa baris baru, berapa duplikat
-di-skip) dan minta konfirmasi `[y/N]` sebelum menulis.
+Backfill always shows a **preview** (how many new rows, how many duplicates
+skipped) and asks for `[y/N]` confirmation before writing.
 
-Backfill itu bootstrap **sekali**, bukan job berulang — jangan taruh di cron
-yang sama dengan `run_daily`. Aman dipanggil back-to-back untuk banyak
-instrument sekaligus (yfinance/FRED balikin seluruh rentang tanggal dalam
-1 request, jumlah request tidak berubah walau rentang tahunnya lebih jauh,
-mis. dari 2010 vs dari 2021).
+Backfill is a **one-time** bootstrap, not a recurring job — don't put it in
+the same cron as `run_daily`. Safe to call back-to-back for many instruments
+at once (yfinance/FRED return the whole date range in 1 request, the request
+count doesn't change however far back the range goes, e.g. from 2010 vs from 2021).
 
-### Artikel manual (riset historis)
+### Manual articles (historical research)
 
-RSS (`scrapers/news.py`) cuma nampilin berita **terkini** — tidak ada cara
-narik headline lama (mis. dari 2010) dari RSS, itu keterbatasan struktural
-sumbernya, bukan sesuatu yang bisa di-backfill. Untuk riset historis, isi
-`manual_articles` manual:
+RSS (`scrapers/news.py`) only shows **current** news — there's no way to pull
+old headlines (e.g. from 2010) from RSS, that's a structural limitation of the
+source, not something that can be backfilled. For historical research, fill
+`manual_articles` manually:
 
 ```bash
-# Tambah artikel yang kamu temukan/kurasi sendiri
+# Add an article you found/curated yourself
 python -m pipeline.add_article add --date 2015-06-19 --source CNBC \
     --url "https://..." --headline "Fed hints at rate hike" \
-    --notes "Titik balik penting buat DXY tahun itu" \
+    --notes "An important turning point for DXY that year" \
     --tags fed,rate,dxy --key-event
 
-# Cari lagi buat riset nanti
+# Search it again for later research
 python -m pipeline.add_article list --tag dxy
 python -m pipeline.add_article list --from 2015-01-01 --to 2015-12-31
 python -m pipeline.add_article list --search "rate hike"
 ```
-Kalau URL yang sama sudah pernah ditambah, tool cuma **kasih tahu** (bukan
-blok) lalu minta konfirmasi — re-visit artikel yang sama dengan catatan baru
-itu valid.
+If the same URL was already added before, the tool just **tells you** (doesn't
+block) and asks for confirmation — revisiting the same article with a new note
+is a valid use case.
 
-### Analysis engine (S&R + breakout/retest, 6 instrument sejak Phase F+)
+### Analysis engine (S&R + breakout/retest, 6 instruments since Phase F+)
 
 ```bash
-# Jalankan deteksi zona S&R + sinyal breakout/retest untuk SEMUA instrument
+# Run S&R zone detection + breakout/retest signal detection for ALL instruments
 # (BTC, GOLD, IHSG, SP500, USDIDR, USDJPY)
 python -m pipeline.run_analysis
 
-# Atau 1 instrument saja
+# Or a single instrument
 python -m pipeline.run_analysis --instrument GOLD
 ```
-Idempotent (re-run tidak duplikat zona/sinyal, tidak menimpa
-`validated`/`notes` yang sudah direview manual). **Manual trigger**
-untuk sekarang, belum di-cron (lokal cuma dev).
+Idempotent (re-running doesn't duplicate zones/signals, doesn't overwrite
+manually-reviewed `validated`/`notes`). **Manual trigger** for now, not yet
+cron'd (local is dev-only for now).
 
 ```bash
-# Review sinyal (WAJIB by id eksplisit — tidak ada mode approve-semua)
+# Review a signal (id MUST be given explicitly — no approve-all mode)
 python -m tools.review_signal list
 python -m tools.review_signal list --instrument BTC --valid-only
-python -m tools.review_signal approve --id 42 --notes "setup bagus, volume kuat"
-python -m tools.review_signal reject  --id 42 --notes "DXY breakout barengan, skip"
+python -m tools.review_signal approve --id 42 --notes "good setup, strong volume"
+python -m tools.review_signal reject  --id 42 --notes "DXY breakout at the same time, skip"
 
-# Seed pembobotan driver per aset (sekali, idempotent)
+# Seed per-asset driver weighting (once, idempotent)
 python -m pipeline.seed_context_weight
 ```
 
-Semua sinyal dari `run_analysis` **suggestion only** — `approved`
-selalu 0 dari kode, cuma berubah lewat `review_signal approve`. Tidak ada
-execution/trading logic di mana pun.
+Every signal from `run_analysis` is **suggestion only** — `approved`
+is always 0 from the code, and only changes via `review_signal approve`.
+There is no execution/trading logic anywhere.
 
-### Dashboard web (8 panel, write-enabled sejak Phase C)
+### Web dashboard (8 panels, write-enabled since Phase C)
 ```bash
 python -m web.app
-# buka http://127.0.0.1:5000
+# open http://127.0.0.1:5000
 ```
-Navigasi 9 tab: **1 Snapshot** (cards +
-source_flags + form Manual Backfill preview→confirm), **2 News** (list +
-filter impact + tandai for Reading + chip saran News Threads (multi-link,
-konfirmasi/tolak/tautkan manual) + tag facet command-palette (Addendum C §21,
-filter AND/OR, "Kirim ke Lensa →" feed manual ke persona) + display_subtitle
-inline-edit + ringkasan RSS collapsible (Addendum D §22 D-1, apa adanya dari
-feed, bukan AI) + Add Manual Article), **3 Forward**
-(Economic Calendar data asli + forecast/previous/actual otomatis/manual,
-Earnings Emiten + warning posisi terbuka, Expectations manual FedWatch/Dot
-Plot, Positioning COT+ETF otomatis & SBN manual, Policy Tracker manual,
-Disonansi Flag rule-based), **4 Reading**
-(4 lensa GEMA/LEON/AKELA/RIVAN via OpenRouter + External AI Check manual +
-Conflict Notes), **5 Chart** (candlestick + S&R zone overlay + marker
-breakout/retest + Approve/Reject sinyal + MA50/100/200 + filter rentang +
-badge lane), **6 Synthesis** (textarea + outlook instrumen + Trading Journal +
-position sizing + Prediction Log + skor prediksi + Daily Briefing), **7
-Riwayat** (arsip synthesis/prediksi/jurnal/lensa, sub-tab), **8 Universe &
-Grader** (Phase J+: universe saham, intake kandidat, uji kelayakan + grade,
-detail emiten + override kuadran, rasio bank manual, validasi lane bar-replay,
-grader log), **9 Settings** (Addendum C §21.11, kurasi lambat/reflektif: Tab
-Tags -- buat/edit description/facet, hapus, gabung tag duplikat, tag yatim;
-Tab Threads -- eks halaman indeks `/threads` DIPINDAH ke sini 17 Jul 2026
-(redundan setelah Settings ada): buat thread baru, inline-edit title/status/
-bacaan-terkini/keywords, Dialog "Kelola" utk verdict/persona_tags/facet tags,
-komposisi stance, umur, N/7 ACTIVE, tombol "Timeline" ke `/threads/:id` --
-halaman timeline itu SENDIRI TIDAK ada di nav, cuma dituju dari sini/chip News).
-Panel 1–6 = ritme
-harian TRADE lane; Panel 8 = ritme mingguan/kuartalan INVEST lane; Settings =
-sesekali/kuartalan (lihat [SOP.md](docs/SOP.md)).
+9 tabs: **1 Snapshot** (cards +
+source_flags + Manual Backfill preview→confirm form), **2 News** (list +
+impact filter + mark for Reading + News Threads suggestion chips (multi-link,
+confirm/reject/manual-link) + facet tag command-palette (Addendum C §21,
+AND/OR filter, "Send to Lens →" feeds a manual article to a persona) +
+display_subtitle inline-edit + collapsible RSS summary (Addendum D §22 D-1,
+as-is from the feed, not AI) + Add Manual Article), **3 Forward**
+(real Economic Calendar data + automatic/manual forecast/previous/actual,
+Earnings Emiten + open-position warning, manual FedWatch/Dot
+Plot Expectations, automatic COT+ETF Positioning & manual SBN, manual Policy
+Tracker, rule-based Dissonance Flag), **4 Reading**
+(4 lenses GEMA/LEON/AKELA/RIVAN via OpenRouter + manual External AI Check +
+Conflict Notes), **5 Chart** (candlestick + S&R zone overlay + breakout/retest
+marker + signal Approve/Reject + MA50/100/200 + range filter +
+lane badge), **6 Synthesis** (textarea + instrument outlook + Trading Journal +
+position sizing + Prediction Log + prediction scoring + Daily Briefing), **7
+History** (synthesis/prediction/journal/lens archive, sub-tabs), **8 Universe &
+Grader** (Phase J+: stock universe, candidate intake, eligibility check + grade,
+ticker detail + quadrant override, manual bank ratios, bar-replay lane validation,
+grader log), **9 Settings** (Addendum C §21.11, slow/reflective curation: Tags
+tab -- create/edit description/facet, delete, merge duplicate tags, orphan
+tags; Threads tab -- the old `/threads` index page was MOVED here on 17 Jul
+2026 (redundant once Settings existed): create a new thread, inline-edit
+title/status/current-read/keywords, "Manage" dialog for verdict/persona_tags/
+facet tags, stance composition, age, N/7 ACTIVE, "Timeline" button to
+`/threads/:id` — that timeline page itself is NOT in the nav, only reached
+from here or a News chip).
+Panels 1–6 = the TRADE lane's daily rhythm; Panel 8 = the INVEST lane's
+weekly/quarterly rhythm; Settings = occasional/quarterly (see
+[SOP.md](docs/SOP.md)).
 
-**Login session-based** (`DASHBOARD_PASSWORD` di `.env`, lihat §Setup —
-sejak Fase 3 migrasi Vue, BUKAN lagi tanpa autentikasi). **Tidak ada
-pemanggilan AI/LLM otomatis di mana pun** — "External AI Check" di Panel 4
-itu kolom paste manual (kamu banding hasil tool lain sendiri), bukan Kastara
-yang manggil AI. Auto-suggest News Threads & validasi tag juga rule-based
-(keyword match / tata bahasa), BUKAN AI.
+**Session-based login** (`DASHBOARD_PASSWORD` in `.env`, see §Setup —
+since the Fase 3 Vue migration, NO LONGER unauthenticated). **No
+automatic AI/LLM calls anywhere** — the "External AI Check" in Panel 4
+is a manual paste field (you compare another tool's output yourself), Kastara
+never calls an AI for it. News Threads auto-suggest & tag validation are also
+rule-based (keyword matching / grammar rules), NOT AI.
 
-API: **82 endpoint `/api/*`** (42 GET + 40 POST), semuanya `jsonify(...)` —
-`/` menyajikan build Vue (`web/frontend/dist/`), semua data client-side
-fetch. Read-only Phase 1 (`/api/latest`, `/api/daily_market`,
-`/api/asset_ohlcv`, `/api/news`, `/api/assets`, `/api/health`) tidak
-berubah. Grup lain: Phase C write
+API: **82 `/api/*` endpoints** (42 GET + 40 POST), all `jsonify(...)` —
+`/` serves the Vue build (`web/frontend/dist/`), all data is fetched
+client-side. Read-only Phase 1 (`/api/latest`, `/api/daily_market`,
+`/api/asset_ohlcv`, `/api/news`, `/api/assets`, `/api/health`) is
+unchanged. Other groups: Phase C writes
 (`/api/backfill/*`, `/api/reading/save`, `/api/signals/review`,
 `/api/synthesis/save`, `/api/journal/add`, `/api/prediction/*`), Phase D
 (`/api/expectations`, `/api/positioning`, `/api/disonansi`), Phase E
-(`/api/briefing/send`), Persona (`/api/persona/{run,status}`, `run` terima
-`news_ids` opsional -- feed manual §21.4), Phase J+
+(`/api/briefing/send`), Persona (`/api/persona/{run,status}`, `run` accepts
+an optional `news_ids` -- manual feed §21.4), Phase J+
 (`/api/universe`, `/api/intake/*`, `/api/emiten/<t>{,/override,/validate_lane}`,
 `/api/sizing/suggest`, `/api/fundamentals/bank_ratios`, `/api/grader_log`,
 `/api/lane_validation_log`, `/api/earnings{,/warnings}`), News Threads
-(`/api/threads*`, incl. `/api/threads/stats`), dan Faceted Tagging Addendum C
-selesai penuh (C-1+C-2, 17 Jul 2026): `/api/tags*` (incl.
+(`/api/threads*`, incl. `/api/threads/stats`), and Faceted Tagging Addendum C
+fully complete (C-1+C-2, 17 Jul 2026): `/api/tags*` (incl.
 `/api/tags/<id>{,/delete}`, `/api/tags/merge`, `/api/tags/orphans`),
 `/api/content_tags*`, `/api/news/for_reading`,
-`/api/news/<id>/display_subtitle`. Auto-suggest tag & thread-link (rule-based
-keyword/tag-match) serta auto-DORMANT thread stale jalan otomatis tiap
-`run_daily` -- tidak ada endpoint terpisah utk itu. Daftar otoritatif = route
-di `web/app.py`.
+`/api/news/<id>/display_subtitle`. Rule-based tag & thread-link auto-suggest
+(keyword/tag-match) and stale-thread auto-DORMANT run automatically every
+`run_daily` -- no separate endpoint for that. The authoritative list is the
+routes in `web/app.py`.
 
-### Daily Briefing ke Telegram (Phase E)
+### Daily Briefing to Telegram (Phase E)
 ```bash
-python -m pipeline.send_briefing --dry-run     # print teks, tidak kirim
-python -m pipeline.send_briefing               # kirim ke Telegram hari ini
+python -m pipeline.send_briefing --dry-run     # print the text, don't send
+python -m pipeline.send_briefing               # send to Telegram, today
 python -m pipeline.send_briefing --date 2026-07-08
 ```
-Dijalankan **manual** oleh kamu sendiri setelah selesai Panel 4-6 (4 lensa +
-approve sinyal terisi) — bukan bagian dari `run_daily`, karena isi briefing
-baru lengkap setelah rutinitas pagi selesai (~07:20), bukan pas data pull
-jam 07:00. Ada juga tombol "Kirim ke Telegram" di Panel 6 dashboard yang
-melakukan hal sama. Section yang belum kamu isi tampil `(belum diisi)` —
-bukan disembunyikan — supaya kelihatan kalau ada yang kelewat.
+Run **manually** by you after finishing Panels 4-6 (4 lenses +
+approved signals filled in) — not part of `run_daily`, because the briefing
+content is only complete after the morning routine is done (~07:20), not at
+data-pull time (07:00). There's also a "Send to Telegram" button on Panel 6
+of the dashboard that does the same thing. Any section you haven't filled in
+shows `(not filled in)` — not hidden — so anything missed is visible.
 
-### Test
+### Tests
 ```bash
 python -m pytest -q
 ```
 
 ---
 
-## 4. Skema data (ringkas)
+## 4. Data schema (summary)
 
-| Tabel | Diisi? | Isi |
+| Table | Filled by? | Contents |
 |---|---|---|
-| `daily_market` | ✅ otomatis | 1 row/tanggal — konteks makro global (BTC, DXY, S&P, IHSG, Fear&Greed, net liquidity, dll) + `source_flags` JSON |
-| `asset_ohlcv` | ✅ otomatis | 1 row/aset/tanggal — OHLCV universal + `volume_ma20` |
-| `daily_news` | ✅ otomatis | headline + `impact_level` (HIGH/MED/LOW) |
-| `econ_calendar` | ✅ otomatis | event ekonomi masa depan (ForexFactory), UPSERT by natural key |
-| `manual_articles` | 🖊️ manual (ada tool) | riset historis — isi via `python -m pipeline.add_article`, RSS tidak bisa backfill |
-| `positioning` | ✅ otomatis + 🖊️ manual | COT (CFTC) + BTC ETF flow otomatis tiap `run_daily`; SBN foreign flow & koreksi manual via dashboard |
-| `expectations` | 🖊️ manual | CME FedWatch cut probability, Fed Dot Plot median — tidak ada sumber gratis, isi via dashboard Panel 3 |
-| `policy_tracker` | 🖊️ manual | pernyataan pembuat kebijakan, `literal_statement` vs `inference` terpisah tegas, via dashboard Panel 3 |
-| `reading_workspace`, `trade_signals`, `sr_zones`, `trading_journal`, `prediction_log`, `asset_context_weight` | 🖊️/⚙️ | dipakai Phase B/C (lihat bagian masing-masing di atas) |
-| `instrument_metadata` | ✅ + 🖊️ | 1 row/saham universe Phase J+ — lane, lot_size, sektor, `has_daily_limit`, `lane_validated_at` (bar-replay) |
-| `fundamentals_quarterly` | ✅ + 🖊️ | fundamentals kuartalan (yfinance) + rasio bank CAR/NPL/NIM/LDR (manual) |
-| `earnings_calendar` | ✅ | jadwal earnings/corporate action (yfinance), penegak rule no-hold-through-earnings saham AS |
-| `emiten_grade`, `grader_log`, `intake_log` | ⚙️ + 🖊️ | hasil Emiten Grader + audit log + keputusan intake kandidat |
-| `lane_validation_log` | 🖊️ | jejak validasi lane bar-replay (append-only, hanya lewat `validate_lane()`) |
-| `sector_benchmark` | ⚙️ | struktur pembanding sektor (J-5, belum diisi — 1 ticker/sektor belum worth) |
+| `daily_market` | ✅ automatic | 1 row/date — global macro context (BTC, DXY, S&P, IHSG, Fear&Greed, net liquidity, etc.) + `source_flags` JSON |
+| `asset_ohlcv` | ✅ automatic | 1 row/asset/date — universal OHLCV + `volume_ma20` |
+| `daily_news` | ✅ automatic | headline + `impact_level` (HIGH/MED/LOW) |
+| `econ_calendar` | ✅ automatic | future economic events (ForexFactory), UPSERT by natural key |
+| `manual_articles` | 🖊️ manual (has a tool) | historical research — filled via `python -m pipeline.add_article`, RSS can't backfill |
+| `positioning` | ✅ automatic + 🖊️ manual | COT (CFTC) + BTC ETF flow automatic every `run_daily`; SBN foreign flow & manual corrections via dashboard |
+| `expectations` | 🖊️ manual | CME FedWatch cut probability, Fed Dot Plot median — no free source exists, filled via dashboard Panel 3 |
+| `policy_tracker` | 🖊️ manual | policymaker statements, `literal_statement` vs `inference` kept strictly separate, via dashboard Panel 3 |
+| `reading_workspace`, `trade_signals`, `sr_zones`, `trading_journal`, `prediction_log`, `asset_context_weight` | 🖊️/⚙️ | used by Phase B/C (see each section above) |
+| `instrument_metadata` | ✅ + 🖊️ | 1 row/stock in the Phase J+ universe — lane, lot_size, sector, `has_daily_limit`, `lane_validated_at` (bar-replay) |
+| `fundamentals_quarterly` | ✅ + 🖊️ | quarterly fundamentals (yfinance) + bank ratios CAR/NPL/NIM/LDR (manual) |
+| `earnings_calendar` | ✅ | earnings/corporate action schedule (yfinance), enforces the no-hold-through-earnings rule for US stocks |
+| `emiten_grade`, `grader_log`, `intake_log` | ⚙️ + 🖊️ | Emiten Grader results + audit log + candidate intake decisions |
+| `lane_validation_log` | 🖊️ | bar-replay lane validation trail (append-only, only via `validate_lane()`) |
+| `sector_benchmark` | ⚙️ | sector comparison structure (J-5, not yet filled — not worth it with 1 ticker/sector yet) |
 
-`source_flags` (JSON di `daily_market`) mencatat status tiap API per run, mis:
+`source_flags` (JSON in `daily_market`) records each API's status per run, e.g.:
 ```json
 {"coingecko_ohlcv": "ok", "binance_ohlcv": "fail", "fred_dxy": "skip", "yf_SP500": "ok"}
 ```
 
-Semua tanggal disimpan `YYYY-MM-DD`, waktu dalam **WIB (UTC+7)**.
+All dates are stored as `YYYY-MM-DD`, times in **WIB (UTC+7)**.
 
 ---
 
-## 5. Otomatisasi (cron)
+## 5. Automation (cron)
 
-**Crontab sudah terinstall** untuk user saat ini (`crontab -l` untuk lihat),
-jadwal `0 0 * * *` (00:00 WIB — TZ sistem WSL ini sudah `Asia/Jakarta`, tidak
-perlu konversi). Log ditulis ke `logs/run.log` (gitignored).
+**A crontab is already installed** for the current user (`crontab -l` to view),
+scheduled `0 0 * * *` (00:00 WIB — this WSL system's TZ is already
+`Asia/Jakarta`, no conversion needed). Logs go to `logs/run.log` (gitignored).
 
 ```cron
 MAILTO=""
-0 0 * * *  cd /path/ke/kastara-finance && .venv/bin/python -m pipeline.run_daily >> logs/run.log 2>&1
+0 0 * * *  cd /path/to/kastara-finance && .venv/bin/python -m pipeline.run_daily >> logs/run.log 2>&1
 ```
 
-**Yang masih perlu 1 langkah manual (butuh password sudo, tidak bisa
-dijalankan otomatis):**
+**Still needs one manual step (requires sudo password, can't be automated):**
 
 ```bash
-# 1. Nyalakan cron daemon (sekali, sampai WSL instance di-restart)
+# 1. Start the cron daemon (once, until this WSL instance restarts)
 sudo service cron start
 
-# 2. (opsional, direkomendasikan) supaya cron ikut nyala otomatis tiap kali
-#    instance WSL ini start — edit /etc/wsl.conf, tambah:
+# 2. (optional, recommended) so cron also starts automatically every time
+#    this WSL instance starts — edit /etc/wsl.conf, add:
 #    [boot]
 #    command = service cron start
 sudo nano /etc/wsl.conf
 ```
 
-**Catatan penting soal WSL:** cron cuma jalan selama instance WSL ini aktif.
-WSL **tidak otomatis start** saat Windows boot kecuali ada yang memicunya
-(buka terminal WSL, atau Windows Task Scheduler diatur menjalankan
-`wsl.exe` saat logon). Kalau butuh jadwal yang benar-benar tidak pernah
-mati, pertimbangkan VPS kecil untuk cron ini nanti (bukan prioritas
-sekarang — lihat `plan.txt` §9, scheduler library belum dipakai di Phase A).
+**Important note about WSL:** cron only runs while this WSL instance is
+active. WSL does **not auto-start** when Windows boots unless something
+triggers it (opening a WSL terminal, or Windows Task Scheduler configured to
+run `wsl.exe` at logon). If you need a schedule that truly never goes down,
+consider a small VPS for this later (not a priority right now — see
+`plan.txt` §9, a scheduler library isn't used in Phase A).
 
-Scheduler library (APScheduler dll) tetap belum dipakai — cron OS cukup.
+A scheduler library (APScheduler etc.) is still not used — OS cron is enough.
 
 ---
 
-## 6. Catatan implementasi
+## 6. Implementation notes
 
-- **Binance sering ke-block** di sebagian jaringan/region (termasuk ID). Scraper
-  crypto otomatis fallback ke CoinGecko untuk OHLC; funding rate & open interest
-  (Binance futures) akan `fail` dan dikosongkan — itu by design, bukan bug.
-  Untuk pakai Binance (VPN aktif) atau route lewat proxy, atur di `.env`:
-  `BINANCE_BASE`, `BINANCE_FAPI_BASE`, `BINANCE_ENABLED`, atau `KASTARA_PROXY`
-  (mis. `socks5://127.0.0.1:1080`). Lihat `.env.example`.
-- **`SQLITE_BUSY` / database is locked** (mis. buka DB di DBeaver): DB pakai
-  mode **DELETE** (default SQLite) + `busy_timeout=5000` (lihat
-  `db/connection.py`) — proses Python kita otomatis retry s/d 5 detik kalau
-  ada lock singkat. Akar masalahnya kalau muncul di DBeaver biasanya
-  **DBeaver di Windows connect lewat path `\\wsl.localhost\...`** — itu
-  efektif network share (9P) dari sisi Windows, dan SQLite (apalagi mode
-  WAL, yang sempat dicoba dan tidak membantu — lihat
-  `docs/ARCHITECTURE.md §6.1`) tidak reliable lintas boundary Windows↔WSL.
-  **Solusi permanen: install DBeaver DI DALAM WSL** (bukan di Windows),
-  jalan via WSLg — akses file jadi native, boundary-nya hilang total.
-  Sudah di-setup di `~/dbeaver` (tarball no-root, bundled JRE, tidak perlu
-  `sudo`/`apt`):
+- **Binance is often blocked** on some networks/regions (including ID). The
+  crypto scraper automatically falls back to CoinGecko for OHLC; funding rate
+  & open interest (Binance futures) will `fail` and stay empty — that's by
+  design, not a bug. To use Binance (active VPN) or route through a proxy,
+  set in `.env`: `BINANCE_BASE`, `BINANCE_FAPI_BASE`, `BINANCE_ENABLED`, or
+  `KASTARA_PROXY` (e.g. `socks5://127.0.0.1:1080`). See `.env.example`.
+- **`SQLITE_BUSY` / database is locked** (e.g. opening the DB in DBeaver): the
+  DB uses **DELETE** mode (SQLite's default) + `busy_timeout=5000` (see
+  `db/connection.py`) — our Python processes automatically retry for up to 5
+  seconds on a brief lock. The root cause when this shows up in DBeaver is
+  usually **DBeaver on Windows connecting via a `\\wsl.localhost\...` path**
+  — that's effectively a network share (9P) from Windows' side, and SQLite
+  (even in WAL mode, which was tried and didn't help — see
+  `docs/ARCHITECTURE.md §6.1`) isn't reliable across the Windows↔WSL
+  boundary. **Permanent fix: install DBeaver INSIDE WSL** (not on Windows),
+  running via WSLg — file access becomes native and the boundary disappears
+  entirely. Already set up at `~/dbeaver` (no-root tarball, bundled JRE, no
+  `sudo`/`apt` needed):
   ```bash
-  ~/dbeaver/launch.sh          # jalankan DBeaver (muncul sebagai window Windows via WSLg)
+  ~/dbeaver/launch.sh          # launch DBeaver (appears as a Windows window via WSLg)
   ```
-  Koneksi di DBeaver: pakai path native sesuai `KASTARA_DB_PATH` di `.env`
-  (lihat poin berikutnya — **bukan** lagi di dalam folder project), dan
-  **bukan** `\\wsl.localhost\...`. Kalau tetap mau pakai DBeaver versi
-  Windows: tutup semua tab/reconnect fresh (transaksi lama yang nyangkut di
-  client itu penyebab paling umum) + tambah driver property
+  Connection in DBeaver: use the native path matching `KASTARA_DB_PATH` in
+  `.env` (see the next point — **no longer** inside the project folder), and
+  **not** `\\wsl.localhost\...`. If you still want to use the Windows version
+  of DBeaver: close all tabs/reconnect fresh (a stale transaction stuck in the
+  client is the most common cause) + add the driver property
   `busy_timeout=5000`.
-- **`KASTARA_DB_PATH` — lokasi DB**: file DB sengaja ditaruh **di luar folder
-  project** (`.env`: `KASTARA_DB_PATH=/home/<user>/LOCAL/kastara-finance-data/kastara-finance.db`)
-  supaya tidak nyampur sama kode/git — DB berubah tiap hari (pipeline/cron),
-  kode tidak; motong risiko ke-commit atau ke-include ke operasi git secara
-  tidak sengaja. Boleh juga isi path Windows UNC
-  (`\\wsl.localhost\<distro>\home\...`) — otomatis diterjemahkan ke path
-  native Linux (file yang sama), tapi untuk akses dari WSL sendiri (pipeline,
-  DBeaver-di-WSL) pakai path native langsung seperti contoh di atas.
-- **SQLite vs Postgres/NoSQL**: untuk backfill sampai ~5 tahun data harian,
-  SQLite masih pas — datanya tabular (cocok relational, bukan NoSQL) dan
-  volumenya (puluhan ribu baris `asset_ohlcv`, ratusan ribu `daily_news`) jauh
-  di bawah kapasitas SQLite. Sudah ditambah index untuk query range-tanggal
-  di skala itu: `idx_asset_ohlcv_instrument_date`, `idx_daily_news_dedup`
-  (juga menegakkan dedup by headline di level DB), `idx_daily_news_impact_date`.
-  Pindah ke Postgres baru relevan kalau nanti multi-user concurrent atau butuh
-  hosting cloud managed — bukan soal volume data historisnya.
-- **RSS feed bisa mati/pindah.** Registry di `scrapers/feeds_config.py`
-  (`FEEDS`) — satu-satunya tempat ganti url/enabled, jangan sentuh
-  `news.py`. `check_feed_health()` cek tiap feed tiap run (status masuk
-  `source_flags` prefix `rss_`, `run_daily` print ringkasan `RSS: X ok, Y
-  dead`) — feed mati langsung kelihatan di log, bukan backlog tersembunyi.
-- **FRED series id kadang berubah.** Lihat `scrapers/macro_fred.py` (`SERIES`).
-  Series gagal ditandai `fail` per-series, pipeline lanjut.
-- **Tidak ada API key di source code.** Semua via `.env` + `python-dotenv`.
-- **Tidak ada kode dari repo AGPL** (OpenBB dll) yang disalin ke project ini.
+- **`KASTARA_DB_PATH` — DB location**: the DB file is deliberately kept
+  **outside the project folder** (`.env`: `KASTARA_DB_PATH=/home/<user>/LOCAL/kastara-finance-data/kastara-finance.db`)
+  so it never mixes with the code/git — the DB changes every day
+  (pipeline/cron), the code doesn't; this removes the risk of it accidentally
+  being committed or included in a git operation. You can also use a Windows
+  UNC path (`\\wsl.localhost\<distro>\home\...`) — it's automatically
+  translated to the native Linux path (the same file), but for access from
+  WSL itself (pipeline, DBeaver-in-WSL) use the native path directly like the
+  example above.
+- **SQLite vs Postgres/NoSQL**: for backfilling up to ~5 years of daily data,
+  SQLite is still a good fit — the data is tabular (a relational fit, not
+  NoSQL) and the volume (tens of thousands of `asset_ohlcv` rows, hundreds of
+  thousands of `daily_news` rows) is well under SQLite's capacity. Indexes
+  have already been added for date-range queries at that scale:
+  `idx_asset_ohlcv_instrument_date`, `idx_daily_news_dedup` (also enforces
+  dedup by headline at the DB level), `idx_daily_news_impact_date`. Moving to
+  Postgres only becomes relevant with concurrent multi-user access or a need
+  for managed cloud hosting later — not a question of historical data volume.
+- **RSS feeds can die/move.** The registry is `scrapers/feeds_config.py`
+  (`FEEDS`) — the only place to change a url/enabled flag, don't touch
+  `news.py`. `check_feed_health()` checks every feed on every run (status
+  goes into `source_flags` with an `rss_` prefix, `run_daily` prints a `RSS: X
+  ok, Y dead` summary) — a dead feed shows up immediately in the log,
+  instead of becoming a hidden backlog.
+- **FRED series ids sometimes change.** See `scrapers/macro_fred.py` (`SERIES`).
+  A failing series is flagged `fail` per-series, the pipeline continues.
+- **No API keys in source code.** Everything goes through `.env` +
+  `python-dotenv`.
+- **No code copied from an AGPL repo** (OpenBB etc.) into this project.
 
 ---
 
 *Kastara Finance Master Plan v1.6 (`docs/Master Plan.md`) + Phase J+ Build
-Contract v1.3. Status per-phase & keputusan terkunci: `docs/ROADMAP.md`. Ritme
-pemakaian: `docs/SOP.md`. Inisiatif berikutnya: migrasi FE → Vue
+Contract v1.3. Status per phase & locked decisions: `docs/ROADMAP.md`. Usage
+rhythm: `docs/SOP.md`. Next initiative: FE migration to Vue
 (`docs/migrationFE.md`).*

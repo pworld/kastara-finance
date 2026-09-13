@@ -9,15 +9,15 @@ import { today, daysAgo, LINK_STATUS_CLASS, FACET_COLOR, LENS_LABELS } from '../
 import { useAppToast } from '../composables/useAppToast'
 import { preserveScroll } from '../composables/useScrollPreserve'
 
-// Port dari web/static/js/panel2.js (lihat docs/migrationFE.md Fase 2).
+// Ported from web/static/js/panel2.js (see docs/migrationFE.md Phase 2).
 const { toast } = useAppToast()
 
 const rows = ref([])
 const loading = ref(true)
-// Default kemarin s.d. hari ini (bukan hari ini saja) -- run_daily jalan
-// 00:00 WIB, tapi RSS/scraper bisa telat masuk atau belum sempat dibuka
-// pagi itu juga, jadi "hari ini saja" sering kosong. Rentang 2 hari
-// jamin selalu ada data buat dibaca begitu panel dibuka.
+// Default yesterday to today (not just today) -- run_daily runs at
+// 00:00 WIB, but RSS/scraper may arrive late or not yet loaded that morning
+// either, so "today only" is often empty. 2-day range ensures there's always
+// data to read when the panel opens.
 const dateFrom = ref(daysAgo(1))
 const dateTo = ref(today())
 const impact = ref('')
@@ -36,9 +36,9 @@ async function loadNews() {
 watch([dateFrom, dateTo, impact], loadNews)
 onMounted(loadNews)
 
-// ---------- Filter bar tag (Addendum C §21.3: "cermin input" -- kosakata
-// filter = kosakata tagging. AND/OR toggle: AND = berita harus punya SEMUA
-// tag terpilih, OR = salah satu cukup.) ----------
+// ---------- Filter bar tag (Addendum C §21.3: "mirror input" -- filter
+// vocabulary = tagging vocabulary. AND/OR toggle: AND = article must have ALL
+// selected tags, OR = any one is enough.) ----------
 const filterTags = ref([])
 const filterMode = ref('AND')
 function addFilterTag(tag) {
@@ -57,11 +57,11 @@ const filteredRows = computed(() => {
   })
 })
 
-// ---------- Kirim ke Lensa (Addendum C §21.4, GELOMBANG C-2) -- jalur
-// ke-3 konteks persona (di luar slice otomatis harian + thread digest):
-// filter tag -> centang berita -> kirim TAMBAHAN ke satu lensa. Guard
-// non-negotiable (tidak pernah ganti slice) hidup di compose_persona_context
-// itu sendiri, bukan di sini -- checkbox ini murni kumpulkan id. ----------
+// ---------- Send to Lens (Addendum C §21.4, WAVE C-2) -- 3rd persona context
+// path (outside of daily automatic slice + thread digest): filter tag -> check
+// article -> send ADDITIONAL to one lens. Non-negotiable guard (never replace
+// slice) lives in compose_persona_context itself, not here -- this checkbox
+// purely collects ids. ----------
 const selectedNewsIds = ref(new Set())
 function toggleSelectNews(row) {
   if (selectedNewsIds.value.has(row.id)) selectedNewsIds.value.delete(row.id)
@@ -72,7 +72,7 @@ const selectedLens = ref('GEMA')
 async function sendToLens() {
   const result = await post('/api/persona/run', { lens: selectedLens.value, news_ids: [...selectedNewsIds.value] })
   if (result.error) { toast(result.error); return }
-  toast(`${selectedNewsIds.value.size} berita dikirim ke lensa ${selectedLens.value} (tambahan, bukan pengganti slice)`)
+  toast(`${selectedNewsIds.value.size} articles sent to lens ${selectedLens.value} (additional, not replacing slice)`)
   lensDialogOpen.value = false
   selectedNewsIds.value = new Set()
 }
@@ -80,13 +80,13 @@ async function sendToLens() {
 async function toggleForReading(row) {
   const now = !!row.for_reading
   await post('/api/news/for_reading', { id: row.id, for_reading: !now })
-  toast(now ? 'Dilepas dari Reading' : 'Ditandai for Reading')
-  preserveScroll(loadNews)() // lihat useScrollPreserve.js
+  toast(now ? 'Removed from Reading' : 'Marked for Reading')
+  preserveScroll(loadNews)() // see useScrollPreserve.js
 }
 
-// ---------- display_subtitle (Addendum C §21.2 poin d): judul/catatan Giel
-// TERPISAH dari headline asli (tidak pernah ditimpa). Input inline pola sama
-// ForwardView.vue's econ_calendar actual edit (Set id -> editing, dict id -> draft value). ----------
+// ---------- display_subtitle (Addendum C §21.2 point d): Giel's title/notes
+// SEPARATE from original headline (never overwritten). Inline input pattern same
+// as ForwardView.vue's econ_calendar actual edit (Set id -> editing, dict id -> draft value). ----------
 const editingSubtitleIds = ref(new Set())
 const subtitleInputs = ref({})
 function startEditSubtitle(row) {
@@ -95,9 +95,9 @@ function startEditSubtitle(row) {
 }
 async function saveSubtitle(row) {
   await post(`/api/news/${row.id}/display_subtitle`, { display_subtitle: subtitleInputs.value[row.id] || null })
-  toast('Subtitle tersimpan')
+  toast('Subtitle saved')
   editingSubtitleIds.value.delete(row.id)
-  preserveScroll(loadNews)() // lihat useScrollPreserve.js
+  preserveScroll(loadNews)() // see useScrollPreserve.js
 }
 
 // ---------- Faceted Tagging C-1: pasang/lepas tag per baris berita
