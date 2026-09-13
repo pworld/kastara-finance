@@ -1,3209 +1,3447 @@
 # Kastara Finance — Roadmap
 
-> Sumber acuan: **[Master Plan.md](Master%20Plan.md)** (v1.5, dokumen strategi
-> lengkap) → diturunkan jadi **[plan.txt](../plan.txt)** (scope eksekusi Phase
-> A yang benar-benar dikerjakan) + keputusan tambahan lewat sesi eksekusi
-> (Phase 1, dashboard). Dokumen ini dokumen hidup — update status di sini tiap
-> phase baru selesai atau tiap kali ada temuan gap baru terhadap Master Plan.
+> Reference source: **[Master Plan.md](Master%20Plan.md)** (v1.5, full strategy
+> document) → derived into **[plan.txt](../plan.txt)** (Phase A execution
+> scope that was actually worked on) + additional decisions made during
+> execution sessions (Phase 1, dashboard). This document is a living
+> document — update the status here every time a new phase is finished or
+> whenever a new gap is found against the Master Plan.
 
-## Status Ringkas
+## Status Summary
 
-| Phase | Nama | Status |
+| Phase | Name | Status |
 |---|---|---|
-| **A** | Database & Scraper (data layer) | ✅ **Selesai penuh** — sesuai `plan.txt` **dan** checklist Master Plan §10 (lihat [status](#anchor-gap-phase-a)); cron daemon butuh 1 langkah manual sudo, lihat catatan |
-| **1** | Dashboard read-only (Flask) | ✅ Selesai — jadi fondasi Panel 1/2/5 di Phase C |
-| **B** | S&R detection, breakout/retest engine | ✅ **Selesai untuk BTC** — `plan_b.txt` (dihapus setelah selesai) dieksekusi penuh, 46 test baru, diverifikasi data asli |
-| **C** | Dashboard/UI penuh (6 panel, write-enabled) | ✅ **Selesai** — `plan_c.txt` (dihapus setelah selesai) dieksekusi penuh, semua panel diverifikasi via browser |
-| **D** | Forward layer (FedWatch, COT, policy) | ✅ **Selesai** — `plan_d.txt` (dihapus setelah selesai) dieksekusi penuh, COT+ETF flow otomatis, Expectations/SBN manual, Disonansi flag jalan |
-| **E** | Telegram bot | ✅ **Selesai (push satu arah)** — `plan_e.txt` (dihapus setelah selesai) dieksekusi penuh, Daily Briefing manual (CLI + tombol Panel 6); bot commands dua-arah ditunda ke backlog |
-| **F+** | Multi-aset expansion | 🟡 **GOLD/SP500/IHSG/USDIDR/USDJPY aktif** (S&R+signals+context weight) — altcoin/saham/komoditas lain belum |
-| **J+** | Equity expansion (saham individual IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026, SELESAI SELURUHNYA 13 Jul 2026), Gerbang G1/G2/G3 DIJAWAB (13 Jul 2026)** — universe = **BBCA + TSLA**; **J-2/J-3(groundwork)/J-3b/J-4/J-6/J-7/J-8/J-10/J-11/J-12/J-13/J-14/J-15 SELESAI**; sisa: **J-5** (ditunda, belum worth dgn 1 ticker/sektor), **J-9** (prompt persona v5, butuh tulisan Giel), + validasi bar-replay manual & kalibrasi §13 (keputusan Giel, bukan otomatis) |
+| **A** | Database & Scraper (data layer) | ✅ **Fully complete** — matches `plan.txt` **and** Master Plan §10 checklist (see [status](#anchor-gap-phase-a)); the cron daemon needs 1 manual sudo step, see note |
+| **1** | Read-only dashboard (Flask) | ✅ Complete — became the foundation for Panels 1/2/5 in Phase C |
+| **B** | S&R detection, breakout/retest engine | ✅ **Complete for BTC** — `plan_b.txt` (deleted after completion) fully executed, 46 new tests, verified with real data |
+| **C** | Full Dashboard/UI (6 panels, write-enabled) | ✅ **Complete** — `plan_c.txt` (deleted after completion) fully executed, all panels verified via browser |
+| **D** | Forward layer (FedWatch, COT, policy) | ✅ **Complete** — `plan_d.txt` (deleted after completion) fully executed, COT+ETF flow automated, Expectations/SBN manual, Dissonance flag working |
+| **E** | Telegram bot | ✅ **Complete (one-way push)** — `plan_e.txt` (deleted after completion) fully executed, manual Daily Briefing (CLI + Panel 6 button); two-way bot commands deferred to backlog |
+| **F+** | Multi-asset expansion | 🟡 **GOLD/SP500/IHSG/USDIDR/USDJPY active** (S&R+signals+context weight) — other altcoins/stocks/commodities not yet |
+| **J+** | Equity expansion (individual stocks IDX→US) | 🔶 **Build Contract v1.3 LOCKED (11 Jul 2026) + Addendum A Tab 8 (12 Jul 2026, FULLY COMPLETE 13 Jul 2026), Gates G1/G2/G3 ANSWERED (13 Jul 2026)** — universe = **BBCA + TSLA**; **J-2/J-3(groundwork)/J-3b/J-4/J-6/J-7/J-8/J-10/J-11/J-12/J-13/J-14/J-15 COMPLETE**; remaining: **J-5** (deferred, not yet worth it with 1 ticker/sector), **J-9** (persona prompt v5, needs Giel's own writing), + manual bar-replay validation & §13 calibration (Giel's decision, not automatic) |
 
 ---
 
 <a id="anchor-gap-tersisa"></a>
-## 📍 Gap Tersisa (13 Jul 2026) — ringkasan cepat, TIDAK perlu scroll ke bawah
+## 📍 Remaining Gaps (13 Jul 2026) — quick summary, NO need to scroll down
 
-Semua build/kode dari kontrak sudah selesai. Yang tersisa cuma butuh
-tindakan/keputusan Giel sendiri, bukan development lagi:
+All build/code from the contract is complete. What remains only needs
+Giel's own action/decision, not further development:
 
-1. **Track A — Deploy infra** (auth, Docker/Railway, Telegram bot 2-arah) —
-   sengaja ditunda ("save for release time"), belum dikerjakan sama sekali.
-2. **Bar-replay validation** — mekanismenya SUDAH ADA (Panel 8 "Validasi
-   Lane", lihat §"Update — Mekanisme validasi lane" di bagian Phase J+ di
-   bawah), tapi belum ada satu instrumen pun yang divalidasi. BBCA & TSLA
-   masih `lane=INVEST`, belum `TRADE`.
-3. **Kalibrasi §13 final** — `IDX_ZONE_TOLERANCE_TICKS = 2` di
-   `analysis/calibration.py` masih DRAFT, nunggu Giel konfirmasi/revisi
-   setelah lihat bar-replay beneran (lihat §"Update — J-3: ARA/ARB..." di
-   bawah).
-4. **J-9 prompt persona** — draft teks sudah ada di
+1. **Track A — Deploy infra** (auth, Docker/Railway, two-way Telegram bot) —
+   deliberately deferred ("save for release time"), not started at all.
+2. **Bar-replay validation** — the mechanism ALREADY EXISTS (Panel 8
+   "Validation Lane", see the §"Update — Lane validation mechanism" section
+   under Phase J+ below), but not a single instrument has been validated
+   yet. BBCA & TSLA are still `lane=INVEST`, not yet `TRADE`.
+3. **Final §13 calibration** — `IDX_ZONE_TOLERANCE_TICKS = 2` in
+   `analysis/calibration.py` is still DRAFT, waiting for Giel to confirm/
+   revise after seeing real bar-replay (see the §"Update — J-3: ARA/ARB..."
+   section below).
+4. **J-9 persona prompt** — draft text already exists at
    [`docs/j9_equity_slice_prompt_draft.md`](j9_equity_slice_prompt_draft.md),
-   belum digabung ke `prompts/persona_rivan.txt`/`persona_akela.txt`
-   (suara Giel sendiri, bukan final version dari saya).
-5. **J-5 — sector benchmark** — ditunda, belum worth effort-nya dengan
-   cuma 1 ticker per sektor di universe saat ini.
+   not yet merged into `prompts/persona_rivan.txt`/`persona_akela.txt`
+   (needs to be in Giel's own voice, not my final version).
+5. **J-5 — sector benchmark** — deferred, not worth the effort yet with
+   only 1 ticker per sector in the current universe.
 
-Detail penuh tiap item ada di section "🔶 Phase J+" di bawah (cari heading
-"**Update —**" terbaru per topik) — poin di atas cuma ringkasan biar tidak
-perlu scroll baca histori lengkapnya.
+Full detail for each item is in the "🔶 Phase J+" section below (search for
+the latest "**Update —**" heading per topic) — the points above are just a
+summary so you don't need to scroll through the full history.
 
 ---
 
 <a id="anchor-cross-check"></a>
 ## 🔍 Cross-check vs Master Plan v1.4
 
-Ditulis setelah `Master Plan.md` (dokumen strategi penuh) dimasukkan ke
-`docs/` — sebelumnya eksekusi hanya mengacu ke `plan.txt` (turunan scope
-Phase A yang lebih sempit). Hasil pembacaan ulang:
+Written after `Master Plan.md` (the full strategy document) was added to
+`docs/` — previously execution only referenced `plan.txt` (a narrower
+derived scope for Phase A). Results of the re-read:
 
-### ✅ Konsisten
-- 11 tabel utama (Section 4 Master Plan) — match persis dengan `schema.sql`.
-- Tech stack (Section 5): SQLite dev → Postgres kalau scale/multi-device,
-  Flask, chart custom (bukan TradingView) — semua match.
-- Prinsip inti: `source_flags`, rule-based scoring (bukan AI), tanpa
-  execution/trading logic, tanpa kode AGPL — semua konsisten.
-- Manual backfill tool (Section 4.1: preview → confirm → commit) — match
-  persis dengan `pipeline/backfill.py`.
+### ✅ Consistent
+- 11 main tables (Master Plan Section 4) — matches `schema.sql` exactly.
+- Tech stack (Section 5): SQLite dev → Postgres if scale/multi-device
+  requires it, Flask, custom chart (not TradingView) — all match.
+- Core principles: `source_flags`, rule-based scoring (not AI), no
+  execution/trading logic, no AGPL code — all consistent.
+- Manual backfill tool (Section 4.1: preview → confirm → commit) — matches
+  `pipeline/backfill.py` exactly.
 
 <a id="anchor-gap-phase-a"></a>
-### ✅ Gap checklist Phase A (Master Plan §10) — sudah ditutup
+### ✅ Phase A gap checklist (Master Plan §10) — now closed
 
-`plan.txt` (yang dieksekusi lebih dulu) sengaja mempersempit scope Phase A.
-Master Plan §10 mendefinisikan Phase A lebih luas; tiga item berikut sempat
-jadi gap, sekarang sudah dikerjakan:
+`plan.txt` (which was executed first) deliberately narrowed the Phase A
+scope. Master Plan §10 defines Phase A more broadly; the following three
+items were gaps for a while, now addressed:
 
-1. **Scraper Economic Calendar** ✅ — `scrapers/econ_calendar.py`, sumber
-   ForexFactory (endpoint JSON tidak resmi, gratis no-key; **Trading
-   Economics sengaja tidak dipakai** karena API resminya butuh key berbayar
-   untuk cakupan penuh — melanggar aturan "no paid API"). UPSERT by
-   `(event_date, event_name, country)` ke `econ_calendar`, di-integrasikan ke
-   `pipeline/run_daily.py`. Endpoint ini tidak resmi/undocumented — bisa
-   berubah/rate-limit sewaktu-waktu; sudah tahan gagal (`source_flags`,
-   tidak crash pipeline). Kolom `actual` tetap NULL dari scraper ini (sumber
-   tidak menyediakan data hasil rilis).
-2. **3 tabel forward-layer** ✅ — `expectations`, `positioning`,
-   `policy_tracker` (Section 4.2) sudah ditambah ke `schema.sql` (struktur
-   saja, sesuai Master Plan §10). Diisi nanti saat Phase D beneran mulai.
-3. **Cron job otomatis 00:00 WIB** 🟡 — crontab per-user sudah **terinstall
-   dan diverifikasi jalan benar** (disimulasikan persis environment cron:
-   `env -i` + `/bin/sh`, exit 0, log tertulis ke `logs/run.log`). Yang
-   **belum**: cron **daemon**-nya sendiri butuh `sudo service cron start`
-   (butuh password interaktif — di luar kendali eksekusi otomatis, harus
-   dijalankan manual satu kali oleh Giel). Lihat instruksi lengkap di
+1. **Economic Calendar scraper** ✅ — `scrapers/econ_calendar.py`, source
+   ForexFactory (unofficial JSON endpoint, free, no key required;
+   **Trading Economics is deliberately not used** because its official API
+   requires a paid key for full coverage — that would violate the "no paid
+   API" rule). UPSERT by `(event_date, event_name, country)` into
+   `econ_calendar`, integrated into `pipeline/run_daily.py`. This endpoint
+   is unofficial/undocumented — it may change/rate-limit at any time;
+   already fail-safe (`source_flags`, doesn't crash the pipeline). The
+   `actual` column stays NULL from this scraper (the source doesn't provide
+   release-result data).
+2. **3 forward-layer tables** ✅ — `expectations`, `positioning`,
+   `policy_tracker` (Section 4.2) have already been added to `schema.sql`
+   (structure only, per Master Plan §10). They'll be populated once Phase D
+   really starts.
+3. **Automatic 00:00 WIB cron job** 🟡 — the per-user crontab has been
+   **installed and verified to run correctly** (simulated exactly matching
+   the cron environment: `env -i` + `/bin/sh`, exit 0, log written to
+   `logs/run.log`). What's still **missing**: the cron **daemon** itself
+   needs `sudo service cron start` (requires an interactive password —
+   outside the control of automated execution, must be run manually once by
+   Giel). See full instructions in
    [README §5](../README.md#5-otomatisasi-cron).
 
-Total tabel sekarang **14** (11 Phase A + 3 forward-layer), naik dari 11.
+Total tables now **14** (11 Phase A + 3 forward-layer), up from 11.
 
-### Deviasi kecil yang disengaja (bukan bug)
+### Small intentional deviations (not bugs)
 
-Master Plan menulis kolom `date` di `daily_news` (dan tabel lain) sebagai
-*"FOREIGN KEY → daily_market"*. Implementasi di `schema.sql` **tidak**
-menulis ini sebagai `FOREIGN KEY` SQL sungguhan — hanya relasi by-convention
-(kolom `date` yang cocok). Ini konsisten dengan `plan.txt` (yang memang tidak
-mendefinisikan FK literal), jadi dibiarkan — dicatat di sini supaya jelas ini
-pilihan sadar, bukan sesuatu yang terlewat.
+The Master Plan writes the `date` column in `daily_news` (and other
+tables) as *"FOREIGN KEY → daily_market"*. The `schema.sql` implementation
+does **not** write this as an actual SQL `FOREIGN KEY` — it's only a
+by-convention relation (a matching `date` column). This is consistent with
+`plan.txt` (which indeed doesn't define a literal FK), so it's left as is —
+noted here to make clear this is a conscious choice, not something missed.
 
 ---
 
-## ✅ Phase A — Database & Scraper (selesai penuh)
+## ✅ Phase A — Database & Scraper (fully complete)
 
-**Selesai sesuai scope `plan.txt` DAN checklist Master Plan §10**: SQLite +
-14 tabel (11 Phase A + 3 forward-layer struktur), 5 scraper modular (crypto,
-macro FRED, macro yfinance, news, economic calendar), pipeline harian
-idempotent, backfill tool dengan preview-before-commit, cron terinstall
-(daemon butuh 1 langkah manual — lihat [gap](#anchor-gap-phase-a) di atas).
+**Complete per `plan.txt` scope AND the Master Plan §10 checklist**: SQLite
++ 14 tables (11 Phase A + 3 forward-layer structure), 5 modular scrapers
+(crypto, macro FRED, macro yfinance, news, economic calendar), an
+idempotent daily pipeline, a backfill tool with preview-before-commit, cron
+installed (the daemon needs 1 manual step — see the [gap](#anchor-gap-phase-a)
+above).
 
-**Deliverable:**
-- `db/schema.sql` — 14 tabel + index untuk skala 5-tahun.
-- `scrapers/{crypto,macro_fred,macro_yf,news,econ_calendar}.py` — tiap
-  sumber independen, tahan API-fail (`source_flags`).
-- `pipeline/run_daily.py` — orchestrator, UPSERT idempotent, termasuk
+**Deliverables:**
+- `db/schema.sql` — 14 tables + indexes sized for a 5-year scale.
+- `scrapers/{crypto,macro_fred,macro_yf,news,econ_calendar}.py` — each
+  source independent, resilient to API failure (`source_flags`).
+- `pipeline/run_daily.py` — orchestrator, idempotent UPSERT, including the
   economic calendar.
-- `pipeline/backfill.py` — historical fetch, preview wajib sebelum commit.
+- `pipeline/backfill.py` — historical fetch, preview mandatory before
+  commit.
 - `indicators/calc.py` — `net_liquidity`, `volume_ma20`.
-- Crontab per-user terinstall (`0 0 * * *`, TZ sistem sudah Asia/Jakarta =
-  WIB, tidak perlu konversi).
-- 29 test, semua hijau.
+- Per-user crontab installed (`0 0 * * *`, system TZ already Asia/Jakarta =
+  WIB, no conversion needed).
+- 29 tests, all green.
 
-**Definition of Done** — semua kriteria di `plan.txt §8` **dan** checklist
-Master Plan §10 terpenuhi.
+**Definition of Done** — all criteria in `plan.txt §8` **and** the Master
+Plan §10 checklist are met.
 
 ---
 
-## ✅ Phase 1 — Dashboard Read-Only (selesai, jadi fondasi Phase C)
+## ✅ Phase 1 — Read-Only Dashboard (complete, became the foundation for Phase C)
 
-Tidak ada di `plan.txt` asli (yang menaruh dashboard di Phase C), tapi
-dikerjakan lebih dulu atas permintaan langsung karena dibutuhkan segera
-untuk verifikasi visual data yang sudah masuk. Kemudian jadi fondasi Panel
-1/2/5 saat Phase C dikerjakan penuh.
+Not in the original `plan.txt` (which placed the dashboard in Phase C), but
+worked on earlier at direct request because it was needed immediately for
+visual verification of data that had already come in. It later became the
+foundation for Panels 1/2/5 when Phase C was fully built.
 
-**Deliverable:**
-- `web/app.py` — Flask, endpoint JSON read-only (`/api/latest`,
+**Deliverables:**
+- `web/app.py` — Flask, read-only JSON endpoints (`/api/latest`,
   `/api/daily_market`, `/api/asset_ohlcv`, `/api/news`, `/api/assets`,
-  `/api/health`). Tidak menulis DB — pipeline tetap satu-satunya penulis
-  (masih berlaku untuk endpoint ini; Phase C nambah endpoint BARU yang
-  menulis, endpoint lama ini TIDAK diubah).
-- `web/templates/index.html` — single-page UI (snapshot cards, status
-  `source_flags`, chart harga SVG per instrument, tabel berita dengan filter
-  impact).
-- Verified end-to-end via preview: semua endpoint 200, chart render dari data
-  backfill, filter HIGH/MED/LOW berfungsi.
+  `/api/health`). Does not write to the DB — the pipeline remains the sole
+  writer (still true for these endpoints; Phase C adds NEW write-enabled
+  endpoints, these old endpoints are NOT changed).
+- `web/templates/index.html` — single-page UI (snapshot cards,
+  `source_flags` status, SVG price chart per instrument, news table with
+  impact filter).
+- Verified end-to-end via preview: all endpoints 200, chart renders from
+  backfilled data, HIGH/MED/LOW filter works.
 
 <a id="anchor-panel-breakdown"></a>
-### Riwayat: Phase 1 vs Phase C (6 panel) — breakdown historis
+### History: Phase 1 vs Phase C (6 panels) — historical breakdown
 
-Catatan ini ditulis waktu Phase 1 baru selesai dan Phase C belum dikerjakan
-sama sekali (breakdown per panel Master Plan §6). **Sudah tidak akurat** —
-lihat [status terkini Phase C](#anchor-phase-c-status) untuk apa yang
-sekarang benar-benar ada. Dipertahankan di sini sebagai riwayat, bukan
-status aktif:
+This note was written when Phase 1 had just finished and Phase C had not
+been worked on at all (breakdown per panel from Master Plan §6). **No
+longer accurate** — see [Phase C's current status](#anchor-phase-c-status)
+for what actually exists now. Kept here as history, not an active status:
 
-| Panel (Master Plan §6) | Status SAAT ITU (Phase 1 baru selesai) |
+| Panel (Master Plan §6) | Status AT THAT TIME (Phase 1 just finished) |
 |---|---|
-| Panel 1 — Data Snapshot | 🟡 Sebagian: cards + `source_flags` ada; tombol Manual Backfill tidak ada |
-| Panel 2 — News Briefing | 🟡 Sebagian: list + impact badge ada; tombol flag manual "key trigger" & "+ Add Manual Article" tidak ada |
-| Panel 3 — Forward Panel | ⬜ Tidak ada (butuh tabel Phase D dulu: `expectations`/`positioning`/`policy_tracker`) |
-| Panel 4 — Reading Workspace | ⬜ Tidak ada (butuh form input 4 lensa) |
-| Panel 5 — Chart + Technical Analysis | 🟡 Sebagian: chart harga polos ada; MA overlay, S&R zone overlay, approve/reject signal tidak ada (butuh Phase B) |
-| Panel 6 — Synthesis | ⬜ Tidak ada (butuh `prediction_log` capture + skor prediksi) |
+| Panel 1 — Data Snapshot | 🟡 Partial: cards + `source_flags` exist; Manual Backfill button doesn't exist |
+| Panel 2 — News Briefing | 🟡 Partial: list + impact badge exist; manual "key trigger" flag button & "+ Add Manual Article" button don't exist |
+| Panel 3 — Forward Panel | ⬜ Doesn't exist (needs the Phase D tables first: `expectations`/`positioning`/`policy_tracker`) |
+| Panel 4 — Reading Workspace | ⬜ Doesn't exist (needs the 4-lens input form) |
+| Panel 5 — Chart + Technical Analysis | 🟡 Partial: plain price chart exists; MA overlay, S&R zone overlay, approve/reject signal don't exist (needs Phase B) |
+| Panel 6 — Synthesis | ⬜ Doesn't exist (needs `prediction_log` capture + prediction scoring) |
 
 ---
 
-## ✅ Phase B — S&R Detection & Breakout/Retest Engine (selesai, BTC)
+## ✅ Phase B — S&R Detection & Breakout/Retest Engine (complete, BTC)
 
-**Execution plan: `plan_b.txt` (dihapus setelah selesai)** — 7 Open Questions di §7
-sudah direview & dikunci Giel, dieksekusi persis sesuai itu.
+**Execution plan: `plan_b.txt` (deleted after completion)** — the 7 Open
+Questions in §7 were reviewed & locked in by Giel, executed exactly per
+that.
 
-**Deliverable:**
-- `analysis/indicators.py` — `moving_average`, `rolling_ma` (MA rolling
-  penuh, dipakai re-derive `volume_ma20` karena kolom itu di `asset_ohlcv`
-  cuma keisi untuk hari yang diproses `run_daily.py` — baris hasil backfill
-  historis NULL semua, ditemukan saat eksekusi), `ma_stack_order`,
-  `volume_ratio`, `is_breakout_volume`, `is_volume_present`.
-- `analysis/sr_zones.py` — swing high/low (lookback simetris §7.1),
-  clustering ±0.5%, touch-count per episode (bukan per-hari), zone_type
-  by majority-vote arah pendekatan, zona <2 touch tetap disimpan
-  `is_active=0` (§7.3). `zone_bucket_key()` — natural key log-scale untuk
-  UPSERT stabil (§7.4).
+**Deliverables:**
+- `analysis/indicators.py` — `moving_average`, `rolling_ma` (full rolling
+  MA, used to re-derive `volume_ma20` because that column in `asset_ohlcv`
+  is only ever populated for days processed by `run_daily.py` — rows from
+  historical backfill are all NULL, discovered during execution),
+  `ma_stack_order`, `volume_ratio`, `is_breakout_volume`,
+  `is_volume_present`.
+- `analysis/sr_zones.py` — swing high/low (symmetric lookback §7.1),
+  ±0.5% clustering, touch-count per episode (not per-day), zone_type by
+  majority-vote approach direction, zones with <2 touches are still stored
+  with `is_active=0` (§7.3). `zone_bucket_key()` — a log-scale natural key
+  for stable UPSERT (§7.4).
 - `analysis/signals.py` — breakout (close > resistance + volume >1.5x MA)
   → retest (close > zone_lower + volume >=80%, §7.2) → entry/SL/TP1/R:R.
-  Breakout tanpa retest disimpan row terpisah (§7.5), R:R < 1.5 tetap
-  disimpan `is_valid=0` (bukan silent-drop).
+  A breakout without a retest is stored as a separate row (§7.5), R:R < 1.5
+  is still stored with `is_valid=0` (not silently dropped).
 - `pipeline/run_analysis.py` — orchestrator, BTC-only filter (§4, generic
-  di `analysis/*`), UPSERT zona (preserve `validated`/`notes` milik
-  manusia saat re-run), INSERT sinyal dedup, `approved` **hardcode 0**
-  di satu-satunya titik tulis.
-- `tools/review_signal.py` — CLI approve/reject **by id eksplisit**, tidak
-  ada mode approve-semua (Master Plan §3: Giel yang approve, bukan mesin).
-- `pipeline/seed_context_weight.py` — seed BTC (`net_liquidity`/`etf_flow`
-  =HIGH, `fear_greed`/`dxy`=MED, persis Master Plan §4.3).
-- 46 test baru (total 80), semua hijau. Diverifikasi juga dengan data BTC
-  ASLI (4.313 baris, 2014-2026): 119 zona (117 aktif), 455 sinyal — **0
-  di antaranya `approved=1`** (regression guard, bukan cuma di test
-  sintetis).
-- Cron: **tidak** dijadwalkan otomatis (§7.6) — dijalankan manual, sejalan
-  dengan keputusan cron production akan pindah ke server, lokal cuma dev.
+  in `analysis/*`), zone UPSERT (preserving human-entered
+  `validated`/`notes` on re-run), deduplicated signal INSERT, `approved`
+  **hardcoded 0** at the single write point.
+- `tools/review_signal.py` — CLI approve/reject **by explicit id**, no
+  approve-all mode (Master Plan §3: Giel approves, not the machine).
+- `pipeline/seed_context_weight.py` — BTC seed (`net_liquidity`/`etf_flow`
+  =HIGH, `fear_greed`/`dxy`=MED, exactly per Master Plan §4.3).
+- 46 new tests (80 total), all green. Also verified with REAL BTC data
+  (4,313 rows, 2014-2026): 119 zones (117 active), 455 signals — **0 of
+  them `approved=1`** (a regression guard, not just in synthetic tests).
+- Cron: **not** scheduled automatically (§7.6) — run manually, in line with
+  the decision that production cron will move to a server, local is dev
+  only.
 
-**Belum termasuk** (sesuai batas scope `plan_b.txt` §9): dashboard approve
-button (Phase C), instrument selain BTC (Phase F+), forward layer (Phase D).
+**Not yet included** (per `plan_b.txt` §9 scope boundary): dashboard
+approve button (Phase C), instruments other than BTC (Phase F+), forward
+layer (Phase D).
 
 ---
 
 <a id="anchor-phase-c-status"></a>
-## ✅ Phase C — Dashboard/UI Penuh (selesai)
+## ✅ Phase C — Full Dashboard/UI (complete)
 
-**Execution plan: `plan_c.txt` (dihapus setelah selesai)** — 5 Open Questions §6
-direview & dikunci Giel, dieksekusi persis sesuai itu. Dashboard sekarang
-**write-enabled** (pertama kalinya, sebelumnya 100% read-only di Phase 1) —
-navigasi 6 tab sesuai alur pagi Master Plan §0/§6.
+**Execution plan: `plan_c.txt` (deleted after completion)** — the 5 Open
+Questions in §6 were reviewed & locked in by Giel, executed exactly per
+that. The dashboard is now **write-enabled** (for the first time, previously
+100% read-only in Phase 1) — 6-tab navigation following the morning flow in
+Master Plan §0/§6.
 
-**Deliverable per panel:**
-- **Panel 1** (Data Snapshot): + form Manual Backfill, preview-then-confirm
-  (reuse `pipeline.backfill.backfill(preview_only=True)`, ekstensi kecil
-  backward-compatible — CLI tidak berubah).
-- **Panel 2** (News Briefing): + tombol flag key trigger (`daily_news.
-  is_key_trigger`), + form "Add Manual Article" (reuse `pipeline.add_article
-  .insert_article()`). *Bug ketemu & diperbaiki saat verifikasi: endpoint
-  `/api/news` tidak pernah SELECT kolom `id` (tidak perlu di Phase 1
-  read-only) — tombol flag butuh itu, sudah ditambahkan.*
-- **Panel 3** (Forward Panel): Economic Calendar tampil data ASLI (76+ event
-  dari Phase A) dengan countdown hari; Policy Tracker form manual + list
-  (independen Phase D, sesuai keputusan #1); Expectations/Positioning/
-  Disonansi tampil **empty state** eksplisit (bukan error) — nunggu Phase D.
-- **Panel 4** (Reading Workspace): 4 lensa GEMA/LEON/AKELA/RIVAN + External
-  AI Check (manual paste, BUKAN pemanggilan AI) + Conflict Notes. Simpan
-  cuma field yang terisi (skip kosong) ke `reading_workspace`
+**Deliverables per panel:**
+- **Panel 1** (Data Snapshot): + Manual Backfill form, preview-then-confirm
+  (reuses `pipeline.backfill.backfill(preview_only=True)`, a small
+  backward-compatible extension — the CLI is unchanged).
+- **Panel 2** (News Briefing): + key-trigger flag button
+  (`daily_news.is_key_trigger`), + "Add Manual Article" form (reuses
+  `pipeline.add_article.insert_article()`). *Bug found & fixed during
+  verification: the `/api/news` endpoint never SELECTed the `id` column
+  (not needed in the Phase 1 read-only version) — the flag button needs it,
+  now added.*
+- **Panel 3** (Forward Panel): Economic Calendar shows REAL data (76+
+  events from Phase A) with a day countdown; Policy Tracker manual form +
+  list (independent of Phase D, per decision #1); Expectations/Positioning/
+  Dissonance show an explicit **empty state** (not an error) — waiting on
+  Phase D.
+- **Panel 4** (Reading Workspace): 4 lenses GEMA/LEON/AKELA/RIVAN + External
+  AI Check (manual paste, NOT an AI call) + Conflict Notes. Only saves
+  fields that are filled in (skips empty ones) to `reading_workspace`
   (`lens` ∈ {GEMA,LEON,AKELA,RIVAN,EXTERNAL_AI,CONFLICT,SYNTHESIS}).
-- **Panel 5** (Chart + TA): upgrade dari line-chart Phase 1 jadi **candlestick
-  OHLCV + S&R zone overlay + marker breakout/retest + Approve/Reject**
-  (reuse `tools.review_signal.set_review()`, `approved` tetap manual).
-  MA50/100/200 overlay + volume bar/MA20 + 4 context mini-chart (DXY/S&P
-  500/US10Y/Fear&Greed) sempat ditunda (keputusan #2), **sudah dikerjakan
-  menyusul** — lihat [Backlog Kecil](#anchor-backlog).
-- **Panel 6** (Synthesis): textarea sintesis (→ `reading_workspace` lens=
-  SYNTHESIS) + outlook dropdown **5 instrumen** (BTC/SP500/IHSG/GOLD/USDIDR,
-  USDJPY dikecualikan — keputusan #5) + form Trading Journal + Prediction
-  Log + widget skor prediksi (BENAR/SALAH/PARTIAL).
+- **Panel 5** (Chart + TA): upgraded from the Phase 1 line chart to a
+  **candlestick OHLCV + S&R zone overlay + breakout/retest markers +
+  Approve/Reject** (reuses `tools.review_signal.set_review()`, `approved`
+  remains manual). MA50/100/200 overlay + volume bar/MA20 + 4 context
+  mini-charts (DXY/S&P 500/US10Y/Fear&Greed) were briefly deferred
+  (decision #2), **later completed anyway** — see [Small Backlog](#anchor-backlog).
+- **Panel 6** (Synthesis): synthesis textarea (→ `reading_workspace`
+  lens=SYNTHESIS) + outlook dropdown for **5 instruments** (BTC/SP500/
+  IHSG/GOLD/USDIDR, USDJPY excluded — decision #5) + Trading Journal form +
+  Prediction Log + prediction score widget (BENAR/SALAH/PARTIAL = CORRECT/
+  WRONG/PARTIAL).
 
-**Verifikasi:** bukan cuma pytest (92 test, semua hijau) — tiap panel
-dicoba LANGSUNG via browser preview (isi form → submit → cek tersimpan di
-DB via query langsung → data test dibersihkan lagi). Approve/reject sinyal,
-flag key trigger, kedua form Panel 3/4/6, semuanya dikonfirmasi menulis
-dengan benar ke tabel yang tepat.
+**Verification:** not just pytest (92 tests, all green) — each panel was
+tried DIRECTLY via browser preview (fill form → submit → check it saved in
+DB via direct query → test data cleaned up again). Approve/reject signal,
+key-trigger flag, both Panel 3/4/6 forms, all confirmed to write correctly
+to the right table.
 
-**Belum termasuk** (sesuai batas `plan_c.txt`, bukan terlewat): scraper
-otomatis Expectations/Positioning/Policy Tracker (Phase D), Telegram bot
-(Phase E), multi-instrument analysis engine (Phase F+), autentikasi (belum
-perlu — local-only). Panel 5 MA/volume/context-chart yang tadinya backlog
-**sudah selesai juga** (lihat [Backlog Kecil](#anchor-backlog)).
+**Not yet included** (per `plan_c.txt` boundary, not missed): automated
+scraper for Expectations/Positioning/Policy Tracker (Phase D), Telegram bot
+(Phase E), multi-instrument analysis engine (Phase F+), authentication
+(not needed yet — local-only). The Panel 5 MA/volume/context-chart backlog
+item **has also now been completed** (see [Small Backlog](#anchor-backlog)).
 
 ---
 
 ## ✅ Phase D — Forward Layer
 
-**Selesai** — `plan_d.txt` (dihapus setelah selesai) dieksekusi penuh. Scope (Master
-Plan §4.2, 3 stage): Policy Tracker (Stage 3/Layer A) sudah dikerjakan
-lebih awal di Phase C (independen dari urutan Phase D). Sisa scope:
+**Complete** — `plan_d.txt` (deleted after completion) fully executed.
+Scope (Master Plan §4.2, 3 stages): Policy Tracker (Stage 3/Layer A) was
+already done earlier in Phase C (independent of the Phase D ordering).
+Remaining scope:
 
-- **Riset sumber sebelum eksekusi** (dicek langsung, bukan asumsi):
-  - CME FedWatch: TIDAK ADA API gratis (resmi mulai $25/bulan) → **manual**.
-  - Fed Dot Plot/SEP: rilis PDF kuartalan → **manual** (sesuai rencana awal).
-  - COT report: CFTC Socrata API **gratis, tanpa API key** (dikonfirmasi
-    live query) → **diotomatisasi**.
-  - BTC ETF flow: farside.co.uk tidak punya API resmi, dan situsnya di
-    belakang Cloudflare — `requests` dengan header default (`Accept:
-    application/json`, UA bot) kena challenge page, header browser-realistis
-    (UA Chrome + `Accept: text/html` + `Accept-Language`) lolos →
-    **diotomatisasi** (HTML scrape, sama profil risiko dengan ForexFactory/
-    RSS: kalau situs berubah, `source_flags` fail + lanjut, tidak crash).
-  - SBN foreign flow: djppr.kemenkeu.go.id tidak scrape-able reliable (fetch
-    polos tidak dapat konten bermakna, indikasi SPA) → **manual**.
+- **Source research before execution** (checked directly, not assumed):
+  - CME FedWatch: NO free API (official one starts at $25/month) →
+    **manual**.
+  - Fed Dot Plot/SEP: released as a quarterly PDF → **manual** (per the
+    original plan).
+  - COT report: CFTC Socrata API is **free, no API key** (confirmed via
+    a live query) → **automated**.
+  - BTC ETF flow: farside.co.uk has no official API, and the site sits
+    behind Cloudflare — `requests` with default headers (`Accept:
+    application/json`, bot UA) hits a challenge page, browser-realistic
+    headers (Chrome UA + `Accept: text/html` + `Accept-Language`) get
+    through → **automated** (HTML scrape, same risk profile as
+    ForexFactory/RSS: if the site changes, `source_flags` fails and
+    continues, doesn't crash).
+  - SBN foreign flow: djppr.kemenkeu.go.id isn't reliably scrapable (a
+    plain fetch doesn't get meaningful content, indicating an SPA) →
+    **manual**.
 - **`scrapers/positioning.py`**: `fetch_cot_positioning()` (BTC/DXY/GOLD/
-  SP500, metric `cot_net_long` = noncomm long−short dari CFTC Legacy Futures
-  Only report) + `fetch_btc_etf_flow()` (10 hari terakhir dari farside.co.uk,
-  metric `etf_net_flow`). Terintegrasi ke `run_daily` (dipanggil tiap hari;
-  COT cuma nambah row kalau memang ada rilis mingguan baru — idempotent).
-- **`positioning` UPSERT**: `idx_positioning_dedup` UNIQUE(date, instrument,
-  metric) ditambah ke schema; `pipeline/run_daily.py::upsert_positioning()`.
-- **Manual entry generik** (`web/writes.py::insert_positioning_manual`):
-  satu form dipakai baik utk SBN foreign flow (metric bebas TEXT) MAUPUN
-  koreksi manual atas row hasil scrape (mis. ETF flow) — `ON CONFLICT DO
-  UPDATE` by natural key, sesuai keputusan #2 di `plan_d.txt`.
-- **Expectations** (`insert_expectation`/`list_expectations`): form manual
-  CME FedWatch cut probability & Dot Plot median.
-- **Disonansi Flag** (`compute_disonansi`): aturan v1 sederhana (BUKAN AI) —
-  bandingkan sign `stance_score` terbaru (Policy Tracker) vs tren
-  `cot_net_long` DXY 14 hari terakhir; kalau berlawanan arah → flagged.
-  Return `{"available": false}` kalau data belum cukup (butuh ≥1
-  stance_score DAN ≥2 baris COT DXY dalam window) — empty-state eksplisit,
-  bukan error.
-- **Dashboard Panel 3**: 3 empty-state lama (Expectations/Positioning/
-  Disonansi) diganti tabel+form asli.
-- **Test baru**: `tests/test_positioning.py` (scraper, live network + unit
-  parse helper) + 6 test baru di `tests/test_web_writes.py` — total 108 test.
-- **Belum otomatis** (dicatat, bukan terlewat): SBN foreign flow (sumber
-  tidak scrape-able), CME FedWatch/Dot Plot (tidak ada API gratis) — semua
-  by design, bukan gap teknis.
+  SP500, metric `cot_net_long` = noncommercial long−short from the CFTC
+  Legacy Futures Only report) + `fetch_btc_etf_flow()` (last 10 days from
+  farside.co.uk, metric `etf_net_flow`). Integrated into `run_daily`
+  (called every day; COT only adds a row when there's actually a new
+  weekly release — idempotent).
+- **`positioning` UPSERT**: `idx_positioning_dedup` UNIQUE(date,
+  instrument, metric) added to the schema;
+  `pipeline/run_daily.py::upsert_positioning()`.
+- **Generic manual entry** (`web/writes.py::insert_positioning_manual`):
+  one form used both for SBN foreign flow (free-text metric) AND for
+  manual correction of scraped rows (e.g. ETF flow) — `ON CONFLICT DO
+  UPDATE` by natural key, per decision #2 in `plan_d.txt`.
+- **Expectations** (`insert_expectation`/`list_expectations`): manual form
+  for CME FedWatch cut probability & Dot Plot median.
+- **Dissonance Flag** (`compute_disonansi`): a simple v1 rule (NOT AI) —
+  compares the sign of the latest `stance_score` (Policy Tracker) vs the
+  14-day trend of `cot_net_long` for DXY; if they diverge → flagged.
+  Returns `{"available": false}` if there isn't enough data yet (needs ≥1
+  stance_score AND ≥2 DXY COT rows within the window) — an explicit empty
+  state, not an error.
+- **Dashboard Panel 3**: the 3 old empty states (Expectations/Positioning/
+  Dissonance) replaced with real tables+forms.
+- **New tests**: `tests/test_positioning.py` (scraper, live network + unit
+  parse helper) + 6 new tests in `tests/test_web_writes.py` — 108 tests
+  total.
+- **Not yet automated** (noted, not missed): SBN foreign flow (source not
+  scrapable), CME FedWatch/Dot Plot (no free API) — all by design, not a
+  technical gap.
 
 ---
 
 ## ✅ Phase E — Telegram Bot
 
-**Selesai (push satu arah)** — `plan_e.txt` (dihapus setelah selesai) dieksekusi penuh.
+**Complete (one-way push)** — `plan_e.txt` (deleted after completion)
+fully executed.
 
-- **Kenapa PUSH MANUAL, bukan auto dari `run_daily`**: isi briefing (4
-  Lensa, Signal approved) baru lengkap SETELAH Giel selesai Panel 4-6
-  (~07:20) — `run_daily` jalan jam 07:00, jauh sebelum itu. Auto-push
-  nempel di `run_daily` bakal selalu kosong di bagian terpenting. Detail
-  lengkap: [ARCHITECTURE.md §6.12](ARCHITECTURE.md#612-telegram-daily-briefing--push-manual-sengaja-tidak-nempel-run_daily).
-- **`notify/telegram.py`**: `send_message()` (push Bot API `sendMessage`,
-  pakai `requests` biasa — TIDAK nambah dependency berat) + `get_latest_
-  chat_id()` (helper setup sekali pakai lewat `getUpdates`).
-- **`pipeline/compose_briefing.py`**: rakit teks briefing PERSIS format
-  Master Plan §8 (Market Snapshot, Key Events, 4 Lensa, Signal,
-  disclaimer wajib) — pure function, murni baca data yang SUDAH Giel isi
-  manual, tidak generate apa pun.
-- **`pipeline/send_briefing.py`**: CLI (`--dry-run`/`--date`) + tombol
-  "Kirim ke Telegram" di Panel 6 dashboard (`POST /api/briefing/send`).
-- **Section kosong** (mis. lensa belum diisi) tampil `(belum diisi)` —
-  bukan disembunyikan, biar Giel sadar ada yang kelewat. Key Events
-  dihilangkan total kalau memang tidak ada news yang di-flag key-trigger
-  hari itu (beda kasus — bukan "wajib diisi Giel").
-- **>1 sinyal approved** hari yang sama -> semua ditampilkan, 1 baris per
-  sinyal (bukan cuma yang terbaru).
-- **Test**: `tests/test_compose_briefing.py` (pure function, tanpa
-  network) + `tests/test_notify_telegram.py` (di-mock pakai `monkeypatch`
-  — SATU-SATUNYA scraper/notify module yang test-nya tidak live-network,
-  karena ini operasi SEND, bukan READ — lihat ARCHITECTURE.md §6.12).
-- **Ditunda ke backlog** (butuh host always-on, bukan gap): bot commands
-  dua-arah (`/snapshot`, `/news` on-demand) — perlu proses long-polling
-  yang selalu nyala, laptop lokal tidak selalu on. Konsisten dengan
-  keputusan DB & scheduler "local dulu, VPS nanti".
-- **Setup manual yang tidak bisa diotomasi**: Giel perlu bikin bot lewat
-  `@BotFather` + ambil `chat_id` sendiri (lihat README §Setup Telegram) —
-  sama pola dengan `FRED_API_KEY`.
+- **Why MANUAL PUSH, not auto from `run_daily`**: the briefing content (4
+  Lenses, approved Signal) is only complete AFTER Giel finishes Panels 4-6
+  (~07:20) — `run_daily` runs at 07:00, well before that. Auto-push tied
+  to `run_daily` would always be empty in the most important part. Full
+  detail: [ARCHITECTURE.md §6.12](ARCHITECTURE.md#612-telegram-daily-briefing--push-manual-sengaja-tidak-nempel-run_daily).
+- **`notify/telegram.py`**: `send_message()` (push via Bot API
+  `sendMessage`, using plain `requests` — NO heavy new dependency) +
+  `get_latest_chat_id()` (one-time setup helper via `getUpdates`).
+- **`pipeline/compose_briefing.py`**: assembles the briefing text EXACTLY
+  per the Master Plan §8 format (Market Snapshot, Key Events, 4 Lenses,
+  Signal, mandatory disclaimer) — a pure function, purely reads data that
+  Giel has ALREADY filled in manually, doesn't generate anything.
+- **`pipeline/send_briefing.py`**: CLI (`--dry-run`/`--date`) + "Send to
+  Telegram" button on the dashboard's Panel 6 (`POST /api/briefing/send`).
+- **Empty sections** (e.g. a lens not yet filled in) show `(belum diisi)`
+  ("not filled in yet") — not hidden, so Giel notices something was
+  missed. Key Events is dropped entirely if there really is no news
+  flagged as a key trigger that day (a different case — not "Giel must
+  fill this in").
+- **More than 1 approved signal** on the same day -> all are shown, 1 line
+  per signal (not just the latest one).
+- **Tests**: `tests/test_compose_briefing.py` (pure function, no network) +
+  `tests/test_notify_telegram.py` (mocked with `monkeypatch` — the ONLY
+  scraper/notify module whose tests are not live-network, because this is
+  a SEND operation, not READ — see ARCHITECTURE.md §6.12).
+- **Deferred to backlog** (needs an always-on host, not a gap): two-way
+  bot commands (`/snapshot`, `/news` on-demand) — needs a long-polling
+  process that's always running, a local laptop isn't always on.
+  Consistent with the DB & scheduler decision "local first, VPS later".
+- **Manual setup that can't be automated**: Giel needs to create a bot via
+  `@BotFather` + get his own `chat_id` (see README §Telegram Setup) — same
+  pattern as `FRED_API_KEY`.
 
 ---
 
-## 🟡 Phase F+ — Multi-Aset Expansion
+## 🟡 Phase F+ — Multi-Asset Expansion
 
-**GOLD/SP500/IHSG/USDIDR/USDJPY selesai diaktifkan** (Master Plan §10,
-Phase F/G/H/I digabung 1 pass — `analysis/*.py` sudah generic sejak Phase B,
-jadi ini murni "nyalain buat instrument lain", bukan bikin fitur baru).
-USDJPY awalnya dikecualikan (keputusan #5 plan_c.txt, khusus utk Panel 6
-outlook dropdown) tapi karena datanya sudah lengkap sejak Phase A, Giel
-minta diikutkan juga di analysis engine ini.
+**GOLD/SP500/IHSG/USDIDR/USDJPY successfully activated** (Master Plan §10,
+Phases F/G/H/I merged into 1 pass — `analysis/*.py` has been generic since
+Phase B, so this is purely "turn it on for other instruments," not
+building new features). USDJPY was originally excluded (decision #5 in
+plan_c.txt, specific to the Panel 6 outlook dropdown) but since its data
+has been complete since Phase A, Giel asked for it to be included in this
+analysis engine too.
 
-Yang sebelumnya cuma jalan utk BTC, sekarang jalan utk keenam instrument:
+What previously only ran for BTC now runs for all six instruments:
 - **`pipeline/run_analysis.py`**: `INSTRUMENTS = ["BTC","GOLD","IHSG","SP500",
-  "USDIDR","USDJPY"]` — `python -m pipeline.run_analysis` (tanpa flag)
-  proses SEMUA sekaligus; `--instrument X` masih bisa jalan 1 saja.
-  `sr_zones`/`trade_signals` sekarang terisi utk keenam instrument (GOLD 74
-  zona/433 sinyal, IHSG 73/251, SP500 90/123, USDIDR 65/0, USDJPY 64/0 —
-  USDIDR & USDJPY belum ada breakout/retest valid di histori saat ini,
-  bukan bug).
+  "USDIDR","USDJPY"]` — `python -m pipeline.run_analysis` (no flag)
+  processes ALL at once; `--instrument X` can still run just one.
+  `sr_zones`/`trade_signals` are now populated for all six instruments
+  (GOLD 74 zones/433 signals, IHSG 73/251, SP500 90/123, USDIDR 65/0,
+  USDJPY 64/0 — USDIDR & USDJPY have no valid breakout/retest in their
+  history yet, not a bug).
 - **`pipeline/seed_context_weight.py`**: `GOLD_WEIGHTS`/`SP500_WEIGHTS`/
-  `IHSG_WEIGHTS`/`FOREX_WEIGHTS` (USDIDR)/`USDJPY_WEIGHTS` ditambah, persis
-  contoh driver Master Plan §4.3 (mis. GOLD: real_yield/dxy/geopolitik;
-  USDJPY: rate_differential BOJ-vs-Fed/trade_balance Jepang-AS). `main()`
-  seed keenam instrument sekaligus.
-- **Dashboard Panel 5**: TIDAK perlu diubah — dropdown instrument &
-  `/api/asset_ohlcv`, `/api/sr_zones`, `/api/signals` sudah generic sejak
-  Phase C, chart+zona+sinyal langsung tampil begitu data ada. Diverifikasi
-  di browser: GOLD/IHSG/SP500/USDIDR/USDJPY semua render chart+zona
-  relevan+tabel sinyal dengan benar.
-- **Test baru**: `test_seed_context_weight.py` nambah 1 test utk 5
-  instrument baru. 121 test hijau total.
-- **Catatan**: Panel 6 "Outlook per Instrumen" (`OUTLOOK_INSTRUMENTS` di
-  `web/app.py`) MASIH 5 instrumen tanpa USDJPY — itu keputusan #5
-  `plan_c.txt` yang terpisah dari analysis engine ini, belum diminta
-  diubah.
+  `IHSG_WEIGHTS`/`FOREX_WEIGHTS` (USDIDR)/`USDJPY_WEIGHTS` added, exactly
+  matching the driver examples in Master Plan §4.3 (e.g. GOLD:
+  real_yield/dxy/geopolitics; USDJPY: BOJ-vs-Fed rate differential/Japan-
+  US trade balance). `main()` seeds all six instruments at once.
+- **Dashboard Panel 5**: did NOT need changes — the instrument dropdown &
+  `/api/asset_ohlcv`, `/api/sr_zones`, `/api/signals` have been generic
+  since Phase C, chart+zones+signals display as soon as data exists.
+  Verified in browser: GOLD/IHSG/SP500/USDIDR/USDJPY all render the
+  relevant chart+zones+signal table correctly.
+- **New tests**: `test_seed_context_weight.py` adds 1 test for the 5 new
+  instruments. 121 tests green total.
+- **Note**: Panel 6 "Outlook per Instrument" (`OUTLOOK_INSTRUMENTS` in
+  `web/app.py`) STILL has 5 instruments without USDJPY — that's decision
+  #5 from `plan_c.txt`, separate from this analysis engine, not yet asked
+  to be changed.
 
-**Belum dikerjakan** (di luar scope "pastikan 4 instrument ini jalan"):
-altcoin lain, saham individual, komoditas tambahan, tinjau ulang SQLite
-kalau volume/concurrency berubah signifikan (lihat
+**Not yet done** (outside the scope of "make sure these 4 instruments
+work"): other altcoins, individual stocks, additional commodities,
+revisiting SQLite if volume/concurrency changes significantly (see
 [ARCHITECTURE.md §6.1](ARCHITECTURE.md#61-sqlite-vs-postgres-vs-nosql)).
 
 ---
 
 <a id="anchor-backlog"></a>
-## Backlog Kecil (tidak terikat 1 phase, bisa dikerjakan kapan saja)
+## Small Backlog (not tied to one phase, can be done any time)
 
-Hal-hal konkret yang sudah teridentifikasi selama Phase A/1 tapi belum
-dikerjakan — dicatat di sini supaya tidak hilang, bukan komitmen jadwal:
+Concrete items that were identified during Phase A/1 but not yet done —
+recorded here so they don't get lost, not a schedule commitment:
 
-- [x] ~~Cron otomatis untuk `run_daily`~~ — crontab terinstall & diverifikasi
-      (lihat [gap checklist](#anchor-gap-phase-a)). **Sisa:** jalankan
-      `sudo service cron start` sekali (butuh password interaktif, tidak bisa
-      dieksekusi otomatis) + opsional `[boot] command=service cron start` di
-      `/etc/wsl.conf` biar cron ikut nyala tiap kali instance WSL start.
-- [x] ~~Scraper Economic Calendar~~ — `scrapers/econ_calendar.py` selesai,
-      terintegrasi ke `run_daily`, 6 test hijau.
-- [x] ~~3 tabel forward-layer~~ — `expectations`/`positioning`/
-      `policy_tracker` sudah di `schema.sql`.
-- [x] ~~Backfill penuh 5 tahun~~ — **selesai** untuk semua instrument
-      (`BTC` 2014-2026, `SP500`/`IHSG`/`GOLD`/`USDIDR`/`USDJPY` 2010-2026,
-      4.000+ baris masing-masing) + semua series FRED (lihat item
-      `hy_credit_spread` di bawah untuk penjelasan kenapa satu series lebih
-      pendek — **bukan gap**, `walcl`/`tga` yang rendah juga WAJAR, seri
-      publikasi mingguan bukan harian).
+- [x] ~~Automatic cron for `run_daily`~~ — crontab installed & verified
+      (see the [gap checklist](#anchor-gap-phase-a)). **Remaining:** run
+      `sudo service cron start` once (needs an interactive password, can't
+      be run automatically) + optionally `[boot] command=service cron
+      start` in `/etc/wsl.conf` so cron starts automatically every time the
+      WSL instance starts.
+- [x] ~~Economic Calendar scraper~~ — `scrapers/econ_calendar.py` done,
+      integrated into `run_daily`, 6 tests green.
+- [x] ~~3 forward-layer tables~~ — `expectations`/`positioning`/
+      `policy_tracker` already in `schema.sql`.
+- [x] ~~Full 5-year backfill~~ — **done** for all instruments (`BTC`
+      2014-2026, `SP500`/`IHSG`/`GOLD`/`USDIDR`/`USDJPY` 2010-2026, 4,000+
+      rows each) + all FRED series (see the `hy_credit_spread` item below
+      for why one series is shorter — **not a gap**, `walcl`/`tga` being
+      low is also NORMAL, weekly publication series not daily).
 - [x] ~~Panel 5 chart MA/volume/context~~ — MA50/100/200 overlay, volume
-      bar+MA20, 4 context mini-chart (DXY/S&P500/US10Y/Fear&Greed) selesai,
-      diverifikasi via browser (120 titik penuh tiap garis MA, tanpa NaN).
-- [x] ~~Panel 5 chart: penanda tanggal/bulan + filter rentang~~ — sumbu bawah
-      chart sekarang nampilin label bulan/tahun (tick otomatis di titik
-      pergantian bulan, di-thin maks. 9 label biar gak numpuk saat rentang
-      panjang), plus 5 tombol filter rentang (1B/3B/6B/1T/Semua) di atas
-      chart yang ganti jumlah candle yang di-fetch & ditampilkan
-      (`CHART_VISIBLE`, default 90 hari). "Semua" narik s.d. 5.000 baris
-      (cap di `/api/asset_ohlcv`, dinaikkan dari 1.000) — cukup untuk histori
-      BTC penuh (~4.300 baris sejak 2014). Diverifikasi di browser: tiap
-      tombol filter mengubah rentang tanggal & jumlah candle yang benar
-      (1B → 30 hari/2 label, Semua → 2014-2026/9 label).
-- [x] ~~Panel 5 chart: sumbu harga (Y) + fix skala tertarik zona jauh~~ —
-      ditambah gridline + label harga di kanan chart biar angka open/close
-      kebaca langsung. Nemu bug pas nambahin ini: `sr_zones` narik SEMUA
-      zona aktif sepanjang histori (termasuk era BTC ~$200), jadi skala Y
-      dulu ke-stretch 199 → 124.457 dan candle beneran keliatan gepeng di
-      dasar chart. Fix: cuma zona yang overlap ±50% dari rentang harga yang
-      lagi tampil dipakai buat skala & digambar (`relevantZones`); label
-      "N/117 zona aktif" nunjukin berapa dari total yang relevan ke harga
-      saat ini. Diverifikasi: 3B → 29/117 zona relevan & axis 42.874-98.286
-      (masuk akal), Semua → 117/117 (span histori penuh, benar).
-- [x] ~~Investigasi `hy_credit_spread`~~ — **BUKAN bug/gap kita.** Dicek
-      langsung ke FRED (`/fred/series` metadata untuk `BAMLH0A0HYM2`):
+      bar+MA20, 4 context mini-charts (DXY/S&P500/US10Y/Fear&Greed) done,
+      verified via browser (120 points across each MA line, no NaN).
+- [x] ~~Panel 5 chart: date/month markers + range filter~~ — the chart's
+      bottom axis now shows month/year labels (auto ticks at month
+      changes, thinned to max 9 labels so they don't crowd during long
+      ranges), plus 5 range filter buttons (1M/3M/6M/1Y/All) above the
+      chart that change how many candles are fetched & shown
+      (`CHART_VISIBLE`, default 90 days). "All" pulls up to 5,000 rows
+      (cap in `/api/asset_ohlcv`, raised from 1,000) — enough for the full
+      BTC history (~4,300 rows since 2014). Verified in browser: each
+      filter button correctly changes the date range & number of candles
+      (1M → 30 days/2 labels, All → 2014-2026/9 labels).
+- [x] ~~Panel 5 chart: price (Y) axis + fix scale stretched by far zones~~ —
+      added gridlines + price labels on the right of the chart so
+      open/close numbers can be read directly. Found a bug while adding
+      this: `sr_zones` was pulling in ALL active zones across the whole
+      history (including the ~$200 BTC era), so the Y scale used to be
+      stretched 199 → 124,457 and real candles looked flattened at the
+      bottom of the chart. Fix: only zones overlapping ±50% of the
+      currently visible price range are used for scaling & drawn
+      (`relevantZones`); the "N/117 active zones" label shows how many of
+      the total are relevant to the current price. Verified: 3M → 29/117
+      relevant zones & axis 42,874-98,286 (makes sense), All → 117/117
+      (full history span, correct).
+- [x] ~~Investigate `hy_credit_spread`~~ — **NOT our bug/gap.** Checked
+      directly against FRED (`/fred/series` metadata for `BAMLH0A0HYM2`):
       *"Starting in April 2026, this series will only include 3 years of
-      observations. For more data, go to the source."* — ICE Data (pemilik
-      data ini) sengaja membatasi seri ini ke rolling 3-tahun karena lisensi
-      dengan FRED, bukan keterbatasan scraper/backfill kita. Dikonfirmasi:
-      DB kita sudah punya 787 dari 793 total observasi yang FRED sediakan
-      (re-run backfill: 0 baris baru = cakupan sudah lengkap). Histori lebih
-      panjang dari series ini **tidak tersedia gratis** — cuma lewat ICE Data
-      langsung (berbayar), di luar scope "no paid API".
-- [x] ~~Panel 3 Economic Calendar: tampilkan forecast/previous + isi actual~~
-      — `forecast`/`previous` sebenarnya sudah discrape sejak awal tapi tidak
-      pernah ditampilkan; sekarang muncul sebagai kolom di tabel. `actual`
-      **tidak pernah** disediakan ForexFactory (dicek langsung ke raw JSON
-      endpoint — field itu tidak ada sama sekali di respons), jadi diisi
-      **manual** lewat dashboard: input inline + tombol "Simpan" per baris
-      (`POST /api/econ_calendar/actual`, `web/writes.py::set_econ_actual`),
-      berubah jadi tombol "Ubah" begitu terisi. Query `/api/econ_calendar`
-      juga diperluas dari "hari ini + mendatang" jadi "H-7 s.d. mendatang"
-      biar event yang baru rilis kemarin masih muncul untuk diisi actual-nya.
-      2 test baru (`test_web_writes.py`), diverifikasi live di browser +
-      query DB langsung.
-- [x] ~~Forward panel: urutkan Economic Calendar berdasar tanggal + filter
-      importance~~ — sebelumnya event lama nongkrong di atas tabel, sekarang
-      di-sort (upcoming/hari-ini dulu, event lewat didorong ke bawah) + filter
-      dropdown default **HIGH saja (bintang 3)**, opsi "HIGH + MED" kalau
-      perlu lihat semua. Murni client-side (`ForwardView.vue`), tidak ubah API.
-- [x] ~~Earnings emiten tampil di Forward panel (J-15 gel.2, kontrak §19.5)~~
-      — `earnings_calendar` (data J-7 sudah ada sejak lama, TAPI tidak pernah
-      di-surface: tak ada endpoint, tak ada di UI) sekarang tampil di
-      `ForwardView.vue` section "Earnings Emiten", berdampingan dgn Economic
-      Calendar ("gabung visual" = section terpisah, bukan 2 skema dipaksa 1
-      tabel). READ-ONLY (eps_actual diisi scraper, bukan manual). Kolom:
-      countdown, EPS forecast/actual, surprise (beat hijau/miss merah).
-      **WARNING earnings posisi terbuka** (kontrak §18 keputusan #3):
-      `trading_journal.outcome='ONGOING'` JOIN `earnings_calendar` mendatang →
-      badge merah "tutup penuh" utk saham AS (`hard_rule`, penegak rule
-      no-hold-through-earnings), badge informatif utk IDX (tak ada aturan
-      tutup-penuh, gap tetap risiko). 2 read helper baru
-      (`list_earnings_calendar`/`list_earnings_warnings`, `web/writes.py`) +
-      2 endpoint (`GET /api/earnings`, `/api/earnings/warnings`). 5 test baru
-      (`test_web_writes.py`), diverifikasi direct-Python ke DB asli (earnings
-      2026-07-22 muncul H-7) + skenario warning temp-DB (TSLA/US hard,
-      BBCA/IDX soft, posisi lewat/jauh di-skip).
-- [x] ~~News Threads N-1 fondasi (Addendum B §20, adendum Giel)~~ — gap
-      Addendum B yang SEBELUMNYA belum dibangun sama sekali (beda dari
-      Addendum A/Panel Universe yang sudah selesai J-14/J-15). **N-1 saja**
-      (fondasi) — N-2 (strip Reading, injeksi digest ke `compose_persona_
-      context.py`, auto-DORMANT) SENGAJA belum dibangun, kontrak sendiri
-      membagi 2 gelombang & N-2 perlu N-1 dipakai beberapa hari dulu sbg
-      bahan uji.
-      **Schema**: 3 tabel baru (`news_threads`, `news_thread_links`,
-      `thread_relations` schema-only utk N-2) + 1 UNIQUE index dedup — 22→25
-      tabel total.
-      **Backend**: `scrapers/news.py::_matches` dipromosikan jadi
-      `scrapers/base.py::keyword_matches()` (reuse rule-based matcher, bukan
-      tulis ulang, dipakai 2 tempat sekarang). `web/writes.py` — `save_thread`
-      (guard title wajib + **maks 7 thread ACTIVE**, ditegakkan di write
-      function bukan cuma UI, keputusan #5), `patch_thread` (guard verdict
-      wajib saat status=CLOSED), `suggest_thread_links` (auto-suggest
-      rule-based, HANYA scan thread ACTIVE, SELALU cuma SUGGESTED — tidak
-      pernah auto-CONFIRMED, human gate §20.0), `confirm_thread_link` (stance
-      WAJIB — anti-confirmation-funnel keputusan #3 — `also_key_trigger`
-      reuse `flag_key_trigger()` existing), `reject_thread_link`,
-      `add_thread_link_manual` (guard ref_table dikenal + dedup), `list_
-      thread_links` (union manual 3 sumber: daily_news/manual_articles/
-      policy_tracker), `attach_thread_suggestions` (CONFIRMED menang atas
-      SUGGESTED kalau 1 berita match >1 thread). `pipeline/run_daily.py`:
-      hook `suggest_thread_links` SETELAH `insert_news_dedup` (butuh row id
-      asli), count masuk `summary`. 7 endpoint baru `/api/threads*`
-      (mutasi via POST, bukan PATCH — konsisten konvensi app ini yang tidak
-      pernah pakai PATCH/PUT di tempat lain) + `/api/news` di-extend nempel
-      `thread_link` per row.
-      **Frontend**: `NewsView.vue` — chip "Saran: `<thread>`?" + Konfirmasi
-      (Dialog pilih stance, checkbox "sekalian key trigger") / Tolak per
-      baris; `ThreadIndexView.vue` (baru, `<DataTable>` + form buat thread) +
-      `ThreadDetailView.vue` (baru, timeline vertikal link CONFIRMED + edit
-      current_read/status/verdict + tautkan manual) — **route `/threads/:id`
-      pertama di app ini yang pakai `:id` dinamis**. Nav sidebar "Threads"
-      ditambah di grup Daily (§20.6: konfirmasi SUGGESTED = ritual pagi) —
-      tanpa ini halaman baru tidak reachable lewat UI normal di N-1.
-      19 test baru (`test_web_writes.py`, guard 7-ACTIVE/verdict-wajib/
-      stance-wajib/ref_table-dikenal/dedup, idempotensi auto-suggest,
-      `also_key_trigger` beneran reuse `flag_key_trigger`). 336 test hijau
-      total. **Diverifikasi live**: `init_db()` dijalankan ke DB asli
-      (tabel baru butuh migrasi — awalnya sempat 500 "no such table" sebelum
-      ini disadari), Flask test-client round-trip penuh (create→list→detail→
-      patch→3 guard 400), DAN `suggest_thread_links` terhadap headline
-      PRODUKSI ASLI hari ini — keyword "hawkish" berhasil match "Bank
-      Sentral Makin Hawkish, Manulife IM Sarankan Pengelolaan Investasi
-      Aktif" dengan status SUGGESTED (bukan auto-CONFIRMED, human gate
-      terbukti jalan). Thread verifikasi di-CLOSE lagi setelahnya (tidak
-      ditinggal ACTIVE di DB asli). `npm run build` sukses (349 module,
-      termasuk `ThreadIndexView`/`ThreadDetailView` — bukti transform
-      SFC baru tidak error; console-check saja tidak cukup karena route
-      lazy-load di balik auth guard tidak pernah di-import kalau belum
-      login).
-- [x] ~~Faceted Tagging C-1 fondasi (Addendum C §21, adendum Giel)~~ — **C-1
-      saja** (fondasi), C-2 (feed manual ke persona, tag-based thread
-      matching) SENGAJA belum dibangun — kontrak sendiri MENGUNCI ini
-      (§21.9 keputusan #7: "bangun C-1+C-2 sekaligus" eksplisit masuk daftar
-      "TIDAK dilakukan", beda dari News Threads yang cuma direkomendasikan).
-      **5 hal dalam 1 paket**: (a) kamus tag facet controlled-vocabulary
-      (geo/org/who/sym/theme/sec, mulai KOSONG), (b) UI command-palette
-      tagging, (c) `display_subtitle` (catatan Giel, headline asli TAK
-      PERNAH ditimpa), (d) rename fungsional `is_key_trigger` →
-      `for_reading` (tag = klasifikasi objektif, for_reading = kurasi
-      subjektif — 2 pertanyaan beda yang dulu dirangkap 1 flag).
-      **Schema**: 2 tabel baru (`tag_dictionary`, `content_tags` — 25→27
-      tabel) + 2 kolom baru di `daily_news` (`display_subtitle`,
-      `for_reading`) lewat `_COLUMN_MIGRATIONS` (BEDA dari tabel baru News
-      Threads — `daily_news` sudah punya data live, jadi lewat jalur
-      migrasi kolom, bukan `CREATE TABLE` — pola sama `asset_context_
-      weight.level`), termasuk backfill one-time `for_reading =
-      is_key_trigger` (idempotent, tidak jalan ulang tiap `init_db()`).
-      **Rename penuh, bukan alias**: `flag_key_trigger()` →
+      observations. For more data, go to the source."* ICE Data (the
+      owner of this data) deliberately limits this series to a rolling
+      3-year window due to licensing with FRED, not a limitation of our
+      scraper/backfill. Confirmed: our DB already has 787 of the 793 total
+      observations FRED provides (re-run backfill: 0 new rows = coverage
+      already complete). Longer history for this series **isn't available
+      for free** — only directly through ICE Data (paid), outside the
+      "no paid API" scope.
+- [x] ~~Panel 3 Economic Calendar: show forecast/previous + fill in actual~~
+      — `forecast`/`previous` had actually been scraped since the start
+      but never displayed; now they appear as columns in the table.
+      `actual` is **never** provided by ForexFactory (checked directly
+      against the raw JSON endpoint — that field doesn't exist at all in
+      the response), so it's filled in **manually** via the dashboard:
+      inline input + a "Save" button per row (`POST
+      /api/econ_calendar/actual`, `web/writes.py::set_econ_actual`),
+      turning into an "Edit" button once filled. The `/api/econ_calendar`
+      query was also expanded from "today + upcoming" to "D-7 through
+      upcoming" so events that just released yesterday still show up to
+      have their actual filled in. 2 new tests (`test_web_writes.py`),
+      verified live in the browser + direct DB query.
+- [x] ~~Forward panel: sort Economic Calendar by date + importance
+      filter~~ — previously old events sat at the top of the table, now
+      it's sorted (upcoming/today first, past events pushed down) + a
+      dropdown filter defaulting to **HIGH only (3 stars)**, with a "HIGH
+      + MED" option to see everything. Purely client-side
+      (`ForwardView.vue`), no API change.
+- [x] ~~Issuer earnings shown in the Forward panel (J-15 wave 2, contract
+      §19.5)~~ — `earnings_calendar` (J-7 data existed for a long time,
+      BUT was never surfaced: no endpoint, not in the UI) now shows in
+      `ForwardView.vue`'s "Issuer Earnings" section, alongside the
+      Economic Calendar ("visually combined" = separate section, not two
+      schemas forced into one table). READ-ONLY (eps_actual is filled by
+      the scraper, not manually). Columns: countdown, EPS forecast/actual,
+      surprise (beat green/miss red). **Open-position earnings WARNING**
+      (contract §18 decision #3): `trading_journal.outcome='ONGOING'`
+      JOIN `earnings_calendar` upcoming → a red "must fully close" badge
+      for US stocks (`hard_rule`, enforcing the no-hold-through-earnings
+      rule), an informational badge for IDX (no full-close rule there, gap
+      risk still exists). 2 new read helpers
+      (`list_earnings_calendar`/`list_earnings_warnings`,
+      `web/writes.py`) + 2 endpoints (`GET /api/earnings`,
+      `/api/earnings/warnings`). 5 new tests (`test_web_writes.py`),
+      verified direct-Python against the real DB (2026-07-22 earnings
+      showed up at D-7) + a warning scenario against a temp DB (TSLA/US
+      hard, BBCA/IDX soft, past/far positions skipped).
+- [x] ~~News Threads N-1 foundation (Addendum B §20, Giel's addendum)~~ — a
+      gap in Addendum B that had PREVIOUSLY not been built at all
+      (different from Addendum A/Universe Panel, which was already done in
+      J-14/J-15). **N-1 only** (foundation) — N-2 (Reading strip, digest
+      injection into `compose_persona_context.py`, auto-DORMANT)
+      DELIBERATELY not built yet, the contract itself splits it into 2
+      waves and N-2 needs N-1 to be used for a few days first as test
+      material.
+      **Schema**: 3 new tables (`news_threads`, `news_thread_links`,
+      `thread_relations` schema-only for N-2) + 1 UNIQUE dedup index —
+      22→25 tables total.
+      **Backend**: `scrapers/news.py::_matches` promoted to
+      `scrapers/base.py::keyword_matches()` (reusing the rule-based
+      matcher, not rewriting it, now used in 2 places). `web/writes.py` —
+      `save_thread` (mandatory-title guard + **max 7 ACTIVE threads**,
+      enforced in the write function not just the UI, decision #5),
+      `patch_thread` (mandatory-verdict guard when status=CLOSED),
+      `suggest_thread_links` (rule-based auto-suggest, ONLY scans ACTIVE
+      threads, ALWAYS just SUGGESTED — never auto-CONFIRMED, human gate
+      §20.0), `confirm_thread_link` (stance is MANDATORY — anti-
+      confirmation-funnel decision #3 — `also_key_trigger` reuses the
+      existing `flag_key_trigger()`), `reject_thread_link`,
+      `add_thread_link_manual` (guards for known ref_table + dedup),
+      `list_thread_links` (union of 3 manual sources: daily_news/
+      manual_articles/policy_tracker), `attach_thread_suggestions`
+      (CONFIRMED wins over SUGGESTED if one news item matches >1 thread).
+      `pipeline/run_daily.py`: hooks `suggest_thread_links` AFTER
+      `insert_news_dedup` (needs the actual row id), count included in
+      `summary`. 7 new `/api/threads*` endpoints (mutations via POST, not
+      PATCH — consistent with this app's convention of never using
+      PATCH/PUT elsewhere) + `/api/news` extended to attach `thread_link`
+      per row.
+      **Frontend**: `NewsView.vue` — a "Suggestion: `<thread>`?" chip +
+      Confirm (a Dialog to pick a stance, checkbox "also flag as key
+      trigger") / Reject per row; `ThreadIndexView.vue` (new, `<DataTable>`
+      + form to create a thread) + `ThreadDetailView.vue` (new, vertical
+      timeline of CONFIRMED links + edit current_read/status/verdict +
+      manual linking) — **the first route in this app with a dynamic
+      `:id`, `/threads/:id`**. Sidebar nav "Threads" added to the Daily
+      group (§20.6: confirming SUGGESTED = a morning ritual) — without
+      this the new pages wouldn't be reachable through normal UI in N-1.
+      19 new tests (`test_web_writes.py`, guards for 7-ACTIVE/mandatory-
+      verdict/mandatory-stance/known-ref_table/dedup, auto-suggest
+      idempotency, `also_key_trigger` genuinely reusing
+      `flag_key_trigger`). 336 tests green total. **Verified live**:
+      `init_db()` run against the real DB (new tables needed a migration —
+      initially got a 500 "no such table" before this was realized), a
+      full Flask test-client round-trip (create→list→detail→patch→3 guard
+      400s), AND `suggest_thread_links` against REAL PRODUCTION headlines
+      today — the keyword "hawkish" successfully matched a headline about
+      the central bank turning more hawkish, Manulife IM recommending
+      active investment management, with status SUGGESTED (not auto-
+      CONFIRMED, the human gate proven to work). The verification thread
+      was CLOSED again afterward (not left ACTIVE in the real DB).
+      `npm run build` succeeded (349 modules, including
+      `ThreadIndexView`/`ThreadDetailView` — proof the new SFC transform
+      doesn't error; a console-check alone isn't enough because the
+      lazy-loaded route behind the auth guard is never imported unless
+      you're logged in).
+- [x] ~~Faceted Tagging C-1 foundation (Addendum C §21, Giel's addendum)~~ —
+      **C-1 only** (foundation), C-2 (manual feed into persona, tag-based
+      thread matching) DELIBERATELY not built yet — the contract itself
+      LOCKS this in (§21.9 decision #7: "build C-1+C-2 at once" explicitly
+      appears on the "NOT to do" list, unlike News Threads which was only
+      recommended against).
+      **5 things in 1 package**: (a) a controlled-vocabulary tag facet
+      dictionary (geo/org/who/sym/theme/sec, starting EMPTY), (b) a
+      command-palette tagging UI, (c) `display_subtitle` (Giel's note, the
+      original headline is NEVER overwritten), (d) a functional rename of
+      `is_key_trigger` → `for_reading` (tag = objective classification,
+      for_reading = subjective curation — two different questions that
+      used to be crammed into 1 flag).
+      **Schema**: 2 new tables (`tag_dictionary`, `content_tags` — 25→27
+      tables) + 2 new columns on `daily_news` (`display_subtitle`,
+      `for_reading`) via `_COLUMN_MIGRATIONS` (DIFFERENT from the News
+      Threads new tables — `daily_news` already has live data, so it goes
+      through the column-migration path, not `CREATE TABLE` — same
+      pattern as `asset_context_weight.level`), including a one-time
+      backfill `for_reading = is_key_trigger` (idempotent, doesn't re-run
+      every `init_db()`).
+      **Full rename, not an alias**: `flag_key_trigger()` →
       `set_for_reading()`, `/api/news/flag_key` → `/api/news/for_reading`,
       `confirm_thread_link`'s `also_key_trigger` → `also_for_reading` —
-      disapu di ~8 file (writes.py, app.py, 2 file pipeline, 2 view Vue, 3
-      file test) via grep menyeluruh, `is_key_trigger` LAMA dibiarkan beku
-      di schema (jangan DROP, DB hidup) tapi tidak dibaca/ditulis lagi.
-      **Backend baru**: `create_tag` (validasi tata bahasa — facet:value,
-      lowercase-hyphen, `sym:` wajib region-prefix — regex PERTAMA di
-      writes.py, tapi idiom raise-ValueError sama persis fungsi lain),
-      `list_tags`/`resolve_tag` (alias), `apply_tag` (guard tag harus ada
-      di kamus dulu + dedup + usage_count naik), `remove_tag`,
-      `list_content_tags`/`attach_content_tags` (batch, mirror
-      `attach_thread_suggestions`). 6 endpoint `/api/tags*`+`/api/content_
-      tags*` baru + `/api/news/<id>/display_subtitle`, semua mutasi via
-      POST (bukan PATCH — konsisten konvensi app ini).
-      **Frontend**: `TagAutocomplete.vue` baru (bungkus PrimeVue
-      `AutoComplete`, sudah tersedia zero-dep di v4.5.5 — grouped dropdown
-      by facet + chip+remove-X bawaan, dikonfirmasi via `npm run build`
-      generate chunk `TagAutocomplete-*.js` beneran, bukan asumsi dari
-      package.json) dipakai 3 tempat: kolom Tag per-baris `NewsView.vue`,
-      filter-chip bar (AND/OR toggle) di News, filter tag di
-      `ReadingView.vue`. `NewsView.vue` juga dapat inline-edit
-      `display_subtitle` (endpoint sempat tidak ke-reach dari UI mana pun
-      sebelum ditambahkan — ketahuan saat review sendiri) + collapsible
-      "Telusuri Semua Tag" (pola sama `source_flags` di SnapshotView,
-      pakai `DataTable.vue` apa adanya).
-      **Bug ketemu saat implementasi**: `attach_content_tags()` awalnya
-      TIDAK menyertakan `content_tags.id` per tag (cuma canonical+facet) —
-      UI tidak akan bisa panggil `remove_tag()` sama sekali tanpa itu.
-      Ketahuan sebelum sempat jadi masalah produksi (saat menyambungkan ke
-      NewsView, bukan lewat bug report) — diperbaiki + test terkait di-update.
-      35 test baru (guard tata bahasa 4 kasus, dedup create/apply, alias
-      resolve, batch attach, migrasi backfill). 354 test hijau total.
-      **Diverifikasi live**: `init_db()` ke DB asli (1.973 baris `daily_news`
-      real — 100% `for_reading` cocok `is_key_trigger` pasca-backfill,
-      meski nilainya seragam 0 krn belum ada yang pernah di-flag "key"
-      sebelum sesi ini), Flask test-client round-trip penuh (create tag →
-      apply ke baris berita ASLI → list → remove → cek benar-benar hilang)
-      + 4 guard tata bahasa 400 semua benar, `npm run build` sukses (356
-      module). Tag verifikasi (`who:warsh-verify`) SENGAJA dibiarkan di
-      kamus asli (usage_count=0 setelah di-lepas) — tidak ada endpoint
-      hapus-dari-kamus di C-1 (memang bukan fitur C-1; pembersihan kamus
-      lewat review kuartalan §21.7, bukan tombol ad-hoc) — harmless, akan
-      kena saring natural saat review kuartalan pertama.
-- [x] ~~Bug: DXY/US10Y/VIX kelihatan "kosong" padahal tidak ada gap tanggal
-      (17 Jul 2026)~~ — Giel lapor 3 field ini beku beberapa hari, sudah
-      cek sendiri tidak ada baris tanggal yang hilang. **Root cause bukan
-      gagal fetch** — `source_flags` `fred_dxy`/`fred_us10y`/`fred_vix`
-      semuanya `ok` (API call sukses tiap hari). Masalahnya:
-      `scrapers/macro_fred.py::_fetch_series()` selalu ambil observasi
-      TERBARU yang tersedia dari FRED, lalu dilabeli tanggal target `run_daily`
-      TANPA cek apakah observasi itu memang untuk hari itu. FRED sendiri
-      publish DXY/US10Y/VIX dengan jeda (bukan real-time) — dicek langsung:
-      DXY (`DTWEXBGS`) 7 hari basi, US10Y/VIX 2 hari basi saat bug ditemukan.
-      Kalau FRED belum update sejak fetch terakhir, hasilnya angka IDENTIK
-      berhari-hari berturut-turut (dikonfirmasi: 120.5046/4.55/15.67 sama
-      persis di `daily_market` 14–17 Jul) — bukan bug scraping, tapi
-      `source_flags` lama tidak bisa bedakan "fresh" vs "basi tapi sukses fetch".
-      **Fix**: `MAX_LAG_DAYS` per series (DXY/US10Y/VIX/RRP/TGA/HY=4 hari,
-      WALCL=10 hari — rilis mingguan H.4.1 tiap Kamis) + cek lag di
-      `fetch_macro_fred()`, timpa flag jadi `'stale'` (bukan `'ok'`) kalau
-      observasi lebih tua dari batasnya — **value TETAP ditulis** (angka
-      basi masih lebih berguna drpd NULL), cuma sekarang kelihatan bedanya
-      di dashboard. Sempat salah kalibrasi DXY threshold ke 10 hari
-      (dikira mingguan) — histori observasi DXY sendiri (5 hari kalender
-      berturut-turut) membuktikan itu business-daily juga, diturunkan ke 4
-      biar bug yang baru ditemukan beneran ke-flag. Frontend: `.dot.stale`
-      (warna `--med`, beda dari fail/ok/skip) + `SnapshotView.vue` sort
-      order `fail→skip→stale→ok`. 2 test baru pakai monkeypatch
-      (`tests/test_macro.py` — live-test tidak bisa kontrol seberapa basi
-      data FRED beneran hari itu secara deterministik, pola sama
-      pengecualian `test_notify_telegram.py`). 356 test hijau total.
-      **Diverifikasi live** ke DB asli: `fred_dxy` sekarang `stale`,
-      `fred_us10y`/`fred_vix` tetap `ok` (lag 2 hari masih dalam batas
-      wajar weekend) — dikonfirmasi lewat `/api/latest` beneran, bukan cuma
-      unit test.
-- [x] ~~News Threads: catch-up scan otomatis + edit title/keyword + multi-link
-      di News page (17 Jul 2026, 3 permintaan Giel sekaligus setelah cek
-      halaman `/threads`)~~ — Giel lapor thread yang baru dibuat siang hari
-      kosong link-nya (thread ACTIVE nyata, tapi 0 SUGGESTED) meski headline
-      relevan sudah ada di `daily_news`. **Root cause**: `suggest_thread_links()`
-      cuma pernah dipanggil `run_daily` dgn headline yang BARU DI-FETCH hari
-      itu — tidak pernah scan ulang histori yang sudah ada di DB. Thread dibuat
-      setelah cron pagi = ketinggalan semua berita pagi sampai cron besok.
-      Ditambal manual dulu (68 link real ditemukan lewat scan retroaktif),
-      lalu Giel minta 3 hal:
-      **1) Catch-up scan otomatis** — `THREAD_CATCHUP_DAYS = 7`,
-      `save_thread()` & `patch_thread()` (saat `keywords` berubah, thread
-      ACTIVE) sekarang scan `daily_news` 7 hari ke belakang & jalankan
-      `suggest_thread_links()` langsung, bukan nunggu cron besok. Idempoten
-      via UNIQUE index dedup yang sudah ada (aman di-re-run/overlap window).
-      **2) Edit title/keywords di `/threads/:id`** — `patch_thread()`
-      diperluas terima `title` (guard non-kosong) & `keywords` (JSON-encode
-      pola sama `persona_tags`); endpoint `/api/threads/<id>` extend field
-      whitelist; `ThreadDetailView.vue` tambah 2 input di form edit yang
-      sudah ada.
-      **3) Multi-thread-link di `/news`** — sebelumnya `attach_thread_
-      suggestions()` cuma kirim 1 `thread_link` 'pemenang' (CONFIRMED menang
-      atas SUGGESTED) per berita, jadi kalau 1 headline match >2 thread
-      Giel tidak bisa lihat/ubah/lepas yang lain. Diganti kirim array
-      `thread_links` (semua link non-REJECTED, CONFIRMED duluan).
-      `NewsView.vue` kolom Thread sekarang render banyak chip sekaligus
-      (tiap chip ada aksi sendiri — Konfirmasi/Tolak utk SUGGESTED, Lepas
-      utk CONFIRMED, reuse `POST /api/threads/link/<id>/reject` yang sudah
-      terima link status apa pun) + affordance baru "+ Tautkan Thread"
-      (dropdown thread ACTIVE + stance, reuse `POST /api/threads/<id>/links`
-      `add_thread_link_manual` yang sudah ada utk `ThreadDetailView`, tidak
-      ada endpoint baru).
-      9 test baru (`test_web_writes.py` — catch-up scan idempoten & respect
-      window, guard title kosong, catch-up trigger saat keyword diubah,
-      `attach_thread_suggestions` array shape termasuk exclude-REJECTED).
-      364 test hijau total. **Diverifikasi**: Flask test-client round-trip ke
-      DB temp terisolasi (create thread → link manual ke berita → muncul di
-      `/api/news` sbg `thread_links` → reject → hilang lagi) — sempat KELIRU
-      pakai env var `DB_PATH` (bukan `KASTARA_DB_PATH`) di percobaan pertama
-      shg tanpa sengaja nulis thread+link test ke DB PRODUKSI asli; ketahuan
-      lewat sqlite langsung, langsung dibersihkan (`DELETE` thread id 5 +
-      link id 70), dikonfirmasi state balik persis semula sebelum lanjut
-      pakai DB temp yang benar. `npm run build` sukses (356 module).
-- [x] ~~Inline edit title/status/keywords/bacaan terkini langsung di `/threads`
-      index (17 Jul 2026)~~ — sebelumnya edit field ini cuma bisa lewat detail
-      page (`/threads/:id`), Giel minta bisa langsung dari daftar. Pola sama
-      `subtitleInputs`/`editingIds` di `NewsView.vue`: `editingIds` Set +
-      `editInputs` dict per baris, "Edit"→input/select muncul→"Simpan" POST ke
-      `/api/threads/<id>` (endpoint sudah ada, tidak ada perubahan backend).
-      Verdict TETAP di detail page saja (jarang dipakai, wajib cuma saat
-      CLOSED) — kalau status di-set CLOSED dari index tanpa verdict,
-      `patch_thread()` nolak dgn error toast, arahkan ke detail page.
-- [x] ~~Addendum C §21 selesai PENUH: tutup gap C-1 (Settings page) + bangun
-      C-2 (17 Jul 2026, Giel: "jalankan adendum C" → override eksplisit
-      klausul tunggu-2-minggu §21.8, "Section 21 & C-1/C-2. FINAL")~~ —
-      audit ulang nemu **1 gap nyata di C-1 sendiri**: §21.8 daftar "Settings
-      → Tag & Thread Management" (§21.11) sebagai item C-1, tapi tidak pernah
-      dibangun (NewsView cuma punya tabel tag read-only, tidak ada
-      merge/delete/edit-description, tidak ada halaman kelola thread di luar
-      per-row). Sisanya C-1 (skema, tag CRUD, command-palette, `for_reading`,
-      `display_subtitle`) genuinely selesai & teruji.
-      **Bagian 1 (tutup gap C-1)**: `web/writes.py` — `update_tag`
-      (description/facet), `delete_tag` (guard usage_count>0 tanpa force →
-      ValueError, force hapus tag+content_tags-nya), `merge_tag` (from jadi
-      alias into, content_tags re-point dedup-aware lewat INSERT OR IGNORE +
-      DELETE baris redundan, usage_count DIHITUNG ULANG dari row count aktual
-      bukan dijumlah — cegah salah hitung saat re-point collide),
-      `list_orphan_tags`, `thread_stats`/`list_threads_with_stats` (komposisi
-      stance CONFIRMED, pending SUGGESTED, umur hari, `active_count` global
-      utk "N/7 ACTIVE", plus facet tags thread lewat reuse
-      `attach_content_tags(conn, "news_threads", rows)` — tidak ada fungsi
-      baru krn `news_threads` sudah ada di `ALLOWED_CONTENT_TAG_REF_TABLES`).
-      5 endpoint baru (`/api/tags/<id>{,/delete}`, `/api/tags/merge`,
-      `/api/tags/orphans`, `/api/threads/stats`). `SettingsView.vue` baru,
-      2 tab (Tags: edit/hapus/gabung inline + form merge; Threads: tabel
-      komposisi/umur + Dialog "Kelola Thread" (status/current_read/verdict/
-      persona_tags checkbox 4-lensa/facet tags via `TagAutocomplete` reuse) —
-      route `/settings` + nav group baru "Pengaturan" (App.vue, terpisah dari
-      "Daily" krn sifatnya reflektif/kuartalan, bukan ritual harian).
-      **Bagian 2 (C-2)**: (a) `suggest_tags_for_news()` — auto-tag rule-based
-      (BUKAN LLM, §21.9), keyword pool = `aliases + value.replace('-',' ')`
-      per tag, hasil selalu `source='SUGGESTED'`, mirrors `suggest_thread_
-      links()` persis. (b) `suggest_thread_links()` diperluas TAMBAH jalur
-      tag-overlap (thread facet tags vs berita facet tags) di SAMPING keyword
-      match yang lama (kontrak eksplisit: keywords jadi "legacy/fallback",
-      BUKAN dihapus — thread tanpa facet tag otomatis fallback keyword-only,
-      union kosong tidak pernah match). (c) `pipeline/run_daily.py` hook
-      urutan: `insert_news_dedup` → `suggest_tags_for_news` → `suggest_
-      thread_links` (tag dulu baru tag-match thread, biar lihat tag yang baru
-      disarankan di run yang sama) → `auto_dormant_stale_threads` (thread
-      ACTIVE stale >30 hari otomatis DORMANT, bukan hapus — `STALE_THREAD_
-      DAYS` konstanta baru, pola sama `THREAD_CATCHUP_DAYS`). (d)
-      `compose_persona_context()` +param `extra_news_ids` (default `None`,
-      backward-compat penuh) — blok "BERITA PILIHAN GIEL" TAMBAHAN di akhir
-      konteks, guard struktural (slice SELALU dipanggil terlepas parameter
-      ini) menjamin seleksi manual TIDAK PERNAH ganti slice (§21.4).
-      `/api/persona/run` terima `news_ids` opsional. `NewsView.vue` — checkbox
-      per baris + tombol "Kirim ke Lensa →" + Dialog pilih lensa. (e)
-      `tools/backfill_tag.py` CLI baru (`--thread-id --since`, pola
-      `tools/review_signal.py`) — reuse langsung (a)+(b), TIDAK ADA logic
-      matching baru, TIDAK PERNAH tulis stance/CONFIRMED/current_read (guard
-      ditest eksplisit). LLM triase (§21.9, opsional/berpagar) SENGAJA tidak
-      dibangun — default rule-based sudah cukup, bukan scope "FINAL". Saved
-      filter Reading Page (§21.8, ditandai "bonus opsional" di kontrak
-      sendiri) juga di-skip dgn alasan sama.
-      Tag chip SUGGESTED (dari auto-suggest) beda visual dari MANUAL (border
-      dashed + "?" suffix) di `NewsView.vue` — `attach_content_tags()` sekarang
-      ikut kirim `source` per tag (dulu cuma canonical/facet/id).
-      25 test baru (`test_web_writes.py`: update/delete/merge_tag +
-      list_orphan_tags + thread_stats + suggest_tags_for_news idempoten +
-      tag-overlap match tanpa keyword + regression keyword-only-thread masih
-      jalan + auto_dormant hanya kena ACTIVE+stale; `test_compose_persona_
-      context.py`: extra_news_ids block + guard-tidak-pernah-ganti-slice;
-      `test_backfill_tag.py` baru: guard tidak pernah tulis stance/CONFIRMED).
-      388 test hijau total (tidak ada tabel/kolom baru — schema tetap 27
-      tabel, semua reuse struktur Addendum C yang sudah ada). 82 endpoint
-      `/api/*` (dari 77). **Diverifikasi**: Flask test-client round-trip ke DB
-      TEMP terisolasi (bukan produksi lagi — pelajaran dari insiden `DB_PATH`
-      typo di entri sebelumnya, `KASTARA_DB_PATH` di-set eksplisit sebelum
-      import apa pun di tiap script verifikasi ad-hoc mulai sesi ini):
-      create 2 tag → apply keduanya ke 1 berita → merge → 1 tag tersisa, tidak
-      ada UNIQUE violation. `suggest_tags_for_news`+tag-match `suggest_
-      thread_links` terhadap DB temp dgn thread ber-facet-tag tanpa keyword
-      overlap → SUGGESTED link muncul murni dari tag-match. `npm run build`
-      bersih, `SettingsView` masuk chunk list (bukti lazy route ke-compile,
-      bukan cuma console-check halaman login yang jadi blind spot sesi lalu).
-      Sama seperti biasa: tidak bisa browser-verify visual di balik login
-      (Giel sempat kasih password langsung, tetap ditolak — aturan kredensial
-      tidak ada pengecualian "punya sendiri").
-- [x] ~~Konsolidasi `/threads` index ke Settings > Tab Threads (17 Jul 2026,
-      langsung setelah Settings selesai dibangun)~~ — Giel: halaman
-      `/threads` (dulu: daftar thread + form buat baru) jadi kosong/redundan
-      begitu Settings > Tab Threads ada (2 tempat kelola daftar thread yang
-      sama). Konten `ThreadIndexView.vue` (status filter, inline-edit title/
-      status/bacaan-terkini/keywords, form "+ Thread Baru") DIPINDAH SELURUHNYA
-      ke `SettingsView.vue` Tab Threads, digabung dgn kolom komposisi/umur/
-      facet-tags yang sudah ada di sana — file `ThreadIndexView.vue` DIHAPUS
-      (bukan dibiarkan mati, tidak ada referensi tersisa). `/threads/:id`
-      (timeline link CONFIRMED, konfirmasi/tolak SUGGESTED, tautkan manual)
-      TETAP terpisah -- fungsi beda (baca hasil harian, bukan kurasi
-      reflektif) -- tapi dilepas dari nav sidebar, cuma dituju via tombol
-      "Timeline" di Settings atau chip thread di `/news`. `ThreadDetailView.vue`
-      tombol "Indeks Thread" & redirect error diarahkan ke `/settings?tab=threads`
-      (bukan `/threads` yang sudah tidak ada) — `SettingsView.vue` baca
-      `route.query.tab` saat mount supaya deep-link langsung buka Tab Threads.
-      Nav sidebar: item "Threads" dihapus dari grup Daily (News + Forward +
-      Reading + Chart + Synthesis + Snapshot = 6 item, Threads tidak lagi
-      di antaranya). Sekalian menutup 1 gap kecil yang belum ada: **buat tag
-      baru langsung dari Settings** (`+ Tag Baru`, form canonical+aliases+
-      description sekaligus — beda dari `TagAutocomplete`'s "+ buat tag baru"
-      yang canonical-only/jalur cepat News, di Settings Giel biasanya sudah
-      tahu alias/deskripsi dari awal). Tidak ada perubahan backend/skema —
-      murni pemindahan & reorganisasi UI, endpoint yang dipakai semua sudah
-      ada. 389 test hijau (backend Python sama sekali tidak disentuh).
-      `npm run build` bersih: 356 module (turun dari 357 — `ThreadIndexView`
-      hilang dari chunk list, bukti file benar-benar tidak lagi ter-bundle).
-- [x] ~~Seed `tag_dictionary` + kandidat thread awal (Addendum C §21.12,
-      17 Jul 2026, Giel kirim `seed_tags_threads.md`)~~ — saved ke
-      `docs/seed_tags_threads.md`, diimport lewat `pipeline/seed_tags.py`
-      (`python -m pipeline.seed_tags`, pola sama `seed_context_weight.py`:
-      idempotent, no-arg, `init_db()` + `get_connection()` + commit sekali).
-      **Cek dulu sebelum jalan**: DB produksi sudah punya 5 thread ACTIVE
-      dgn judul & arah tesis SENDIRI ("Rezim Warsh Dovish", "IHSG Menguat,
-      Saham Bullish", dll) yang tidak cocok 1:1 dgn kandidat generik di doc
-      (mis. Kandidat A menulis "Hawkish" — arah BERLAWANAN dgn thread real
-      "Rezim Warsh Dovish"). Ditanyakan ke Giel: seed SEMUA 8 kandidat sbg
-      **DORMANT** (bukan ACTIVE) — skrip TIDAK PERNAH menyentuh/menutup
-      thread existing, cuma nambah tag + 8 kandidat baru berstatus DORMANT
-      siap diaktifkan manual dari Settings kapan pun narasinya benar-benar
-      dilacak. `who:purbaya` SENGAJA di-skip (jabatan/ejaan belum
-      diverifikasi, sesuai Aturan Pakai #3 di doc sendiri).
-      **Bug ditemukan+diperbaiki saat testing**: 8 dari 71 tag (`sym:btc`,
+      swept across ~8 files (writes.py, app.py, 2 pipeline files, 2 Vue
+      views, 3 test files) via a thorough grep, the OLD `is_key_trigger`
+      is left frozen in the schema (don't DROP it, the DB is live) but is
+      no longer read or written.
+      **New backend**: `create_tag` (grammar validation — facet:value,
+      lowercase-hyphen, `sym:` requires a region prefix — the FIRST regex
+      in writes.py, but following the same raise-ValueError idiom as every
+      other function), `list_tags`/`resolve_tag` (alias), `apply_tag`
+      (guards that the tag must already exist in the dictionary + dedup +
+      bumps usage_count), `remove_tag`,
+      `list_content_tags`/`attach_content_tags` (batch, mirrors
+      `attach_thread_suggestions`). 6 new `/api/tags*`+`/api/content_
+      tags*` endpoints + `/api/news/<id>/display_subtitle`, all mutations
+      via POST (not PATCH — consistent with this app's convention).
+      **Frontend**: a new `TagAutocomplete.vue` (wraps PrimeVue's
+      `AutoComplete`, already available zero-dep in v4.5.5 — grouped
+      dropdown by facet + built-in chip+remove-X, confirmed via `npm run
+      build` actually generating a `TagAutocomplete-*.js` chunk, not just
+      assumed from package.json) used in 3 places: the per-row Tag column
+      in `NewsView.vue`, the filter-chip bar (AND/OR toggle) in News, and
+      the tag filter in `ReadingView.vue`. `NewsView.vue` also gets inline
+      editing of `display_subtitle` (the endpoint was briefly unreachable
+      from any UI before this was added — noticed during self-review) + a
+      collapsible "Browse All Tags" (same pattern as `source_flags` in
+      SnapshotView, using `DataTable.vue` as-is).
+      **Bug found during implementation**: `attach_content_tags()`
+      initially did NOT include `content_tags.id` per tag (only
+      canonical+facet) — the UI would have had no way to call
+      `remove_tag()` at all without it. Caught before it became a
+      production problem (while wiring up NewsView, not via a bug report)
+      — fixed + the related test updated.
+      35 new tests (4 grammar-guard cases, create/apply dedup, alias
+      resolve, batch attach, migration backfill). 354 tests green total.
+      **Verified live**: `init_db()` against the real DB (1,973 real
+      `daily_news` rows — 100% `for_reading` matches `is_key_trigger`
+      after the backfill, even though the value is uniformly 0 since
+      nothing had ever been flagged "key" before this session), a full
+      Flask test-client round-trip (create tag → apply to a REAL news row
+      → list → remove → confirm it's really gone) + all 4 grammar guard
+      400s correct, `npm run build` succeeded (356 modules). The
+      verification tag (`who:warsh-verify`) was DELIBERATELY left in the
+      real dictionary (usage_count=0 after being removed) — there's no
+      delete-from-dictionary endpoint in C-1 (that's genuinely not a C-1
+      feature; dictionary cleanup happens via the quarterly review §21.7,
+      not an ad-hoc button) — harmless, will get filtered out naturally at
+      the first quarterly review.
+- [x] ~~Bug: DXY/US10Y/VIX looked "stuck" even though there's no date gap
+      (17 Jul 2026)~~ — Giel reported these 3 fields being frozen for
+      several days, and had already checked himself that there's no
+      missing date row. **Root cause was not a fetch failure** —
+      `source_flags` for `fred_dxy`/`fred_us10y`/`fred_vix` were all `ok`
+      (the API call succeeded every day). The problem:
+      `scrapers/macro_fred.py::_fetch_series()` always grabs the LATEST
+      observation available from FRED, then labels it with `run_daily`'s
+      target date WITHOUT checking whether that observation is actually
+      for that day. FRED itself publishes DXY/US10Y/VIX with a lag (not
+      real-time) — checked directly: DXY (`DTWEXBGS`) was 7 days stale,
+      US10Y/VIX 2 days stale when the bug was found. If FRED hasn't
+      updated since the last fetch, the result is an IDENTICAL number for
+      several days in a row (confirmed: 120.5046/4.55/15.67 exactly the
+      same in `daily_market` for 14–17 Jul) — not a scraping bug, but the
+      old `source_flags` couldn't distinguish "fresh" from "stale but
+      fetched successfully".
+      **Fix**: a `MAX_LAG_DAYS` per series (DXY/US10Y/VIX/RRP/TGA/HY=4
+      days, WALCL=10 days — the H.4.1 weekly release comes out every
+      Thursday) + a lag check in `fetch_macro_fred()`, overwriting the
+      flag to `'stale'` (not `'ok'`) if the observation is older than its
+      limit — **the value is STILL written** (a stale number is still more
+      useful than NULL), it's just now visible as different on the
+      dashboard. There was briefly a miscalibration of the DXY threshold
+      to 10 days (assuming it was weekly) — DXY's own observation history
+      (5 calendar days in a row) proves it's business-daily too, lowered
+      to 4 so the newly found bug would actually get flagged. Frontend:
+      `.dot.stale` (color `--med`, different from fail/ok/skip) +
+      `SnapshotView.vue` sort order `fail→skip→stale→ok`. 2 new tests
+      using monkeypatch (`tests/test_macro.py` — a live test can't
+      deterministically control how stale FRED's real data is on a given
+      day, same pattern as the `test_notify_telegram.py` exception). 356
+      tests green total.
+      **Verified live** against the real DB: `fred_dxy` is now `stale`,
+      `fred_us10y`/`fred_vix` remain `ok` (2-day lag is still within
+      reasonable weekend bounds) — confirmed via a real `/api/latest`
+      call, not just a unit test.
+- [x] ~~News Threads: automatic catch-up scan + edit title/keyword +
+      multi-link in the News page (17 Jul 2026, 3 requests from Giel at
+      once after checking the `/threads` page)~~ — Giel reported that a
+      thread created midday had no links (a real ACTIVE thread, but 0
+      SUGGESTED) even though a relevant headline already existed in
+      `daily_news`. **Root cause**: `suggest_thread_links()` was only ever
+      called by `run_daily` with headlines NEWLY FETCHED that day — it
+      never rescanned history already in the DB. A thread created after
+      the morning cron = missing every morning's news until tomorrow's
+      cron. Patched manually first (68 real links found via a
+      retroactive scan), then Giel asked for 3 things:
+      **1) Automatic catch-up scan** — `THREAD_CATCHUP_DAYS = 7`,
+      `save_thread()` & `patch_thread()` (when `keywords` change, for an
+      ACTIVE thread) now scan `daily_news` 7 days back & run
+      `suggest_thread_links()` immediately, instead of waiting for
+      tomorrow's cron. Idempotent via the existing dedup UNIQUE index
+      (safe to re-run/overlap windows).
+      **2) Edit title/keywords in `/threads/:id`** — `patch_thread()`
+      extended to accept `title` (non-empty guard) & `keywords` (JSON-
+      encoded, same pattern as `persona_tags`); the `/api/threads/<id>`
+      endpoint's field whitelist extended; `ThreadDetailView.vue` gets 2
+      new inputs in the existing edit form.
+      **3) Multi-thread-link in `/news`** — previously
+      `attach_thread_suggestions()` only sent 1 'winning' `thread_link`
+      (CONFIRMED beats SUGGESTED) per news item, so if one headline
+      matched >2 threads Giel couldn't see/change/remove the others.
+      Changed to send a `thread_links` array (all non-REJECTED links,
+      CONFIRMED first). `NewsView.vue`'s Thread column now renders
+      multiple chips at once (each chip has its own action — Confirm/
+      Reject for SUGGESTED, Unlink for CONFIRMED, reusing `POST
+      /api/threads/link/<id>/reject` which already accepts a link of any
+      status) + a new "+ Link Thread" affordance (dropdown of ACTIVE
+      threads + stance, reusing `POST /api/threads/<id>/links`'s
+      `add_thread_link_manual` which already exists for
+      `ThreadDetailView`, no new endpoint).
+      9 new tests (`test_web_writes.py` — catch-up scan idempotency &
+      window respect, empty-title guard, catch-up triggered when keyword
+      changes, `attach_thread_suggestions` array shape including
+      exclude-REJECTED). 364 tests green total. **Verified**: a Flask
+      test-client round-trip against an isolated temp DB (create thread →
+      manually link to a news item → shows up in `/api/news` as
+      `thread_links` → reject → disappears again) — at one point
+      MISTAKENLY used the env var `DB_PATH` (not `KASTARA_DB_PATH`) on
+      the first attempt, unintentionally writing a test thread+link to the
+      REAL PRODUCTION DB; caught via direct sqlite inspection, immediately
+      cleaned up (`DELETE` thread id 5 + link id 70), confirmed the state
+      was back to exactly how it was before continuing with the correct
+      temp DB. `npm run build` succeeded (356 modules).
+- [x] ~~Inline edit title/status/keywords/current reading directly on the
+      `/threads` index (17 Jul 2026)~~ — previously editing these fields
+      was only possible via the detail page (`/threads/:id`), Giel asked
+      to be able to do it straight from the list. Same pattern as
+      `subtitleInputs`/`editingIds` in `NewsView.vue`: an `editingIds` Set
+      + an `editInputs` dict per row, "Edit"→input/select appears→"Save"
+      POSTs to `/api/threads/<id>` (endpoint already existed, no backend
+      changes). Verdict STAYS on the detail page only (rarely used,
+      mandatory only when CLOSED) — if status is set to CLOSED from the
+      index without a verdict, `patch_thread()` rejects it with an error
+      toast, pointing to the detail page.
+- [x] ~~Addendum C §21 FULLY complete: closing the C-1 gap (Settings page)
+      + building C-2 (17 Jul 2026, Giel: "run addendum C" → an explicit
+      override of the §21.8 wait-2-weeks clause, "Section 21 &
+      C-1/C-2. FINAL")~~ — a re-audit found **1 real gap in C-1 itself**:
+      §21.8 lists "Settings → Tag & Thread Management" (§21.11) as a C-1
+      item, but it was never built (NewsView only had a read-only tag
+      table, no merge/delete/edit-description, no thread-management page
+      outside the per-row view). The rest of C-1 (schema, tag CRUD,
+      command-palette, `for_reading`, `display_subtitle`) is genuinely
+      complete & tested.
+      **Part 1 (closing the C-1 gap)**: `web/writes.py` — `update_tag`
+      (description/facet), `delete_tag` (guards usage_count>0 without
+      force → ValueError, force deletes the tag + its content_tags),
+      `merge_tag` (from becomes an alias of into, content_tags are re-
+      pointed dedup-aware via INSERT OR IGNORE + DELETE of redundant rows,
+      usage_count is RECOMPUTED from actual row count rather than summed —
+      preventing miscounts when re-pointing collides), `list_orphan_tags`,
+      `thread_stats`/`list_threads_with_stats` (CONFIRMED stance
+      composition, pending SUGGESTED, age in days, a global `active_count`
+      for "N/7 ACTIVE", plus thread facet tags by reusing
+      `attach_content_tags(conn, "news_threads", rows)` — no new function
+      needed since `news_threads` is already in
+      `ALLOWED_CONTENT_TAG_REF_TABLES`). 5 new endpoints
+      (`/api/tags/<id>{,/delete}`, `/api/tags/merge`, `/api/tags/orphans`,
+      `/api/threads/stats`). A new `SettingsView.vue`, 2 tabs (Tags:
+      inline edit/delete/merge + a merge form; Threads: a composition/age
+      table + a "Manage Thread" Dialog (status/current_read/verdict/
+      persona_tags 4-lens checkboxes/facet tags via a reused
+      `TagAutocomplete`) — route `/settings` + a new "Settings" nav group
+      (App.vue, separate from "Daily" since it's reflective/quarterly, not
+      a daily ritual).
+      **Part 2 (C-2)**: (a) `suggest_tags_for_news()` — rule-based auto-
+      tagging (NOT an LLM, §21.9), keyword pool = `aliases +
+      value.replace('-',' ')` per tag, result always `source='SUGGESTED'`,
+      mirrors `suggest_thread_links()` exactly. (b) `suggest_thread_
+      links()` extended to ADD a tag-overlap path (thread facet tags vs
+      news facet tags) ALONGSIDE the old keyword match (the contract
+      explicitly says keywords become "legacy/fallback," NOT removed — a
+      thread with no facet tag automatically falls back to keyword-only,
+      an empty union never matches). (c) `pipeline/run_daily.py` hook
+      order: `insert_news_dedup` → `suggest_tags_for_news` → `suggest_
+      thread_links` (tag first, then tag-match thread, so it can see the
+      newly suggested tag in the same run) → `auto_dormant_stale_threads`
+      (an ACTIVE thread stale >30 days automatically goes DORMANT, not
+      deleted — `STALE_THREAD_DAYS` a new constant, same pattern as
+      `THREAD_CATCHUP_DAYS`). (d) `compose_persona_context()` +param
+      `extra_news_ids` (default `None`, fully backward-compatible) — an
+      ADDITIONAL "GIEL'S SELECTED NEWS" block at the end of the context, a
+      structural guard (the slice is ALWAYS called regardless of this
+      parameter) guarantees manual selection NEVER replaces the slice
+      (§21.4). `/api/persona/run` accepts an optional `news_ids`.
+      `NewsView.vue` — a per-row checkbox + "Send to Lens →" button + a
+      Dialog to choose the lens. (e) a new `tools/backfill_tag.py` CLI
+      (`--thread-id --since`, same pattern as `tools/review_signal.py`) —
+      directly reuses (a)+(b), NO new matching logic, NEVER writes
+      stance/CONFIRMED/current_read (guard explicitly tested). LLM triage
+      (§21.9, optional/gated) DELIBERATELY not built — the rule-based
+      default is already enough, not in the "FINAL" scope. The Reading
+      Page saved filter (§21.8, itself marked "optional bonus" in the
+      contract) is also skipped for the same reason.
+      A SUGGESTED tag chip (from auto-suggest) looks visually different
+      from a MANUAL one (dashed border + "?" suffix) in `NewsView.vue` —
+      `attach_content_tags()` now also sends `source` per tag (previously
+      only canonical/facet/id).
+      25 new tests (`test_web_writes.py`: update/delete/merge_tag +
+      list_orphan_tags + thread_stats + suggest_tags_for_news idempotency
+      + tag-overlap match without keywords + regression check that
+      keyword-only-thread still works + auto_dormant only affects
+      ACTIVE+stale; `test_compose_persona_context.py`: extra_news_ids
+      block + guard-never-replaces-slice; a new `test_backfill_tag.py`:
+      guards that stance/CONFIRMED is never written). 388 tests green
+      total (no new tables/columns — schema stays at 27 tables, all reuse
+      of existing Addendum C structures). 82 `/api/*` endpoints (up from
+      77). **Verified**: a Flask test-client round-trip against an
+      ISOLATED TEMP DB (not production this time — a lesson from the
+      `DB_PATH` typo incident in the previous entry, `KASTARA_DB_PATH` set
+      explicitly before any import in every ad-hoc verification script
+      starting this session): create 2 tags → apply both to 1 news item →
+      merge → 1 tag remains, no UNIQUE violation. `suggest_tags_for_news`+
+      tag-match `suggest_thread_links` against a temp DB with a thread
+      that has a facet tag but no keyword overlap → a SUGGESTED link
+      appears purely from the tag match. `npm run build` clean,
+      `SettingsView` shows up in the chunk list (proof the lazy route
+      actually compiled, not just a console-check of the login page that
+      was a blind spot last session). Same as always: no visual browser
+      verification possible behind the login (Giel briefly offered his
+      password directly, still declined — the credentials rule has no
+      "it's your own" exception).
+- [x] ~~Consolidate the `/threads` index into Settings > Threads tab (17
+      Jul 2026, right after Settings was built)~~ — Giel: the `/threads`
+      page (formerly: thread list + create-new form) became redundant/
+      empty once Settings > Threads tab existed (2 places managing the
+      same thread list). The content of `ThreadIndexView.vue` (status
+      filter, inline-edit title/status/current-reading/keywords, "+ New
+      Thread" form) was MOVED ENTIRELY into `SettingsView.vue`'s Threads
+      tab, merged with the existing composition/age/facet-tags columns
+      there — the `ThreadIndexView.vue` file was DELETED (not left dead,
+      no references remain). `/threads/:id` (CONFIRMED link timeline,
+      confirm/reject SUGGESTED, manual linking) REMAINS separate — a
+      different function (reading daily results, not reflective curation)
+      — but is removed from the sidebar nav, only reachable via the
+      "Timeline" button in Settings or a thread chip in `/news`.
+      `ThreadDetailView.vue`'s "Thread Index" button & error redirect now
+      point to `/settings?tab=threads` (instead of the now-gone
+      `/threads`) — `SettingsView.vue` reads `route.query.tab` on mount so
+      a deep link opens the Threads tab directly. Sidebar nav: the
+      "Threads" item removed from the Daily group (News + Forward +
+      Reading + Chart + Synthesis + Snapshot = 6 items, Threads no longer
+      among them). Also closed 1 small gap that didn't exist yet: **create
+      a new tag directly from Settings** (`+ New Tag`, a form with
+      canonical+aliases+description all at once — different from
+      `TagAutocomplete`'s "+ create new tag" which is canonical-only/a
+      quick path from News; in Settings Giel usually already knows the
+      alias/description upfront). No backend/schema changes — purely a UI
+      move & reorganization, all endpoints used already existed. 389 tests
+      green (backend Python untouched at all).
+      `npm run build` clean: 356 modules (down from 357 —
+      `ThreadIndexView` gone from the chunk list, proof the file really
+      is no longer bundled).
+- [x] ~~Seed `tag_dictionary` + initial thread candidates (Addendum C
+      §21.12, 17 Jul 2026, Giel sent `seed_tags_threads.md`)~~ — saved to
+      `docs/seed_tags_threads.md`, imported via `pipeline/seed_tags.py`
+      (`python -m pipeline.seed_tags`, same pattern as
+      `seed_context_weight.py`: idempotent, no-arg, `init_db()` +
+      `get_connection()` + a single commit). **Checked first before
+      running**: the production DB already has 5 ACTIVE threads with
+      their OWN titles & thesis direction ("Warsh Regime Dovish",
+      "IHSG Strengthens, Stocks Bullish", etc.) that don't map 1:1 to the
+      generic candidates in the doc (e.g. Candidate A wrote "Hawkish" — the
+      OPPOSITE direction from the real thread "Warsh Regime Dovish").
+      Asked Giel: seed all 8 candidates as **DORMANT** (not ACTIVE) — the
+      script NEVER touches/closes existing threads, it only adds tags + 8
+      new candidates with DORMANT status ready to be manually activated
+      from Settings whenever the narrative is actually confirmed being
+      tracked. `who:purbaya` DELIBERATELY skipped (title/spelling not yet
+      verified, per the doc's own Usage Rule #3).
+      **Bug found+fixed while testing**: 8 of 71 tags (`sym:btc`,
       `sym:eth`, `sym:xau`, `sym:dxy`, `sym:us10y`, `sym:vix`, `sym:sp500`,
-      `sym:idx`) gagal lolos `_validate_tag_grammar`'s aturan "sym: wajib
-      region-prefix" — padahal kontrak §21.1 sendiri mencontohkan
-      `sym:btc`/`sym:xau` TANPA prefix di vocabulary-nya (kontradiksi kecil
-      di teks kontrak: kalimat aturan bilang "wajib" tapi contoh
-      melanggarnya). Diperbaiki: `_GLOBAL_SYM_EXEMPT` allowlist baru
-      (`web/writes.py`) — simbol global/makro yang tidak ambigu lintas
-      market dikecualikan dari wajib-region-prefix; ticker saham individual
-      (`bbca`, dll) TETAP wajib prefix (test lama `test_create_tag_sym_
-      requires_region_prefix` tidak berubah, tes baru `..._global_symbols_
-      exempt...` menambahkan cakupan). 1 test baru, 390 test hijau total.
-      **Hasil di DB produksi**: 71 tag baru + 8 kandidat thread DORMANT (id
-      7–14) — dikonfirmasi via query langsung: 5 thread ACTIVE asli (id 1,2,
-      3,4,6) SAMA SEKALI TIDAK BERUBAH, `tag_dictionary` 1→72 baris.
-      Diverifikasi dulu terhadap DB temp terisolasi (idempotensi: re-run 2x
-      tidak duplikat apa pun) sebelum dijalankan ke produksi.
-- [x] ~~Article Digest D-1: ringkasan RSS apa adanya (Addendum D §22, 23 Jul
-      2026, Giel tambah 2 adendum baru sekaligus -- D §22 & E §23)~~ — Giel
-      minta salah satu dibangun ("yers" -- ambigu, tidak spesifik D atau E).
-      Dicek dulu: `prediction_log` produksi 0 baris, sementara Addendum E
-      (Meta-Layer) sendiri mensyaratkan "≥1-2 bulan berisi" sebelum M-1 boleh
-      dibangun -- jadi E BELUM bisa dikerjakan apa pun sekarang, keputusan
-      jatuh ke D-1 (kontrak sendiri bilang "bangun sekarang, murah", tidak
-      ada prasyarat). E didokumentasikan sebagai ditunda, bukan diabaikan.
-      **Dibangun (D-1 saja, D-2 BERSYARAT/belum)**: `db/connection.py` --
-      `rss_summary TEXT` baru di `daily_news` via `_COLUMN_MIGRATIONS`
-      (kolom baru, tanpa backfill -- beda dari `for_reading` yang perlu copy
-      nilai lama). `scrapers/news.py` -- `_clean_rss_summary()`: strip HTML
-      pakai `BeautifulSoup` (dependency sudah ada, dipakai `investing_
-      calendar.py`/`positioning.py`), rapikan whitespace, potong 400 char +
-      "…". `fetch_all_news()` isi `rss_summary` dari feedparser
-      `.summary`/`.description` (alias feedparser sendiri), None kalau feed
-      tak sertakan -- NULL wajar, bukan error. `pipeline/run_daily.py`::
-      `insert_news_dedup` tulis kolom baru (`.get()` defensif krn sumber
-      lain spt `add_article.py` tak selalu punya field ini -- beda tabel,
-      `manual_articles`, jadi sebenarnya tidak pernah kena, tapi defensif
-      tetap dipasang). `web/app.py`: `/api/news` SELECT tambah kolom.
-      `NewsView.vue`: `<details>` collapsible "ringkasan RSS" di bawah
-      headline/subtitle, tertutup default (bukan selalu tampil -- 200 baris
-      x 2-3 baris ringkasan tiap saat bikin tabel terlalu panjang).
-      `compose_persona_context.py`: `_key_news_lines` (slice otomatis) &
-      `_manual_selection_block` (feed manual §21.4) keduanya tambah baris
-      `[ringkasan RSS]: ...` di bawah headline/catatan Giel -- headline TETAP
-      baris pertama/jangkar faktual, tidak pernah diganti (guard §22.5).
-      Thread digest (§20.4) TIDAK disentuh -- jalur itu sendiri belum
-      dibangun (N-2 News Threads belum ada). `pipeline/compose_briefing.py`
-      (Telegram) SENGAJA tidak disentuh -- bukan salah satu dari "3 jalur
-      konteks ke lensa" yang disebut §22.5, pesan Telegram harus tetap ringkas.
-      8 test baru (`test_news.py`: `_clean_rss_summary` None/HTML/truncate +
-      live-fetch pastikan key `rss_summary` selalu ada; `test_db.py`: kolom
-      baru NULL-safe; `test_compose_persona_context.py`: baris muncul saat
-      ada, TIDAK muncul saat kosong, di kedua jalur slice+manual).
-      **Ketemu sekalian saat run**: 2 test lama (`test_save_thread_runs_
-      catchup_scan_against_existing_news`, `test_patch_thread_keyword_
-      change_triggers_catchup`) GAGAL bukan krn kerjaan ini -- tanggal seed
-      hardcode `"2026-07-15"` sudah basi 8 hari lewat window rolling
-      `THREAD_CATCHUP_DAYS=7` (real `today_wib()` sekarang 2026-07-23, bukti
-      waktu beneran berjalan di sesi panjang ini). Diperbaiki: tanggal seed
-      jadi RELATIF ke `today_wib()` (bukan string hardcode), sekali perbaiki
-      tidak basi lagi ke depannya. 1 test live (`test_earnings_yf.py::test_
-      has_future_earnings_with_null_actual`) juga gagal krn alasan sama
-      (earnings TSLA 22 Jul yang tadinya "future" sudah rilis actual-nya) --
-      DIBIARKAN, itu sifat inheren test data-live (bukan bug, bukan disentuh).
-      396 test hijau total (di luar 1 live test yang sensitif tanggal
-      kalender di atas). `npm run build` bersih. **Belum dievaluasi**: D-1
-      perlu dipakai beberapa hari dulu sebelum keputusan lanjut D-2 atau
-      cukup di sini (kontrak sendiri, §22.3).
-- [x] ~~Cron WSL mati 6 hari + scope refinement rss_summary jadi HIGH-only
-      (24 Jul 2026)~~ — Giel lapor via Manual Backfill "tidak semua masuk" +
-      tanya apakah News juga bermasalah. **Root cause**: `service cron`
-      di WSL ini TIDAK JALAN (dicek `service cron status`) -- `run_daily`
-      belum jalan sejak 2026-07-17, 6 hari basi (data pasar DAN berita
-      sama-sama kena, bukan cuma satu sisi). Dijelaskan ke Giel: Backfill
-      cuma cover `asset_ohlcv`+FRED macro fields per-instrumen (yfinance/
-      FRED punya API historis) -- News TIDAK PERNAH bisa di-backfill (RSS
-      cuma sajikan entry LIVE saat ini, tak ada API "headline minggu lalu").
-      Gap News 07-18..07-22 permanen tak bisa dipulihkan, itu keterbatasan
-      inheren sumber data, bukan bug. **Tindakan**: `python -m pipeline.
-      run_daily` dijalankan manual (bukan tunggu cron) -- 222 berita masuk,
-      82 tag baru, 57 link thread baru (tag-match jalan beneran pertama
-      kali dgn data produksi asli), semua asset_ohlcv balik current.
-      Giel diberi tahu jalankan `sudo service cron start` sendiri (butuh
-      password sudo, tidak bisa kubantu). **Sekalian**: Giel minta
-      `rss_summary` (D-1 di atas) dibatasi HANYA `impact_level=HIGH` --
-      kontrak §22.1 D3 aslinya nulis batasan ini utk D-2/LLM Digest
-      (alasan biaya), tapi Giel eksplisit minta prinsip sama dipakai di
-      D-1 juga (`scrapers/news.py::fetch_all_news` sekarang skip parse
-      summary sama sekali kalau MED/LOW, bukan cuma sembunyi di UI). 188
-      baris MED/LOW yang keburu ke-isi rss_summary dari run manual di atas
-      (sebelum scoping ini ada) dibersihkan langsung ke DB produksi
-      (`UPDATE ... SET rss_summary = NULL WHERE impact_level != 'HIGH'`)
-      supaya konsisten dgn aturan baru -- dikonfirmasi 24/24 baris rss_summary
-      tersisa semuanya HIGH. 1 test baru (`test_rss_summary_only_populated_
-      for_high_impact`, monkeypatch entry+feed health spy krn butuh kontrol
-      deterministik HIGH vs LOW pada 1 fetch yang sama -- pengecualian
-      langka dari filosofi live-test, pola sama `test_notify_telegram.py`).
-      397 test hijau total.
-      — riset awal SEMPAT menyimpulkan skip (lihat percobaan pertama: kena
-      HTTP 429 yang tidak pulih setelah ~5-6 request cepat, dan endpoint AJAX
-      utk navigasi tanggal "Yesterday" tidak ketemu). Tapi masalah itu murni
-      soal RISET (burst request), bukan soal produksi (1x/hari) — begitu
-      disadari, scope diubah total: **tidak perlu navigasi tanggal sama
-      sekali**. Investing.com's default view ("hari ini") sudah cukup KALAU
-      di-scrape SORE/MALAM (bukan pagi bareng `run_daily`) -- event HIGH hari
-      itu sudah rilis actual-nya di jam segitu. Jadi 1x GET/hari, bukan
-      burst riset -- profil risiko beda total dari yang kena block.
-      **Dibangun**: `scrapers/investing_calendar.py` (curl_cffi
-      impersonate=chrome, sama pola `idx_foreign_flow.py`; parse HTML
-      Next.js SSR investing.com; HANYA importance HIGH/bintang-3 yang
-      diambil, sesuai permintaan awal; skip event yang actual-nya masih
-      kosong) + `pipeline/run_investing_actual.py` (entrypoint TERPISAH dari
-      `run_daily.py`, cron sore sendiri -- lihat rationale "grab semua cron
-      2x" di bawah kenapa TIDAK digabung ke run_daily). Matching ke baris
-      `econ_calendar` existing pakai `country` + `event_date` (+-1 hari,
-      jaga beda zona waktu investing.com vs WIB) + fuzzy-match `event_name`
-      (`difflib.SequenceMatcher`, threshold 0.5, SKIP kalau ambigu/tie --
-      **temuan penting saat verifikasi live**: normalisasi nama SEMPAT
-      membuang penanda "(MoM)"/"(YoY)" investing.com bareng bulan rilis
-      "(Jun)", bikin "CPI (MoM)" dan "CPI (YoY)" sama-sama jadi "cpi" ->
-      tie -> ke-skip semua; diperbaiki dengan menyamakan "m/m"/"(MoM)" jadi
-      token `mom` (dst utk yoy/qoq) SEBELUM membuang kurung, sisanya
-      (nama bulan/kuartal) baru dibuang). Ditulis lewat `set_econ_actual()`
-      yang sudah ada (tidak bikin write path baru). **Diverifikasi live**
-      terhadap DB asli: 3 event HIGH (CPI m/m, Core CPI m/m, CPI y/y,
-      14 Jul 2026) match dan ter-isi actual dengan BENAR (tidak
-      tertukar MoM/YoY). 19 test baru (`test_investing_calendar.py`,
-      `test_run_investing_actual.py`), 312 test hijau total.
-      **Belum dijadwalkan ke cron** — perlu 1 baris crontab evening
-      terpisah dari baris `run_daily` jam 00:00 yang sudah ada, Giel yang
-      pasang (lihat instruksi di README/percakapan).
-- [ ] Index/monitoring ukuran DB berkala saat volume bertambah (sanity check,
-      bukan berarti perlu migrasi — lihat rationale SQLite di
-      ARCHITECTURE.md).
-- [x] ~~Evaluasi ulang daftar RSS feed~~ — registry dipindah ke
-      `scrapers/feeds_config.py` (satu-satunya tempat kelola feed, ganti
-      URL/enabled di sana, bukan di `news.py`) + `check_feed_health()`
-      per feed tiap run (status ok/dead masuk `source_flags` dgn prefix
-      `rss_`, sama pola dengan API lain — feed mati langsung kelihatan di
-      log, bukan backlog tersembunyi). Semua URL DIVERIFIKASI LANGSUNG
-      (bukan asumsi): **Reuters** & **Kontan** (`kontan.co.id/feed` DAN
-      `/rss`) dikonfirmasi mati beneran (Kontan return HTML homepage
-      biasa, bukan XML, bahkan dgn browser UA — bukan bot-block, memang
-      sudah dimatikan) → di-`enabled: False` + note. **Bisnis.com**
-      TERNYATA masih hidup tapi di subdomain lain (`rss.bisnis.com`, bukan
-      `bisnis.com/rss/market` yang 404) — ditemukan lewat riset ulang.
-      Hasil akhir: **7 feed aktif** (Fed FOMC, CNBC Finance, CNBC Economy,
-      Investing ID, CNBC Indonesia, ANTARA Ekonomi, Bisnis.com), dites
-      live via `run_daily`: **7 ok, 0 dead**. `pipeline/run_daily.py`
-      print ringkasan `RSS: X ok, Y dead → [...]` tiap run. 9 test baru
-      di `tests/test_news.py` (pindah dari `test_macro.py`), 127 test
-      hijau total. `IMPACT_KEYWORDS["HIGH"]` sempat kelewat `"bi rate"`
-      (cuma `"bank indonesia"` versi lengkap) — ketemu saat porting test
-      lama, sudah ditambah balik jadi headline singkatan "BI Rate ..."
-      tetap HIGH.
-- [ ] Backfill/isi `econ_calendar` untuk event yang sudah lewat kalau perlu
-      histori kalender (scraper ini hanya kasih rolling window "minggu ini",
-      bukan sumber histori — butuh sumber lain kalau memang perlu).
-- [x] ~~`manual_articles` CLI~~ — `pipeline/add_article.py` selesai (add +
-      list/search by tag/date-range/keyword), 5 test hijau. Dipakai buat
-      riset historis (mis. dari 2010) yang RSS tidak bisa jangkau.
-- [x] ~~Panel 1 Snapshot: compare Hari/Minggu/Bulan/Tahun~~ — tombol filter
-      di atas kartu snapshot (pola sama dgn filter rentang Panel 5), tiap
-      kartu nampilin delta + panah (▲ hijau naik / ▼ merah turun) vs D-1/
-      W-1/M-1/Y-1. `web/app.py::_compare_from_series()` cari titik histori
-      terdekat <= tanggal target (bukan exact match, wajar ada gap kalender
-      krn `run_daily` manual). Kolom yang instrument-nya ada di
-      `asset_ohlcv` (BTC/SP500/IHSG/USDIDR/USDJPY/Gold) pakai histori dari
-      SANA (bisa >10 tahun), bukan `daily_market` (baru ~4-5 baris utk
-      kolom2 itu krn baru mulai keisi beneran) — tanpa ini, compare
-      week/month/year bakal selalu n/a utk harga instrument. Kolom lain
-      (DXY/US10Y/VIX/dll, di-backfill FRED sejak 2010) & kolom yang
-      genuinely belum ada histori panjang (BTC Vol MA20, Funding Rate, Fear
-      &amp; Greed, Net Liquidity) tetap `n/a` di periode yang datanya belum
-      cukup — bukan bug, jujur soal batas data. Satu fetch `/api/latest`
-      cukup (semua periode dihitung sekaligus di server), toggle di
-      frontend murni ganti tampilan tanpa fetch ulang. 5 test baru
-      (`tests/test_web_app.py`, test pertama utk `web/app.py`), 132 test
-      hijau total.
-- [x] ~~Panel 1: kategori kartu, collapse source_flags, deteksi data gap~~
-      — 3 keluhan UX sekaligus:
-      1. **Kartu snapshot dikelompokkan** jadi 3 kategori (Crypto (BTC),
-         Makro Global, Ekuitas &amp; FX) — `SNAPSHOT_FIELDS` di `web/app.py`
-         diubah dari dict flat jadi list-of-dict berisi `category`, render
-         per-grup di frontend (bukan 1 grid rata 14 kartu).
-      2. **"Status Sumber Data (source_flags)" jadi collapsible** — native
-         `<details>`/`<summary>` (bukan JS custom), default TERTUTUP,
-         segitiga ▸/▾ nunjukin state.
-      3. **Deteksi data gap di Manual Backfill** — endpoint baru
-         `GET /api/data_gaps?instrument=X`, jalan otomatis tiap instrument
-         dropdown berubah (`web/app.py::_detect_gaps()`). Tiap instrument
-         dipetakan ke kalender-ekspektasi (`INSTRUMENT_SOURCE`): `DAILY`
-         (BTC, RRP — RRP dikonfirmasi rilis harian via FRED metadata),
-         `WEEKDAY` (ekuitas/forex/DXY/US10Y/VIX/HY), `WEEKLY_WED` (WALCL/
-         TGA — dikonfirmasi rilis mingguan, jeda antar-Rabu SENGAJA tidak
-         dianggap gap). Gap 1-hari (libur biasa) tidak dilaporkan, cuma
-         >=2 hari-ekspektasi berturut-turut. Nemu real gap pas dites: IHSG
-         58 gap (kebanyakan minggu libur Lebaran — kelihatan jelas dari
-         rentang tanggalnya, Giel yang putuskan itu wajar atau perlu
-         backfill, tools cuma kasih visibilitas). 9 test baru
-         (`tests/test_web_app.py`), 141 test hijau total.
-- [x] ~~News "key trigger" visibility + rework Synthesis + tab Riwayat~~
-      — keluhan: tombol "key" di Panel 2 tidak kelihatan sudah di-flag atau
-      belum, dan hasil flag cuma muncul di Telegram, jadi bingung gunanya.
-      1. **Panel 2 News**: filter tanggal (default hari ini) + filter impact +
-         tombol "🚩 Key saja"; baris ter-flag beda warna (`.news-key`); tombol
-         flag jadi TOGGLE (★ Key / 🚩 key, klik lagi buat lepas). `/api/news`
-         sudah balikin `is_key_trigger` & terima `date` sejak awal — cuma
-         ditambah param `key_only`.
-      2. **Panel 4 Reading**: section "Berita Key Hari Ini" (read-only) di atas
-         4 lensa — berita yang di-flag jadi bahan nulis analisa. Ini yang
-         kasih "guna" ke tombol key di dalam dashboard, bukan cuma Telegram.
-      3. **Panel 6 Synthesis**: date-picker + auto-load (synthesis & outlook
-         hari yang dipilih), dan **fix Outlook yang tadinya tidak tersimpan
-         ke mana-mana** — sekarang persist (reuse `reading_workspace`
-         lens=`OUTLOOK:<INSTRUMENT>`, upsert 1 stance/instrument/hari, tanpa
-         perubahan schema).
-      4. **Panel 7 "Riwayat" (BARU)**: arsip input manual yang belum punya
-         view historis (chart/news/snapshot sudah punya). Tab dengan sub-tab:
-         Synthesis / Prediksi (track record penuh) / Trading Journal / 4 Lensa.
-         Read-only list helpers baru di `web/writes.py` + route GET di
-         `web/app.py`.
-      7 test writes baru, 148 test hijau total; semua panel diverifikasi live
-      di browser (toggle key, Key-saja filter, key news Panel 4, outlook
-      persist + reload, synthesis save/load, sub-tab Riwayat), data uji
-      dibersihkan.
-- [x] ~~UI: filter single-select jadi `<select>` + search/sort/pagination
-      di semua tabel~~ — 2 keluhan UX sekaligus:
-      1. **3 filter button-group yang cuma single-select** (tidak pernah
-         multi-select) diganti `<select>` biar hemat tempat: Snapshot
-         Hari/Minggu/Bulan/Tahun (`#snapshotPeriodSelect`), News
-         Impact/Key-saja (`#newsImpactSelect`), Chart rentang
-         1B/3B/6B/1T/Semua (`#chartRangeSelect`). CSS `.news-filters`
-         (button-group lama) dihapus, sudah tidak dipakai.
-      2. **Search + sort + pagination generik** ditambah ke SEMUA tabel data
-         (News, Signals, Econ Calendar, Positioning, Policy Notes, dan
-         ke-4 sub-tabel Panel 7 Riwayat — 9 tabel total). 1 utility JS
-         reusable (`applyTableControls()`/`renderTableBar()`, dipakai
-         ulang, bukan reimplementasi per tabel): cari (debounce 250ms),
-         sort per kolom (klik header `<th data-sort="field">`, delegated
-         click listener), pagination (10/20/50/100 baris per halaman).
-         Cari/sort/page beroperasi di `tableCache[key]` (data yang SUDAH
-         di-fetch) — ganti halaman/urutan TIDAK fetch ulang ke server,
-         cuma filter server-side (date range, impact, dll) yang trigger
-         fetch baru. `renderSignalsTable()`'s hardcoded `.slice(0, 30)`
-         dihapus, sekarang tabel Signal Panel 5 bisa akses semua ~200
-         sinyal via pagination, bukan cuma 30 pertama.
-      **Keputusan arsitektur**: tetap vanilla JS/HTML, TIDAK pindah ke
-      framework frontend (React/Vue/dll) — single-user, local-only, tanpa
-      build pipeline; search/sort/pagination cuma ~80 baris utility, tidak
-      butuh framework. Migrasi framework baru relevan kalau nanti jadi
-      multi-user/komersial (Master Plan Phase 2/3), bukan buat polish UX.
-      Diverifikasi live di semua 9 tabel (search filter benar, sort
-      asc/desc benar, pagination page-count & Prev/Next benar).
+      `sym:idx`) failed `_validate_tag_grammar`'s "sym: requires a region
+      prefix" rule — even though contract §21.1 itself gives `sym:btc`/
+      `sym:xau` as vocabulary EXAMPLES WITHOUT a prefix (a small
+      contradiction in the contract text: the rule says "required" but the
+      example violates it). Fixed: a new `_GLOBAL_SYM_EXEMPT` allowlist
+      (`web/writes.py`) — global/macro symbols that aren't ambiguous
+      across markets are exempted from the mandatory region prefix;
+      individual stock tickers (`bbca`, etc.) STILL require the prefix
+      (the old test `test_create_tag_sym_requires_region_prefix` is
+      unchanged, a new test `..._global_symbols_exempt...` adds coverage).
+      1 new test, 390 tests green total. **Result in the production DB**:
+      71 new tags + 8 DORMANT thread candidates (ids 7–14) — confirmed via
+      direct query: the 5 real ACTIVE threads (ids 1,2,3,4,6) COMPLETELY
+      UNCHANGED, `tag_dictionary` went 1→72 rows. Verified first against an
+      isolated temp DB (idempotency: re-running twice doesn't duplicate
+      anything) before running against production.
+- [x] ~~Article Digest D-1: plain RSS summary (Addendum D §22, 23 Jul 2026,
+      Giel added 2 new addenda at once -- D §22 & E §23)~~ — Giel asked for
+      one of them to be built ("yers" -- ambiguous, not specific to D or
+      E). Checked first: `prediction_log` in production has 0 rows, while
+      Addendum E (Meta-Layer) itself requires "≥1-2 months of content"
+      before M-1 may be built -- so E CAN'T do anything right now, the
+      decision fell to D-1 (the contract itself says "build now, it's
+      cheap," no prerequisite). E is documented as deferred, not ignored.
+      **Built (D-1 only, D-2 CONDITIONAL/not yet)**: `db/connection.py` --
+      a new `rss_summary TEXT` on `daily_news` via `_COLUMN_MIGRATIONS`
+      (a new column, no backfill -- unlike `for_reading` which needed old
+      values copied over). `scrapers/news.py` -- `_clean_rss_summary()`:
+      strip HTML using `BeautifulSoup` (already a dependency, used by
+      `investing_calendar.py`/`positioning.py`), tidy whitespace, truncate
+      to 400 chars + "…". `fetch_all_news()` fills `rss_summary` from
+      feedparser's `.summary`/`.description` (feedparser's own alias),
+      None if the feed doesn't include it -- NULL is expected, not an
+      error. `pipeline/run_daily.py`::`insert_news_dedup` writes the new
+      column (defensive `.get()` since other sources like `add_article.py`
+      don't always have this field -- a different table actually,
+      `manual_articles`, so it's never really hit, but the defensive
+      guard is kept anyway). `web/app.py`: `/api/news` SELECT adds the
+      column. `NewsView.vue`: a collapsible `<details>` "RSS summary"
+      below the headline/subtitle, closed by default (not always shown --
+      200 rows x 2-3 lines of summary each would make the table too long
+      at all times). `compose_persona_context.py`: both `_key_news_lines`
+      (the automatic slice) & `_manual_selection_block` (the §21.4 manual
+      feed) now add a `[RSS summary]: ...` line below the headline/Giel's
+      note -- the headline STAYS the first line/factual anchor, never
+      replaced (§22.5 guard).
+      Thread digest (§20.4) is NOT touched -- that path itself hasn't been
+      built yet (News Threads N-2 doesn't exist yet).
+      `pipeline/compose_briefing.py` (Telegram) is DELIBERATELY untouched
+      -- it's not one of the "3 context paths to the lens" mentioned in
+      §22.5, the Telegram message must stay concise.
+      8 new tests (`test_news.py`: `_clean_rss_summary` None/HTML/truncate
+      + a live-fetch check that the `rss_summary` key is always present;
+      `test_db.py`: the new column is NULL-safe;
+      `test_compose_persona_context.py`: the line appears when present,
+      does NOT appear when empty, on both the slice+manual paths).
+      **Also found along the way**: 2 old tests (`test_save_thread_runs_
+      catchup_scan_against_existing_news`,
+      `test_patch_thread_keyword_change_triggers_catchup`) FAILED not
+      because of this work -- a hardcoded seed date `"2026-07-15"` had
+      gone 8 days stale past the `THREAD_CATCHUP_DAYS=7` rolling window
+      (real `today_wib()` is now 2026-07-23, proof real time is passing
+      during this long session). Fixed: the seed date is now RELATIVE to
+      `today_wib()` (not a hardcoded string), fixed once so it won't go
+      stale again going forward. 1 live test
+      (`test_earnings_yf.py::test_has_future_earnings_with_null_actual`)
+      also failed for the same reason (TSLA's 22 Jul earnings, previously
+      "future," has now had its actual released) -- LEFT AS IS, that's the
+      inherent nature of live-data tests (not a bug, not touched).
+      396 tests green total (excluding the 1 live test above that's
+      sensitive to the calendar date). `npm run build` clean. **Not yet
+      evaluated**: D-1 needs to be used for a few days before deciding
+      whether to proceed with D-2 or stop here (the contract's own §22.3).
+- [x] ~~WSL cron dead for 6 days + scope refinement making rss_summary
+      HIGH-only (24 Jul 2026)~~ — Giel reported via Manual Backfill that
+      "not everything came in" + asked whether News was also affected.
+      **Root cause**: `service cron` on this WSL instance was NOT RUNNING
+      (checked via `service cron status`) -- `run_daily` hadn't run since
+      2026-07-17, 6 days stale (both market data AND news affected, not
+      just one side). Explained to Giel: Backfill only covers
+      `asset_ohlcv`+FRED macro fields per instrument (yfinance/FRED have
+      historical APIs) -- News can NEVER be backfilled (RSS only serves
+      LIVE entries right now, there's no "last week's headlines" API).
+      The 07-18..07-22 News gap is permanently unrecoverable, that's an
+      inherent limitation of the data source, not a bug. **Action**:
+      `python -m pipeline.run_daily` run manually (rather than waiting for
+      cron) -- 222 news items came in, 82 new tags, 57 new thread links
+      (tag-match working for real for the first time with actual
+      production data), all asset_ohlcv back to current. Giel was told to
+      run `sudo service cron start` himself (needs the sudo password,
+      can't be done for him). **Also**: Giel asked for `rss_summary` (D-1
+      above) to be restricted to ONLY `impact_level=HIGH` -- contract
+      §22.1 D3 originally wrote this restriction for D-2/LLM Digest (for
+      cost reasons), but Giel explicitly asked for the same principle to
+      apply to D-1 too (`scrapers/news.py::fetch_all_news` now skips
+      parsing the summary entirely for MED/LOW, not just hiding it in the
+      UI). 188 MED/LOW rows that had already gotten rss_summary filled in
+      from the manual run above (before this scoping existed) were
+      cleaned up directly in the production DB (`UPDATE ... SET
+      rss_summary = NULL WHERE impact_level != 'HIGH'`) to stay consistent
+      with the new rule -- confirmed 24/24 remaining rss_summary rows are
+      all HIGH. 1 new test
+      (`test_rss_summary_only_populated_for_high_impact`, monkeypatching
+      the entry+feed-health spy since it needs deterministic control over
+      HIGH vs LOW within a single fetch -- a rare exception from the
+      live-test philosophy, same pattern as `test_notify_telegram.py`).
+      397 tests green total.
+      — initial research had BRIEFLY concluded to skip this (see the first
+      attempt: hit an HTTP 429 that didn't recover after ~5-6 rapid
+      requests, and the AJAX endpoint for "Yesterday" date navigation
+      couldn't be found). But that problem was purely a RESEARCH issue
+      (burst requests), not a production issue (1x/day) — once realized,
+      the scope was changed entirely: **no date navigation needed at
+      all**. Investing.com's default ("today") view is enough IF scraped
+      in the EVENING/NIGHT (not morning alongside `run_daily`) -- that
+      day's HIGH events already have their actual released by then. So
+      it's 1 GET/day, not research bursts -- a completely different risk
+      profile from what got blocked.
+      **Built**: `scrapers/investing_calendar.py` (curl_cffi
+      impersonate=chrome, same pattern as `idx_foreign_flow.py`; parses
+      investing.com's Next.js SSR HTML; ONLY HIGH/3-star importance is
+      taken, per the original request; skips events whose actual is still
+      empty) + `pipeline/run_investing_actual.py` (a SEPARATE entrypoint
+      from `run_daily.py`, its own evening cron -- see the "grab
+      everything twice via cron" rationale below for why it's NOT merged
+      into run_daily). Matching to existing `econ_calendar` rows uses
+      `country` + `event_date` (+-1 day, accounting for the timezone
+      difference between investing.com and WIB) + fuzzy-matching
+      `event_name` (`difflib.SequenceMatcher`, threshold 0.5, SKIP if
+      ambiguous/tied -- **an important finding during live verification**:
+      normalization had BRIEFLY been discarding investing.com's
+      "(MoM)"/"(YoY)" markers along with the release month "(Jun)",
+      making "CPI (MoM)" and "CPI (YoY)" both become "cpi" -> a tie -> all
+      skipped; fixed by normalizing "m/m"/"(MoM)" into a `mom` token
+      (likewise for yoy/qoq) BEFORE stripping parentheses, with the rest
+      (month/quarter names) stripped afterward). Written via the existing
+      `set_econ_actual()` (no new write path created). **Verified live**
+      against the real DB: 3 HIGH events (CPI m/m, Core CPI m/m, CPI y/y,
+      14 Jul 2026) matched and got their actual filled in CORRECTLY (not
+      mixed up between MoM/YoY). 19 new tests
+      (`test_investing_calendar.py`, `test_run_investing_actual.py`), 312
+      tests green total.
+      **Not yet scheduled to cron** — needs 1 separate evening crontab
+      line apart from the existing 00:00 `run_daily` line, Giel will set
+      it up (see instructions in the README/conversation).
+- [ ] Periodic DB size indexing/monitoring as volume grows (a sanity check,
+      not necessarily meaning a migration is needed — see the SQLite
+      rationale in ARCHITECTURE.md).
+- [x] ~~Re-evaluate the RSS feed list~~ — the registry was moved to
+      `scrapers/feeds_config.py` (the single place to manage feeds, change
+      URL/enabled there, not in `news.py`) + `check_feed_health()` per
+      feed on every run (ok/dead status goes into `source_flags` with the
+      `rss_` prefix, same pattern as other APIs — a dead feed is visible
+      immediately in the log, not a hidden backlog). All URLs were
+      VERIFIED DIRECTLY (not assumed): **Reuters** & **Kontan**
+      (`kontan.co.id/feed` AND `/rss`) confirmed genuinely dead (Kontan
+      returns a normal HTML homepage, not XML, even with a browser UA —
+      not a bot-block, it's really been shut down) → set to
+      `enabled: False` + a note. **Bisnis.com** TURNED OUT to still be
+      alive but on a different subdomain (`rss.bisnis.com`, not
+      `bisnis.com/rss/market` which 404s) — found through re-research.
+      Final result: **7 active feeds** (Fed FOMC, CNBC Finance, CNBC
+      Economy, Investing ID, CNBC Indonesia, ANTARA Economy, Bisnis.com),
+      tested live via `run_daily`: **7 ok, 0 dead**.
+      `pipeline/run_daily.py` prints a summary `RSS: X ok, Y dead → [...]`
+      every run. 9 new tests in `tests/test_news.py` (moved from
+      `test_macro.py`), 127 tests green total. `IMPACT_KEYWORDS["HIGH"]`
+      had briefly missed `"bi rate"` (only had the full `"bank indonesia"`)
+      — found while porting the old test, added back so headlines
+      abbreviated as "BI Rate ..." still register as HIGH.
+- [ ] Backfill/fill in `econ_calendar` for past events if calendar history
+      is ever needed (this scraper only gives a rolling "this week" window,
+      not a historical source — would need a different source if history
+      is really needed).
+- [x] ~~`manual_articles` CLI~~ — `pipeline/add_article.py` complete (add +
+      list/search by tag/date-range/keyword), 5 tests green. Used for
+      historical research (e.g. from 2010) that RSS can't reach.
+- [x] ~~Panel 1 Snapshot: Day/Week/Month/Year compare~~ — filter buttons
+      above the snapshot cards (same pattern as the Panel 5 range filter),
+      each card shows a delta + arrow (▲ green up / ▼ red down) vs D-1/
+      W-1/M-1/Y-1. `web/app.py::_compare_from_series()` finds the nearest
+      historical point <= the target date (not an exact match, since gaps
+      in the calendar are expected given `run_daily` is manual). Columns
+      whose instrument exists in `asset_ohlcv` (BTC/SP500/IHSG/USDIDR/
+      USDJPY/Gold) use history from THERE (can go back >10 years), not
+      `daily_market` (only ~4-5 rows for those columns since they only
+      recently started being populated for real) — without this, week/
+      month/year compare for instrument prices would always be n/a. Other
+      columns (DXY/US10Y/VIX/etc., backfilled from FRED since 2010) & any
+      columns genuinely without long history yet (BTC Vol MA20, Funding
+      Rate, Fear & Greed, Net Liquidity) still show `n/a` for periods
+      where there isn't enough data — not a bug, being honest about data
+      limits. A single `/api/latest` fetch is enough (all periods computed
+      at once server-side), toggling in the frontend is purely a display
+      change with no refetch. 5 new tests (`tests/test_web_app.py`, the
+      first test for `web/app.py`), 132 tests green total.
+- [x] ~~Panel 1: card categories, collapse source_flags, data gap
+      detection~~ — 3 UX complaints at once:
+      1. **Snapshot cards grouped** into 3 categories (Crypto (BTC), Global
+         Macro, Equity & FX) — `SNAPSHOT_FIELDS` in `web/app.py` changed
+         from a flat dict to a list-of-dicts with a `category`, rendered
+         per group on the frontend (instead of one flat 14-card grid).
+      2. **"Data Source Status (source_flags)" made collapsible** — native
+         `<details>`/`<summary>` (not custom JS), closed by default, a
+         ▸/▾ triangle showing state.
+      3. **Data gap detection in Manual Backfill** — a new endpoint `GET
+         /api/data_gaps?instrument=X`, runs automatically whenever the
+         instrument dropdown changes (`web/app.py::_detect_gaps()`). Each
+         instrument is mapped to an expected calendar
+         (`INSTRUMENT_SOURCE`): `DAILY` (BTC, RRP — RRP confirmed to
+         release daily per FRED metadata), `WEEKDAY` (equities/forex/DXY/
+         US10Y/VIX/HY), `WEEKLY_WED` (WALCL/TGA — confirmed to release
+         weekly, the gap between Wednesdays is DELIBERATELY not treated as
+         a gap). A 1-day gap (a normal holiday) isn't reported, only
+         >=2 expected-days in a row. Found a real gap while testing: IHSG
+         had 58 gaps (mostly during Lebaran holiday week — clearly visible
+         from the date range), Giel decides whether that's normal or needs
+         backfilling, the tool just provides visibility. 9 new tests
+         (`tests/test_web_app.py`), 141 tests green total.
+- [x] ~~News "key trigger" visibility + Synthesis rework + History tab~~ —
+      complaint: the "key" button on Panel 2 didn't show whether something
+      was already flagged or not, and the flag result only ever showed up
+      in Telegram, so its purpose was unclear.
+      1. **Panel 2 News**: date filter (defaults to today) + impact filter +
+         a "🚩 Key only" button; flagged rows are a different color
+         (`.news-key`); the flag button is now a TOGGLE (★ Key / 🚩 key,
+         click again to unflag). `/api/news` already returned
+         `is_key_trigger` & accepted `date` from the start — just added
+         the `key_only` param.
+      2. **Panel 4 Reading**: a "Today's Key News" section (read-only)
+         above the 4 lenses — flagged news to use as material for writing
+         analysis. This is what gives the key button "purpose" inside the
+         dashboard, not just Telegram.
+      3. **Panel 6 Synthesis**: a date-picker + auto-load (synthesis &
+         outlook for the chosen day), and **fixed Outlook, which previously
+         wasn't being saved anywhere** — now persisted (reuses
+         `reading_workspace` lens=`OUTLOOK:<INSTRUMENT>`, upsert 1
+         stance/instrument/day, no schema change).
+      4. **Panel 7 "History" (NEW)**: an archive for manual input that
+         didn't have a history view yet (chart/news/snapshot already had
+         one). A tab with sub-tabs: Synthesis / Predictions (full track
+         record) / Trading Journal / 4 Lenses. New read-only list helpers
+         in `web/writes.py` + a GET route in `web/app.py`.
+      7 new write tests, 148 tests green total; every panel verified live
+      in the browser (toggling key, Key-only filter, key news in Panel 4,
+      outlook persist + reload, synthesis save/load, the History sub-tabs),
+      test data cleaned up.
+- [x] ~~UI: single-select filters turned into `<select>` + search/sort/
+      pagination across all tables~~ — 2 UX complaints at once:
+      1. **3 filter button-groups that were only ever single-select** (never
+         multi-select) turned into `<select>`s to save space: Snapshot
+         Day/Week/Month/Year (`#snapshotPeriodSelect`), News Impact/Key-
+         only (`#newsImpactSelect`), Chart range 1M/3M/6M/1Y/All
+         (`#chartRangeSelect`). The old `.news-filters` button-group CSS
+         removed, no longer used.
+      2. **Generic search + sort + pagination** added to EVERY data table
+         (News, Signals, Econ Calendar, Positioning, Policy Notes, and all
+         4 sub-tables of Panel 7 History — 9 tables total). 1 reusable JS
+         utility (`applyTableControls()`/`renderTableBar()`, reused rather
+         than reimplemented per table): search (250ms debounce), per-
+         column sort (click a `<th data-sort="field">` header, delegated
+         click listener), pagination (10/20/50/100 rows per page). Search/
+         sort/paging operate on `tableCache[key]` (data already fetched) —
+         changing page or order does NOT refetch from the server, only
+         server-side filters (date range, impact, etc.) trigger a new
+         fetch. `renderSignalsTable()`'s hardcoded `.slice(0, 30)` was
+         removed, so the Panel 5 Signal table can now access all ~200
+         signals via pagination, not just the first 30.
+      **Architecture decision**: staying with vanilla JS/HTML, NOT moving
+      to a frontend framework (React/Vue/etc.) — single-user, local-only,
+      no build pipeline; search/sort/pagination is only ~80 lines of
+      utility, doesn't need a framework. A framework migration would be
+      relevant later if this becomes multi-user/commercial (Master Plan
+      Phase 2/3), not for UX polish. Verified live across all 9 tables
+      (search filter correct, sort asc/desc correct, pagination page-count
+      & Prev/Next correct).
 
-- [x] ~~`index.html` dipecah jadi partials/static assets~~ — file tunggal
-      1700 baris (HTML+CSS+JS campur) dipecah, TANPA ubah perilaku apa pun
-      dan TANPA pindah dari Jinja2/vanilla JS (konsisten dengan keputusan
-      arsitektur di atas):
-      1. **CSS** → `web/static/css/dashboard.css` (dilink via
+- [x] ~~`index.html` split into partials/static assets~~ — a single 1,700-
+      line file (HTML+CSS+JS mixed together) was split, WITHOUT changing
+      any behavior and WITHOUT moving away from Jinja2/vanilla JS
+      (consistent with the architecture decision above):
+      1. **CSS** → `web/static/css/dashboard.css` (linked via
          `url_for('static', ...)`).
-      2. **HTML per-panel** → `web/templates/partials/panelN_*.html` (7
-         file, 1 per tab), di-`{% include %}` dari `index.html`.
-      3. **JS per-panel** → `web/static/js/{core,panel1..7,main}.js` (9
-         file: shared helpers/table-utility di `core.js`, tiap panel
-         dipisah biar gampang dicari, `main.js` isinya `refreshAll()` +
-         init), di-load via `<script src>` berurutan (dependency order:
-         core dulu, baru panel1-7, baru main — karena semua fungsi masih
-         global, bukan module, urutan load penting).
-      `index.html` sekarang ~57 baris (shell doang: head+nav+includes+script
-      tags). Flask default `static_folder`/`template_folder` (relatif ke
-      `web/`) dipakai apa adanya, tidak perlu config baru. Diverifikasi:
-      148 test tetap hijau (murni restructure frontend, tidak sentuh
-      backend), live browser check tiap panel (1/2/5/7 dicek eksplisit —
-      snapshot cards, news table+pagination, chart SVG 335 elemen, sub-tab
-      Riwayat) tanpa console error, semua asset ke-load 200/304.
-- [x] ~~Panel 4: label 4 lensa deskriptif + hapus "Entri Hari Ini"~~ — 2
-      keluhan UX:
-      1. Label kartu 4 lensa cuma kode (GEMA/LEON/AKELA/RIVAN) tanpa
-         konteks fungsinya. Sekarang jadi "GEMA · Makro Global" / "LEON ·
-         Makro Lokal" / "AKELA · On-chain/Fundamental" / "RIVAN · Sentimen
-         &amp; Psikologi Pasar" (`LENS_LABELS` map baru di `core.js`, dipakai
-         juga di Panel 7 histori 4 Lensa biar konsisten). **Kode `lens` di
-         DB TIDAK berubah** (tetap GEMA/LEON/AKELA/RIVAN) — cuma label
-         tampilan, biar histori lama tetap kompatibel.
-      2. Section "Entri Hari Ini" (tabel kecil di bawah 4 lensa, cuma
-         nampilin entri hari ini) dihapus dari Panel 4 — sudah redundan
-         sejak Panel 7 "Riwayat &gt; 4 Lensa" ada (nampilin SEMUA histori
-         termasuk hari ini, di baris teratas). `loadReadingEntries()` di
-         `panel4.js` dihapus, `main.js::refreshAll()` disesuaikan.
-      Diverifikasi live: label baru muncul di kartu Panel 4 & kolom Lensa
-      Panel 7, "Entri Hari Ini" sudah tidak ada, save 4 lensa masih jalan
-      (dicek row tersimpan lewat query DB langsung, lalu dibersihkan).
-- [x] ~~Panel 4: 4 Analisa jadi AI-generated (OpenRouter)~~ — **deviasi
-      eksplisit & disengaja** dari prinsip Phase C (`web/writes.py` §0 /
-      Master Plan: "4 lensa diisi manual, bukan AI agent"). Atas permintaan
-      Giel langsung, 4 analisa (GEMA/LEON/AKELA/RIVAN) sekarang di-generate
-      lewat OpenRouter, dipicu manual per kartu (tombol "Jalankan Analisa"),
-      ditampilkan read-only di popup modal (bukan textarea yang bisa diedit).
-      Codename dianonimkan dari UI (cuma label fungsi yang tampil: Makro
-      Global / Makro Lokal / On-chain-Fundamental / Sentimen &amp; Psikologi
-      Pasar) — kode `lens` di DB TIDAK berubah, histori lama tetap kompatibel.
-      1. **`llm/persona_analysis.py`** (paket baru, pola sama `notify/telegram.py`)
-         — panggil OpenRouter chat completion via `requests` (sudah dependency,
-         tanpa SDK baru). Model dari env `OPENROUTER_MODEL` (default
-         `anthropic/claude-3.7-sonnet`). System prompt tiap persona ditulis
-         manual Giel di `prompts/persona_&lt;lens&gt;.txt` — **TIDAK dibuat
-         otomatis, TIDAK di-commit** (gitignored, dianggap IP analisa
-         pribadi Giel, cuma `prompts/README.md` yang di-track). Kalau file
-         kosong/belum ada, `run_persona_analysis()` raise
-         `PersonaPromptMissing` — endpoint balikin error yang jelas ke UI,
-         BUKAN diam-diam skip atau jalan dengan prompt kosong (sesuai
-         permintaan eksplisit: "jika belum ada prompt persona beri tahu saya").
-      2. **`pipeline/compose_persona_context.py`** — pure function (pola sama
-         `compose_briefing.py`), rakit SATU blob konteks (snapshot pasar +
-         berita key hari ini) yang dikirim SAMA ke ke-4 persona; system
-         prompt masing-masing yang nentuin sudut pandang (bukan konteks
-         beda-beda per persona — disederhanakan karena kita tidak punya
-         data on-chain asli terpisah).
-      3. **`web/writes.py::save_persona_analysis()`** — upsert (DELETE lalu
-         INSERT, pola sama `save_outlook`) sehingga re-run persona yang sama
-         di hari yang sama OVERWRITE, tidak numpuk duplikat di histori Panel 7.
-      4. **`web/app.py`**: `POST /api/persona/run` (body `{lens}, jalankan 1
-         persona) + `GET /api/persona/status` (cek prompt sudah diisi atau
-         belum, dipakai render kartu). Reuse `GET /api/reading?date=X` yang
-         sudah ada buat load hasil tersimpan (tidak perlu route baru).
-      5. Manual note lain (External AI Check, Conflict Notes, Synthesis,
-         Outlook, Trading Journal, Prediction Log) **TIDAK berubah** — tetap
-         100% manual, scope deviasi ini SENGAJA dibatasi ke 4 analisa saja.
-      Diverifikasi: 14 test baru (`test_persona_analysis.py`,
-      `test_compose_persona_context.py`, + 2 test upsert di
-      `test_web_writes.py`, semua di-mock — tidak hit OpenRouter asli),
-      162 test hijau total. Live browser: path "prompt belum diisi" (semua
-      status `false`, tombol kasih toast, tidak ada panggilan API) diverifikasi
-      dulu sebelum prompt asli diisi Giel.
-- [x] ~~Panel 1: OI agregat + Long/Short Ratio + Liquidation Long/Short 24h
-      (Coinalyze)~~ — scraper baru `scrapers/coinalyze.py` (pola sama
-      `scrapers/crypto.py`), 3 endpoint Coinalyze dites LIVE sebelum ditulis
-      (`/open-interest`, `/liquidation-history`, `/long-short-ratio-history`,
-      auth `Authorization: Bearer <key>`, no key = di-skip bukan error).
-      **OI agregat = jumlah 3 exchange utama** (Binance/OKX/Bybit — API
-      Coinalyze TIDAK punya simbol gabungan siap pakai, harus dijumlah
-      manual; simbol per-exchange formatnya beda-beda, mis. Binance
-      `BTCUSDT_PERP.A` vs Bybit `BTCUSDT.6` tanpa suffix `_PERP` — dicek
-      satu-satu, bukan ditebak). **Liquidation dipisah long vs short** (2
-      kolom baru `btc_liq_long_24h`/`btc_liq_short_24h`), BUKAN 1 angka
-      gabungan — kolom lama `btc_liquidation_24h` (sejak Phase A,
-      diperuntukkan CoinGlass) dibiarkan kosong/tidak dipakai, bukan
-      dihapus (hindari migrasi berisiko). Kolom `btc_long_short_ratio`
-      (sejak Phase A, sama-sama pernah kosong) akhirnya terisi juga.
-      `btc_oi_aggregate` kolom baru, BEDA dari `btc_oi` yang sudah ada sejak
-      Phase A (itu single-exchange Binance saja) — keduanya tetap ada,
-      tidak saling gantikan. **Migrasi kolom ke DB lama**: `CREATE TABLE IF
-      NOT EXISTS` di `schema.sql` tidak menambah kolom ke tabel yang sudah
-      ada isinya — ditambah `db/connection.py::_migrate_columns()` (cek
-      `PRAGMA table_info` lalu `ALTER TABLE ADD COLUMN` idempotent),
-      dipanggil dari `init_db()`, dites terhadap DB asli (bukan cuma DB
-      test) sebelum lanjut. 5 test baru (`test_coinalyze.py`, live network
-      pola sama `test_crypto.py`), 167 test hijau total. Diverifikasi live:
-      `python -m pipeline.run_daily` penuh (bukan cuma scraper isolated),
-      4 card baru muncul di Panel 1 kategori "Crypto (BTC)" dengan angka
-      asli (OI agregat ≈$12.35B, L/S ratio 1.46, liq long/short terpisah).
-- [x] ~~Panel 3: IHSG Foreign Net Buy/Sell (IDX)~~ — scraper baru
-      `scrapers/idx_foreign_flow.py`, sumber internal JSON API idx.co.id
-      "Digital Statistic" (bukan API resmi publik, ditemukan lewat source
-      code proyek open-source `NeaByteLab/IDX-API` dan dikonfirmasi LIVE
-      sebelum dipakai — endpoint `primary/DigitalStatistic/GetApiData`,
-      TANPA API key, cuma session cookie). **Simpan 3 komponen mentah
-      TERPISAH** (`ihsg_ff_foreign_foreign`, `ihsg_ff_foreign_domestic`,
-      `ihsg_ff_domestic_foreign`) + 1 net terhitung
-      (`foreign_net_buy_value`), bukan cuma net — GEMA/LEON persona (Track
-      D) butuh baca F2F vs F2D vs D2F sendiri-sendiri sesuai aturan
-      interpretasi masing-masing. **Koreksi penting** atas library
-      referensi `NeaByteLab/IDX-API`: field `foreignForeign*`/
-      `foreignDomestic*` BUKAN "buy"/"sell" langsung seperti yang
-      dipetakan library itu — label kolom ASLI dari IDX (dari
-      `columns[].Title` di response): `foreignForeign` = "Foreign Investor
-      Sell − Foreign Investor Buy" (F2F, asing-ke-asing, BUKAN sinyal
-      arah), `foreignDomestic` = "Foreign Investor Sell − Domestic
-      Investor Buy" (F2D, sisi distribusi). Rumus benar: **Foreign Net Buy
-      = domesticForeignValue (D2F, dari endpoint kembaran) −
-      foreignDomesticValue (F2D)** — dites & tervalidasi terhadap angka
-      nyata (2026-06-02: −Rp 1,39 triliun, magnitude masuk akal).
-      **Temuan teknis penting**: idx.co.id di belakang Cloudflare
-      bot-management — header browser-realistis SAJA TIDAK CUKUP (beda
-      dari farside.co.uk yang juga Cloudflare tapi cukup dengan header,
-      lihat `scrapers/positioning.py`). Dikonfirmasi lewat testing
-      langsung: curl CLI tembus konsisten (3/3), tapi `requests`/urllib3
-      Python KONSISTEN kena halaman JS-challenge ("Just a moment...", 403)
-      walau header identik — soal TLS fingerprint (JA3), bukan header.
-      Fix: dependency baru **`curl_cffi`** (requirements.txt) yang meniru
-      TLS handshake browser asli — SATU-SATUNYA scraper di project ini
-      yang butuh ini. `positioning` table dipakai apa adanya (metric
-      generik per-instrument per-hari, TIDAK perlu kolom baru di
-      `daily_market`), reuse `upsert_positioning` yang sudah ada (natural
-      key `date+instrument+metric` dedupe otomatis) — cuma nambah item
-      list, pola persis sama dengan COT/ETF flow yang sudah ada. Pola
-      tarik-rentang-bukan-1-hari (mirror `fetch_btc_etf_flow`) dipilih
-      karena data "hari ini" sering belum terbit saat `run_daily` jalan
-      (dikonfirmasi: bulan berjalan selalu balik array kosong) — jadi
-      scraper tarik SELURUH bulan tiap run, biar hari-hari sebelumnya
-      ke-backfill otomatis kalau run sebelumnya sempat gagal/terlewat. 5
-      test baru (`test_idx_foreign_flow.py`, live network pola sama
-      scraper lain), 172 test hijau total. Diverifikasi live penuh:
-      `pipeline.run_daily` untuk tanggal Juni 2026 (bulan lengkap) — 80
-      row masuk `positioning` (20 hari bursa × 4 metric), angka 2026-06-02
-      cocok PERSIS dengan perhitungan manual saat riset plan, Panel 3
-      browser nampilin ke-4 baris dengan benar.
-- [x] ~~Panel 4: rewrite konteks 4 Persona jadi Shared Core + Slice per
-      persona (system prompt v4)~~ — **pivot arsitektur eksplisit dari
-      Giel**, membalik keputusan awal ("Sama untuk ke-4 (Recommended)" saat
-      Panel 4 pertama dibangun). Alasan: 4 analis yang membaca data BERBEDA
-      menghasilkan sudut pandang independen yang bisa didebat (konflik
-      produktif), bukan 4 analis baca data identik yang cuma beda gaya
-      bicara.
+      2. **Per-panel HTML** → `web/templates/partials/panelN_*.html` (7
+         files, 1 per tab), `{% include %}`-ed from `index.html`.
+      3. **Per-panel JS** → `web/static/js/{core,panel1..7,main}.js` (9
+         files: shared helpers/table utility in `core.js`, each panel
+         split out for easy lookup, `main.js` holds `refreshAll()` +
+         init), loaded via `<script src>` in order (dependency order: core
+         first, then panel1-7, then main — because all functions are still
+         global, not modules, so load order matters).
+      `index.html` is now ~57 lines (just a shell: head+nav+includes+script
+      tags). Flask's default `static_folder`/`template_folder` (relative to
+      `web/`) used as-is, no new config needed. Verified: 148 tests stayed
+      green (purely a frontend restructure, backend untouched), a live
+      browser check of each panel (1/2/5/7 checked explicitly — snapshot
+      cards, news table+pagination, 335-element SVG chart, History sub-
+      tab) with no console errors, all assets loading 200/304.
+- [x] ~~Panel 4: descriptive 4-lens labels + remove "Today's Entries"~~ — 2
+      UX complaints:
+      1. The 4-lens card labels were just codes (GEMA/LEON/AKELA/RIVAN)
+         with no context on their function. Now they read "GEMA · Global
+         Macro" / "LEON · Local Macro" / "AKELA · On-chain/Fundamental" /
+         "RIVAN · Market Sentiment & Psychology" (a new `LENS_LABELS` map
+         in `core.js`, also used in the Panel 7 4-Lens history for
+         consistency). **The `lens` code in the DB is UNCHANGED** (still
+         GEMA/LEON/AKELA/RIVAN) — just a display label, so old history
+         stays compatible.
+      2. The "Today's Entries" section (a small table under the 4 lenses,
+         showing only today's entries) was removed from Panel 4 — already
+         redundant since Panel 7 "History > 4 Lenses" exists (shows ALL
+         history including today, at the top row).
+         `loadReadingEntries()` in `panel4.js` removed, `main.js::
+         refreshAll()` adjusted accordingly.
+      Verified live: new labels appear on the Panel 4 cards & the Lens
+      column in Panel 7, "Today's Entries" is gone, saving the 4 lenses
+      still works (checked the saved row via direct DB query, then
+      cleaned up).
+- [x] ~~Panel 4: the 4 Analyses become AI-generated (OpenRouter)~~ — an
+      **explicit, deliberate deviation** from the Phase C principle
+      (`web/writes.py` §0 / Master Plan: "the 4 lenses are filled in
+      manually, not by an AI agent"). At Giel's direct request, the 4
+      analyses (GEMA/LEON/AKELA/RIVAN) are now generated via OpenRouter,
+      triggered manually per card (a "Run Analysis" button), shown read-
+      only in a popup modal (not an editable textarea). Codenames are
+      anonymized in the UI (only the function labels show: Global Macro /
+      Local Macro / On-chain-Fundamental / Market Sentiment & Psychology)
+      — the `lens` code in the DB is UNCHANGED, old history stays
+      compatible.
+      1. **`llm/persona_analysis.py`** (a new package, same pattern as
+         `notify/telegram.py`) — calls an OpenRouter chat completion via
+         `requests` (already a dependency, no new SDK). The model comes
+         from the `OPENROUTER_MODEL` env var (default
+         `anthropic/claude-3.7-sonnet`). Each persona's system prompt is
+         written manually by Giel in `prompts/persona_<lens>.txt` — **NOT
+         auto-generated, NOT committed** (gitignored, treated as Giel's
+         personal analysis IP, only `prompts/README.md` is tracked). If
+         the file is empty/missing, `run_persona_analysis()` raises
+         `PersonaPromptMissing` — the endpoint returns a clear error to the
+         UI, NOT a silent skip or running with an empty prompt (per the
+         explicit request: "if the persona prompt isn't there yet, tell
+         me").
+      2. **`pipeline/compose_persona_context.py`** — a pure function (same
+         pattern as `compose_briefing.py`), assembles ONE context blob
+         (market snapshot + today's key news) sent IDENTICALLY to all 4
+         personas; each one's system prompt determines the point of view
+         (not different context per persona — simplified because we don't
+         have real separate on-chain data).
+      3. **`web/writes.py::save_persona_analysis()`** — upsert (DELETE
+         then INSERT, same pattern as `save_outlook`) so re-running the
+         same persona on the same day OVERWRITES instead of piling up
+         duplicates in the Panel 7 history.
+      4. **`web/app.py`**: `POST /api/persona/run` (body `{lens}`, runs 1
+         persona) + `GET /api/persona/status` (checks whether the prompt
+         has been filled in yet, used to render the card). Reuses the
+         existing `GET /api/reading?date=X` to load saved results (no new
+         route needed).
+      5. Other manual notes (External AI Check, Conflict Notes, Synthesis,
+         Outlook, Trading Journal, Prediction Log) **UNCHANGED** — still
+         100% manual, this deviation's scope is DELIBERATELY limited to
+         just the 4 analyses.
+      Verified: 14 new tests (`test_persona_analysis.py`,
+      `test_compose_persona_context.py`, + 2 upsert tests in
+      `test_web_writes.py`, all mocked — no real OpenRouter hits), 162
+      tests green total. Live browser: the "prompt not filled in yet"
+      path (all statuses `false`, button shows a toast, no API call) was
+      verified before the real prompts were filled in by Giel.
+- [x] ~~Panel 1: Aggregate OI + Long/Short Ratio + Long/Short Liquidation
+      24h (Coinalyze)~~ — a new scraper `scrapers/coinalyze.py` (same
+      pattern as `scrapers/crypto.py`), 3 Coinalyze endpoints tested LIVE
+      before being written (`/open-interest`, `/liquidation-history`,
+      `/long-short-ratio-history`, auth `Authorization: Bearer <key>`, no
+      key = skipped rather than erroring). **Aggregate OI = sum of 3 major
+      exchanges** (Binance/OKX/Bybit — the Coinalyze API has no ready-made
+      combined symbol, it has to be summed manually; per-exchange symbol
+      formats differ, e.g. Binance `BTCUSDT_PERP.A` vs Bybit `BTCUSDT.6`
+      with no `_PERP` suffix — checked one by one, not guessed).
+      **Liquidation split into long vs short** (2 new columns
+      `btc_liq_long_24h`/`btc_liq_short_24h`), NOT 1 combined number — the
+      old column `btc_liquidation_24h` (since Phase A, intended for
+      CoinGlass) is left empty/unused, not deleted (avoiding a risky
+      migration). The `btc_long_short_ratio` column (also since Phase A,
+      also previously empty) is finally populated too. `btc_oi_aggregate`
+      is a new column, DIFFERENT from the existing `btc_oi` (that one is
+      Binance-only, single-exchange) — both still exist, neither replaces
+      the other. **Migrating columns into the old DB**: `CREATE TABLE IF
+      NOT EXISTS` in `schema.sql` doesn't add columns to a table that
+      already has data — added `db/connection.py::_migrate_columns()`
+      (checks `PRAGMA table_info` then idempotent `ALTER TABLE ADD
+      COLUMN`), called from `init_db()`, tested against the real DB (not
+      just the test DB) before proceeding. 5 new tests
+      (`test_coinalyze.py`, live network, same pattern as
+      `test_crypto.py`), 167 tests green total. Verified live: a full
+      `python -m pipeline.run_daily` (not just the isolated scraper), 4
+      new cards appear on Panel 1 in the "Crypto (BTC)" category with real
+      numbers (aggregate OI ≈$12.35B, L/S ratio 1.46, long/short
+      liquidation separated).
+- [x] ~~Panel 3: IHSG Foreign Net Buy/Sell (IDX)~~ — a new scraper
+      `scrapers/idx_foreign_flow.py`, source: idx.co.id's internal
+      "Digital Statistic" JSON API (not a public official API, found via
+      the open-source project `NeaByteLab/IDX-API`'s source code and
+      confirmed LIVE before use — endpoint
+      `primary/DigitalStatistic/GetApiData`, NO API key, just a session
+      cookie). **Stores 3 raw components SEPARATELY**
+      (`ihsg_ff_foreign_foreign`, `ihsg_ff_foreign_domestic`,
+      `ihsg_ff_domestic_foreign`) + 1 computed net
+      (`foreign_net_buy_value`), not just the net — the GEMA/LEON persona
+      (Track D) needs to read F2F vs F2D vs D2F separately per their own
+      interpretation rules. **An important correction** to the reference
+      library `NeaByteLab/IDX-API`: the `foreignForeign*`/
+      `foreignDomestic*` fields are NOT directly "buy"/"sell" as that
+      library maps them — the ACTUAL column labels from IDX (from
+      `columns[].Title` in the response): `foreignForeign` = "Foreign
+      Investor Sell − Foreign Investor Buy" (F2F, foreign-to-foreign, NOT
+      a directional signal), `foreignDomestic` = "Foreign Investor Sell −
+      Domestic Investor Buy" (F2D, the distribution side). The correct
+      formula: **Foreign Net Buy = domesticForeignValue (D2F, from the
+      sibling endpoint) − foreignDomesticValue (F2D)** — tested & validated
+      against a real figure (2026-06-02: −Rp 1.39 trillion, a sensible
+      magnitude). **An important technical finding**: idx.co.id is behind
+      Cloudflare bot-management — browser-realistic headers ALONE AREN'T
+      ENOUGH (different from farside.co.uk, also Cloudflare, but headers
+      are enough there, see `scrapers/positioning.py`). Confirmed via
+      direct testing: the curl CLI got through consistently (3/3), but
+      Python `requests`/urllib3 CONSISTENTLY hit a JS-challenge page ("Just
+      a moment...", 403) with identical headers — it's about TLS
+      fingerprint (JA3), not headers. Fix: a new dependency **`curl_cffi`**
+      (requirements.txt) which mimics a real browser's TLS handshake — the
+      ONLY scraper in this project that needs this. The `positioning`
+      table is used as-is (generic per-instrument-per-day metric, NO new
+      column needed on `daily_market`), reusing the existing
+      `upsert_positioning` (natural key `date+instrument+metric`
+      auto-dedupes) — just adding a list item, same pattern as the
+      existing COT/ETF flow. The pull-a-range-not-1-day pattern (mirroring
+      `fetch_btc_etf_flow`) was chosen because "today's" data is often not
+      yet published when `run_daily` runs (confirmed: the current month
+      always returns an empty array) — so the scraper pulls the WHOLE
+      month every run, so any days missed by a prior failed/skipped run
+      get backfilled automatically. 5 new tests
+      (`test_idx_foreign_flow.py`, live network, same pattern as other
+      scrapers), 172 tests green total. Verified fully live:
+      `pipeline.run_daily` for June 2026 (a full month) — 80 rows went
+      into `positioning` (20 trading days × 4 metrics), the 2026-06-02
+      figure matched EXACTLY the manual calculation done during plan
+      research, Panel 3 in the browser correctly showed all 4 rows.
+- [x] ~~Panel 4: rewrite the 4-Persona context into Shared Core + Per-
+      Persona Slice (system prompt v4)~~ — an **explicit architecture
+      pivot from Giel**, reversing an earlier decision ("Same for all 4
+      (Recommended)" when Panel 4 was first built). Reason: 4 analysts
+      reading DIFFERENT data produce independent, debatable viewpoints
+      (productive conflict), rather than 4 analysts reading identical data
+      who just differ in speaking style.
       1. **`indicators/calc.py`**: `COMPARE_PERIODS`/`compare_from_series`
-         (delta Hari/Minggu/Bulan/Tahun) dipindah dari `web/app.py` ke sini
-         — dipakai BARENG oleh Panel 1 (`web/app.py`) dan konteks persona
-         (`pipeline/compose_persona_context.py`), hindari `pipeline`
-         import dari `web` (layering salah arah kalau tetap di app.py).
-      2. **`pipeline/compose_persona_context.py`** — rewrite total,
-         signature jadi `compose_persona_context(conn, date, lens)`.
-         **SHARED CORE** (semua persona): tanggal, berita key, BTC
-         close+delta H/M. **SLICE per lens**: GEMA (DXY/US10Y/VIX/Net
-         Liquidity/HY+delta, USD/JPY/Gold/SP500/BTCDom tanpa delta,
-         USD/IDR+delta, IHSG foreign flow F2F/F2D/D2F dari Track C, COT
-         DXY+ETF flow, Policy Tracker speaker ASING), LEON (IHSG/USD-IDR+
-         delta, IHSG foreign flow — framing BEDA dari GEMA: "rapor
-         kepercayaan kebijakan" bukan "arah arus modal", econ_calendar
-         country=ID, Policy Tracker speaker DOMESTIK), AKELA (econ_calendar
-         penuh, Disonansi Flag, Fear&Greed+delta, VIX, BTC Vol MA20,
-         funding rate, delta H/M/B/T instrumen utama), RIVAN (funding rate,
-         OI agregat+delta dari Track B, liquidation long/short 24h, L/S
-         ratio, ETF flow, BTC Dominance, volume vs Vol MA20). IHSG foreign
-         flow SENGAJA tidak diberikan ke AKELA/RIVAN (disiplin slice).
-         Policy Tracker speaker asing/domestik diklasifikasi lewat keyword
-         match nama institusi (`DOMESTIC_INSTITUTION_KEYWORDS`) — tabel
-         `policy_tracker` tidak punya kolom terstruktur utk ini.
-      3. **`web/app.py::persona_run()`** — teruskan `lens` ke
+         (Day/Week/Month/Year delta) moved here from `web/app.py` — used
+         by BOTH Panel 1 (`web/app.py`) and the persona context
+         (`pipeline/compose_persona_context.py`), avoiding `pipeline`
+         importing from `web` (which would be layering in the wrong
+         direction if it stayed in app.py).
+      2. **`pipeline/compose_persona_context.py`** — a full rewrite,
+         signature now `compose_persona_context(conn, date, lens)`.
+         **SHARED CORE** (all personas): date, key news, BTC close+H/M
+         delta. **PER-LENS SLICE**: GEMA (DXY/US10Y/VIX/Net Liquidity/HY+
+         delta, USD/JPY/Gold/SP500/BTCDom without delta, USD/IDR+delta,
+         IHSG foreign flow F2F/F2D/D2F from Track C, COT DXY+ETF flow,
+         Policy Tracker FOREIGN speakers), LEON (IHSG/USD-IDR+delta, IHSG
+         foreign flow — framed DIFFERENTLY from GEMA: "policy-credibility
+         report card" rather than "capital flow direction," econ_calendar
+         country=ID, Policy Tracker DOMESTIC speakers), AKELA (full
+         econ_calendar, Dissonance Flag, Fear&Greed+delta, VIX, BTC Vol
+         MA20, funding rate, D/W/M/Y delta for key instruments), RIVAN
+         (funding rate, aggregate OI+delta from Track B, 24h long/short
+         liquidation, L/S ratio, ETF flow, BTC Dominance, volume vs Vol
+         MA20). IHSG foreign flow is DELIBERATELY not given to
+         AKELA/RIVAN (slice discipline). Policy Tracker foreign/domestic
+         speakers are classified via an institution-name keyword match
+         (`DOMESTIC_INSTITUTION_KEYWORDS`) — the `policy_tracker` table
+         has no structured column for this.
+      3. **`web/app.py::persona_run()`** — passes `lens` through to
          `compose_persona_context`.
-      4. **`prompts/persona_{gema,leon,akela,rivan}.txt`** — diganti PENUH
-         (verbatim) dengan system prompt v4 dari Giel, termasuk panduan
-         interpretasi F2F/F2D/D2F eksplisit di prompt GEMA & LEON.
-      5. Prompt Orkestrator (panel debat 4-sekaligus + sintesis konflik,
-         juga ada di dokumen v4) **DICATAT sebagai backlog**, TIDAK
-         dibangun — Panel 4 saat ini jalankan 1 persona per klik, bukan
-         panel debat serentak; butuh desain UI terpisah.
-      **Temuan saat implementasi**: `econ_calendar country='ID'` SELALU
-      kosong saat ini — sumber ForexFactory tidak cover kalender Indonesia
-      sama sekali (dicek: `SELECT DISTINCT country` cuma NZ/AU/CA/GB/US/
-      EU/CH/JP/CN, tidak ada ID). Bukan bug Track D — keterbatasan sumber
-      data yang sudah ada, dicatat apa adanya di teks konteks LEON
-      ("sumber ForexFactory saat ini tidak cover kalender ID") bukan
-      disembunyikan.
-      **Urutan eksekusi**: Track B → Track C → Track D (keras, bukan
-      preferensi) — slice GEMA/LEON butuh field Track C, slice RIVAN butuh
-      field Track B; pasang prompt v4 sebelum data-nya ada akan bikin
-      persona mengklaim data yang sebenarnya kosong.
-      9 test baru (`test_compose_persona_context.py` full rewrite, fokus
-      verifikasi ISOLASI slice — field GEMA tidak bocor ke RIVAN dst),
-      178 test hijau total. Diverifikasi live: ke-4 slice dipanggil dengan
-      tanggal sama terhadap DB asli, konfirmasi isi 100% beda (bukan
-      identik lagi), 1 run RIVAN asli lewat OpenRouter — hasilnya
-      mengutip angka liquidation long/short SUNGGUHAN dan menerapkan
-      aturan interpretasi "short-covering" dari prompt v4 dengan benar,
-      row test dibersihkan setelah verifikasi.
+      4. **`prompts/persona_{gema,leon,akela,rivan}.txt`** — replaced
+         ENTIRELY (verbatim) with Giel's v4 system prompt, including
+         explicit F2F/F2D/D2F interpretation guidance in the GEMA & LEON
+         prompts.
+      5. The Orchestrator prompt (an all-4-at-once debate panel + conflict
+         synthesis, also in the v4 document) is **RECORDED as backlog**,
+         NOT built — Panel 4 currently runs 1 persona per click, not a
+         simultaneous debate panel; would need a separate UI design.
+      **Finding during implementation**: `econ_calendar country='ID'` is
+      ALWAYS empty right now — the ForexFactory source doesn't cover the
+      Indonesian calendar at all (checked: `SELECT DISTINCT country` only
+      has NZ/AU/CA/GB/US/EU/CH/JP/CN, no ID). Not a Track D bug — an
+      existing data-source limitation, noted as-is in LEON's context text
+      ("the ForexFactory source currently doesn't cover the ID calendar")
+      rather than hidden.
+      **Execution order**: Track B → Track C → Track D (strict, not a
+      preference) — the GEMA/LEON slice needs Track C fields, the RIVAN
+      slice needs Track B fields; wiring up the v4 prompt before its data
+      exists would make a persona claim data that's actually empty.
+      9 new tests (`test_compose_persona_context.py` fully rewritten,
+      focused on verifying slice ISOLATION — GEMA fields don't leak into
+      RIVAN etc.), 178 tests green total. Verified live: all 4 slices
+      called with the same date against the real DB, confirmed the
+      content is 100% different (not identical anymore), 1 real RIVAN run
+      through OpenRouter — the result quoted REAL long/short liquidation
+      numbers and correctly applied the "short-covering" interpretation
+      rule from the v4 prompt, test rows cleaned up after verification.
 
 ## 🔶 Phase J+ — Equity Expansion (Build Contract v1.3 LOCKED 11 Jul 2026 + Addendum A 12 Jul 2026)
 
-> **Single source of truth spesifikasi**: [phase_j_build_contract_v1_3_LOCKED.md](phase_j_build_contract_v1_3_LOCKED.md)
-> (file kontrak lengkap, verbatim dari Giel). Ringkasan di bawah untuk konteks
-> changelog — kalau beda dengan file kontrak, KONTRAK yang benar.
+> **Single source of truth for the spec**: [phase_j_build_contract_v1_3_LOCKED.md](phase_j_build_contract_v1_3_LOCKED.md)
+> (the complete contract file, verbatim from Giel). The summary below is for
+> changelog context — if it differs from the contract file, the CONTRACT is correct.
 
-Dokumen kontrak lengkap (15 langkah build J-0→J-13 + J-14/J-15 dari
-Addendum A, 3 gerbang G1-G3, modul Emiten Grader, sizing/lot engine,
-execution layer manual-only, kalibrasi per-market, intake workflow, panel
-dashboard baru Tab 8) diterima penuh dari Giel — lihat ringkasan keputusan
-terkunci §18 kontrak. Beberapa langkah SUDAH bisa dikerjakan tanpa menunggu
-gerbang (schema + riset + J-14), yang lain BLOCKED eksplisit sampai Giel isi
-inputnya sendiri.
+The complete contract document (15 build steps J-0→J-13 + J-14/J-15 from
+Addendum A, 3 gates G1-G3, the Emiten Grader module, the sizing/lot engine,
+the manual-only execution layer, per-market calibration, the intake workflow,
+the new Tab 8 dashboard panel) has been fully accepted from Giel — see the
+locked decision summary in contract §18. Some steps could ALREADY be worked
+on without waiting for the gates (schema + research + J-14), others are
+explicitly BLOCKED until Giel fills in the inputs himself.
 
-### Ringkasan prinsip terkunci — Section 13-18 kontrak (BARU dicatat, belum semua dibangun)
+### Summary of locked principles — Sections 13-18 of the contract (NEWLY recorded, not all built yet)
 
-- **§13 Kalibrasi Per-Market**: engine S&R/breakout satu, tapi parameter
-  di-tune per pasar sebelum instrumen boleh naik ke lane `TRADE` — 5 poin:
-  volume proxy (ATR/range) untuk aset `has_real_volume=false`, R:R saham
-  sebagai estimasi optimis (gap risk, beda dari BTC), buffer sizing ARA/ARB
-  IDX, toleransi zona S&R diskalakan per fraksi harga (bukan angka absolut),
-  dan validasi bar-replay wajib per instrumen sebelum `lane_validated_at`
-  terisi (**"Engine teruji di BTC ≠ teruji di BBRI"**). Tabel karakter
-  IDX-vs-US (ARA/ARB vs LULD, gap kecil vs earnings gap, retest longgar vs
-  ketat, GTC limit order IBKR dipasang siang WIB tanpa begadang) — jadi
-  acuan J-3/K-2, belum dieksekusi.
-- **§14 Sizing & Lot Quantization**: budget risiko ÷ jarak entry-SL →
-  **bulatkan KE BAWAH** ke kelipatan `lot_size` (risiko aktual ≤ rencana,
-  tidak pernah sebaliknya); kapasitas tidak cukup 1 lot → sinyal **SKIP**
-  (`skip_reason=RISK_CAPACITY_EXCEEDED`), setara status skip R:R<1.5;
-  **dilarang keras geser SL supaya lot "muat"** — SL tetap struktural dari
-  zona, sizing yang menyesuaikan. Efek samping disengaja: rule ini menyaring
-  universe secara alami (emiten yang belum muat kapasitas risiko otomatis
-  cuma layak lane `INVEST`). Belum dibangun di `analysis/signals.py` —
-  masih J-3b di build order.
-- **§15 Execution Layer**: sistem berhenti di sinyal+size, eksekusi 100%
-  manual tangan Giel (Stockbit utk IDX, IBKR GTC limit order utk US,
-  exchange existing utk crypto) — **TIDAK ADA integrasi API broker untuk
-  fase J-K**, ini keputusan terkunci (§18 poin 6). Guard eksplisit ditulis
-  di kontrak untuk masa depan: kalau integrasi API broker dipertimbangkan
-  ulang suatu saat, WAJIB lewat review tertulis terpisah yang menjawab
-  "bagaimana human gate tetap hidup jika eksekusi otomatis" — dan review
-  itu HARUS dilakukan saat TIDAK sedang posisi/drawdown (keputusan saat
-  frustrasi eksekusi manual = keputusan paling patut dicurigai). Dicatat di
-  sini supaya guard ini tidak hilang kalau suatu saat idenya muncul lagi.
-- **§16 Intake Workflow**: alur uji kelayakan emiten kandidat di luar
-  universe (input metadata → input fundamental, 8 kuartal target/4 minimum
-  dgn flag `LOW_CONFIDENCE` → scraper cek UMA/papan pemantauan/suspensi →
-  grader jalan → keputusan Giel: universe/watchlist/tolak, **tercatat +
-  alasan wajib**) — pakai rubrik SAMA dengan universe existing, TIDAK ADA
-  jalur istimewa (emiten yang masuk karena hype/rekomendasi justru paling
-  butuh flag integritas — grader = rem, bukan stempel). Diimplementasi
-  sebagai Komponen C Tab 8 (lihat Addendum A di bawah), bukan modul
-  terpisah.
-- **§18 Keputusan terkunci (7 poin, review Giel 11 Jul 2026)**: hierarki
-  resmi persona→mesin→Giel; model `lane` per-instrumen; **no-hold-through-
-  earnings VERSI PENUH** untuk saham AS (tutup posisi sebelum earnings,
-  TANPA opsi size setengah — beda dari draft awal yang masih kasih opsi);
-  buffer sizing ARA/ARB = **1.5× jarak SL** sebagai default (revisi cuma
-  lewat bukti jurnal, bukan per kasus); skip rule + larangan geser SL
-  final; larangan API broker berlaku fase J-K (bukan permanen); build order
-  J-0→J-13 disetujui tanpa perubahan.
+- **§13 Per-Market Calibration**: one S&R/breakout engine, but parameters
+  are tuned per market before an instrument may be promoted to the `TRADE`
+  lane — 5 points: volume proxy (ATR/range) for assets with
+  `has_real_volume=false`, stock R:R as an optimistic estimate (gap risk,
+  different from BTC), ARA/ARB sizing buffer for IDX, S&R zone tolerance
+  scaled per price fraction (not an absolute number), and mandatory
+  bar-replay validation per instrument before `lane_validated_at` is filled
+  in (**"An engine tested on BTC ≠ tested on BBRI"**). The IDX-vs-US
+  characteristics table (ARA/ARB vs LULD, small gaps vs earnings gaps,
+  loose vs tight retest, GTC limit orders placed on IBKR during the WIB
+  afternoon without staying up late) — serves as a reference for J-3/K-2,
+  not yet executed.
+- **§14 Sizing & Lot Quantization**: risk budget ÷ entry-SL distance →
+  **round DOWN** to a multiple of `lot_size` (actual risk ≤ planned,
+  never the other way around); capacity insufficient for 1 lot → signal
+  **SKIP** (`skip_reason=RISK_CAPACITY_EXCEEDED`), equivalent status to a
+  R:R<1.5 skip; **strictly forbidden to move the SL just so the lot
+  "fits"** — the SL stays structural, derived from the zone, sizing is what
+  adjusts. Intentional side effect: this rule naturally filters the
+  universe (an issuer that doesn't yet fit the risk capacity automatically
+  only qualifies for the `INVEST` lane). Not yet built in
+  `analysis/signals.py` — still J-3b in the build order.
+- **§15 Execution Layer**: the system stops at signal+size, execution is
+  100% manual by Giel's own hand (Stockbit for IDX, IBKR GTC limit orders
+  for US, existing exchange for crypto) — **NO broker API integration for
+  phase J-K**, this is a locked decision (§18 point 6). An explicit guard is
+  written into the contract for the future: if broker API integration is
+  ever reconsidered, it MUST go through a separate written review that
+  answers "how does the human gate stay alive if execution is automated" —
+  and that review MUST be done while NOT currently in a position/drawdown
+  (a decision made out of frustration with manual execution = the most
+  suspect kind of decision). Recorded here so this guard isn't lost if the
+  idea ever resurfaces.
+- **§16 Intake Workflow**: the feasibility-testing flow for candidate
+  issuers outside the universe (metadata input → fundamental input, 8
+  quarters target / 4 minimum with `LOW_CONFIDENCE` flag → scraper checks
+  UMA/special monitoring board/suspension → grader runs → Giel's decision:
+  universe/watchlist/reject, **recorded + mandatory reason**) — uses the
+  SAME rubric as the existing universe, NO special path (an issuer that
+  comes in because of hype/recommendation is precisely the one that most
+  needs the integrity flag — the grader is a brake, not a rubber stamp).
+  Implemented as Tab 8 Component C (see Addendum A below), not as a
+  separate module.
+- **§18 Locked decisions (7 points, Giel's review 11 Jul 2026)**: the
+  official hierarchy persona→machine→Giel; the per-instrument `lane`
+  model; **FULL VERSION of no-hold-through-earnings** for US stocks (close
+  the position before earnings, WITHOUT the half-size option — different
+  from the earlier draft which still offered that option); ARA/ARB sizing
+  buffer = **1.5× SL distance** as default (revision only via journal
+  evidence, not case-by-case); final skip rule + ban on moving the SL; the
+  broker-API ban applies to phase J-K (not permanent); build order
+  J-0→J-13 approved without changes.
 
-### Addendum A (12 Jul 2026) — Panel Universe & Grader, Tab 8 baru
+### Addendum A (12 Jul 2026) — Universe & Grader Panel, new Tab 8
 
-Menutup backlog eksplisit "UI form input manual `instrument_metadata`"
-(dicatat sebelumnya di bagian "lanjutan kickoff" di bawah) — bukan modul
-terpisah, jadi bagian dashboard Tab 8. Posisi di spine: **kotak ⑤ BACA**
-(konteks & kelola universe), BUKAN eksekusi — tidak ada tombol approve/
-reject `trade_signals`, tidak tampilkan entry/SL/TP (itu tetap Panel 5).
-Cadence mingguan/kuartalan, sengaja terpisah dari ritual harian Panel 1-6.
+Closes the explicit backlog item "manual `instrument_metadata` input UI form"
+(previously recorded in the "kickoff continuation" section below) — not a
+separate module, it's part of Tab 8 of the dashboard. Position in the spine:
+**box ⑤ READ** (context & universe management), NOT execution — no
+approve/reject button for `trade_signals`, doesn't display entry/SL/TP
+(that stays with Panel 5). Weekly/quarterly cadence, deliberately separate
+from the daily ritual of Panels 1-6.
 
-4 komponen (pola kode: write lewat `web/writes.py` pure function testable,
-read baru di `web/app.py`, partial `partials/panel8_*.html` + `static/js/
-panel8.js`, mengikuti pola Phase C):
-- **Komponen A — Tabel Universe**: `instrument_metadata` LEFT JOIN grade
-  terbaru (`emiten_grade` per `MAX(as_of)`). Kolom: ticker/sector/market,
-  badge `lane` (TRADE hijau/BOTH biru/INVEST abu/NONE putus-putus), badge
-  kuadran (INVESTABLE/WATCH/SPECULATIVE/AVOID, "—" kalau belum digrade),
-  `fund_score`, jumlah flag aktif. `GET /api/universe`.
-- **Komponen B — Detail Emiten** (gelombang 2, prasyarat J-4+J-11):
-  `GET /api/emiten/<ticker>` gabung metadata+8 kuartal fundamental (atau
-  kurang + `LOW_CONFIDENCE`)+benchmark sektor+grade+flag aktif. Playbook
-  bank: `is_financial=1` → tampil CAR/NPL/NIM/LDR, **SEMBUNYIKAN**
-  DER/net-debt-EBITDA (ganti, bukan tambah). Satu-satunya tulis di
-  komponen ini: `POST /api/emiten/<ticker>/override` (`{quadrant, reason}`,
-  `reason` wajib non-kosong) → `save_grade_override()` — nilai mesin asli
-  tetap terlihat, override tampil dengan penanda terpisah.
-- **Komponen C — Intake Kandidat**: **gelombang 1** (J-14, bisa sekarang) —
-  form metadata (`POST /api/intake` → `save_intake_metadata()`), **guard di
-  level write function** (bukan cuma UI): `lane` dari jalur intake HANYA
-  boleh `INVEST`/`NONE`, `TRADE`/`BOTH` ditolak eksplisit (mirror assert
-  `test_seed_universe.py`), `lane_validated_at` selalu NULL. **Gelombang 2**
-  (J-15) — fundamental manual + tombol cek integritas (scraper J-11a) +
-  tombol jalankan grade + keputusan Giel tercatat ke tabel baru
+4 components (code pattern: writes go through `web/writes.py` pure
+testable functions, reads new in `web/app.py`, partial `partials/panel8_*.html`
++ `static/js/panel8.js`, following the Phase C pattern):
+- **Component A — Universe Table**: `instrument_metadata` LEFT JOIN with the
+  latest grade (`emiten_grade` per `MAX(as_of)`). Columns: ticker/sector/market,
+  `lane` badge (TRADE green/BOTH blue/INVEST gray/NONE dashed), quadrant badge
+  (INVESTABLE/WATCH/SPECULATIVE/AVOID, "—" if not yet graded), `fund_score`,
+  count of active flags. `GET /api/universe`.
+- **Component B — Issuer Detail** (wave 2, prerequisite J-4+J-11):
+  `GET /api/emiten/<ticker>` combines metadata+8 quarters of fundamentals
+  (or fewer + `LOW_CONFIDENCE`)+sector benchmark+grade+active flags. Bank
+  playbook: `is_financial=1` → display CAR/NPL/NIM/LDR, **HIDE**
+  DER/net-debt-EBITDA (replace, not add). The only write in this
+  component: `POST /api/emiten/<ticker>/override` (`{quadrant, reason}`,
+  `reason` mandatory non-empty) → `save_grade_override()` — the original
+  machine value remains visible, the override displays with a separate
+  marker.
+- **Component C — Candidate Intake**: **wave 1** (J-14, can start now) —
+  metadata form (`POST /api/intake` → `save_intake_metadata()`), **guard at
+  the write-function level** (not just the UI): `lane` from the intake path
+  may ONLY be `INVEST`/`NONE`, `TRADE`/`BOTH` explicitly rejected (mirrors
+  the assert in `test_seed_universe.py`), `lane_validated_at` always NULL.
+  **Wave 2** (J-15) — manual fundamentals + integrity-check button (scraper
+  J-11a) + run-grade button + Giel's recorded decision into a new table
   **`intake_log`** (`id, instrument, decided_at, decision, reason TEXT NOT
-  NULL, grade_snapshot JSON, created_at` — padanan `prediction_log` utk
-  intake, `CREATE TABLE IF NOT EXISTS`).
-- **Komponen D — Grader Log & Kalibrasi** (gelombang 2): `GET
-  /api/grader_log` (riwayat per instrumen) + widget "Nilai Outcome" (pola
-  identik widget "Skor Prediksi" Panel 6) → `POST /api/grader_log/<id>/
-  outcome` → `save_grader_outcome()`. Reminder UI: revisi bobot rubrik
-  HANYA lewat log ini, bukan per kasus.
+  NULL, grade_snapshot JSON, created_at` — the intake counterpart of
+  `prediction_log`, `CREATE TABLE IF NOT EXISTS`).
+- **Component D — Grader Log & Calibration** (wave 2): `GET
+  /api/grader_log` (per-instrument history) + an "Outcome Score" widget
+  (identical pattern to the Panel 6 "Prediction Score" widget) → `POST
+  /api/grader_log/<id>/outcome` → `save_grader_outcome()`. UI reminder:
+  revising rubric weights ONLY through this log, not case-by-case.
 
-**Sengaja TIDAK masuk Tab 8**: earnings calendar (rumah Panel 3), chart/
-sinyal/approve-reject (rumah Panel 5), analisa persona per emiten (rumah
-Panel 4, slice RIVAN baca `fundamentals_quarterly` via prompt v5 nanti).
+**Deliberately NOT included in Tab 8**: earnings calendar (home is Panel 3),
+chart/signal/approve-reject (home is Panel 5), per-issuer persona analysis
+(home is Panel 4, the RIVAN slice reads `fundamentals_quarterly` via prompt
+v5 later).
 
-**Build order 2 gelombang:**
+**2-wave build order:**
 ```
-J-14 (BISA SEKARANG, tidak nunggu gerbang/grader):
-  Tab 8 shell (partial+JS+nav) · Komponen A (GET /api/universe + tabel +
-  badge lane) · Komponen C v1 (form intake + guard lane) · Panel 5: badge
-  LANE di header chart per instrumen
-J-15 (prasyarat J-4 fundamentals + J-11 grader engine selesai):
-  Komponen B penuh (+override) · Komponen C penuh (fundamental manual+cek
-  integritas+grade run+intake_log) · Komponen D (grader_log+outcome) ·
-  Panel 5 badge KUADRAN · Panel 3 earnings_calendar di sumbu waktu + warning
-  posisi ONGOING mendekati earnings
+J-14 (CAN START NOW, no need to wait for gate/grader):
+  Tab 8 shell (partial+JS+nav) · Component A (GET /api/universe + table +
+  lane badge) · Component C v1 (intake form + lane guard) · Panel 5: LANE
+  badge in the per-instrument chart header
+J-15 (prerequisite: J-4 fundamentals + J-11 grader engine complete):
+  Full Component B (+override) · Full Component C (manual fundamentals+
+  integrity check+grade run+intake_log) · Component D (grader_log+outcome) ·
+  Panel 5 QUADRANT badge · Panel 3 earnings_calendar on the timeline + warning
+  for ONGOING positions approaching earnings
 ```
 
-**Sudah dikerjakan (tidak butuh input Giel dulu):**
-- [x] **Schema `instrument_metadata`** (kontrak §3, lengkap) — 1 row per
-      instrumen ekuitas/index/fx/commodity di luar BTC/makro inti. Field
-      kunci: `lane` (TRADE/INVEST/BOTH/NONE, Gerbang G1), `lane_validated_at`
-      (audit trail validasi bar-replay sebelum naik ke TRADE), `lot_size`,
-      `has_daily_limit` (ARA/ARB IDX), `has_real_volume` (false utk FX/Gold
-      spot — proxy range/ATR).
-- [x] **Ekstensi `trading_journal`**: `planned_size`/`actual_size` (audit
-      kuantisasi lot), `skip_reason` (RISK_CAPACITY_EXCEEDED dll),
-      `return_asset_ccy`/`return_idr` (P&L ganda aset USD).
-- [x] **Ekstensi `policy_tracker`**: `+sector_tags` (JSON, filter LEON slice
-      per sektor emiten).
-- Migrasi kolom via `db/connection.py::_migrate_columns()` (pola sama Track
-  B) — dites terhadap DB asli, 178 test tetap hijau (2 test count tabel
-  `test_db.py` disesuaikan 14→15).
-- **BELUM dibangun** (dirujuk kontrak sebagai "tidak berubah dari v1.1" —
-  dokumen v1.1 berisi DDL lengkapnya TIDAK diberikan ke saya, jadi TIDAK
-  ditebak strukturnya): `fundamentals_quarterly`, `earnings_calendar`,
-  `sector_benchmark`, `emiten_grade`, `grader_log`, dan ekstensi konkret
-  `asset_context_weight` (kontrak cuma bilang "pewarisan index → sector →
-  instrument" naratif, belum jadi kolom). Perlu dokumen v1.1 atau deskripsi
-  ulang sebelum bisa dibangun.
-- [x] **Prototipe G3 (yfinance `.JK` fundamentals)** — dites live 3 kandidat
-      (BBCA.JK, BBRI.JK, TLKM.JK, dipilih sebagai sample uji sumber data,
-      BUKAN keputusan universe). Temuan:
+**Already done (doesn't need Giel's input first):**
+- [x] **Schema `instrument_metadata`** (contract §3, complete) — 1 row per
+      equity/index/fx/commodity instrument outside core BTC/macro. Key
+      fields: `lane` (TRADE/INVEST/BOTH/NONE, Gate G1), `lane_validated_at`
+      (audit trail of bar-replay validation before promotion to TRADE),
+      `lot_size`, `has_daily_limit` (ARA/ARB for IDX), `has_real_volume`
+      (false for FX/Gold spot — range/ATR proxy).
+- [x] **`trading_journal` extension**: `planned_size`/`actual_size` (lot
+      quantization audit), `skip_reason` (RISK_CAPACITY_EXCEEDED etc.),
+      `return_asset_ccy`/`return_idr` (dual P&L for USD assets).
+- [x] **`policy_tracker` extension**: `+sector_tags` (JSON, filters the LEON
+      slice per issuer sector).
+- Column migration via `db/connection.py::_migrate_columns()` (same pattern
+  as Track B) — tested against the real DB, 178 tests still green (2 table
+  count tests in `test_db.py` adjusted from 14→15).
+- **NOT built yet** (referenced in the contract as "unchanged from v1.1" —
+  the v1.1 document containing the full DDL was NOT given to me, so its
+  structure was NOT guessed): `fundamentals_quarterly`, `earnings_calendar`,
+  `sector_benchmark`, `emiten_grade`, `grader_log`, and the concrete
+  extension of `asset_context_weight` (the contract only narratively says
+  "inheritance index → sector → instrument", not yet turned into columns).
+  Need the v1.1 document or a re-description before it can be built.
+- [x] **G3 Prototype (yfinance `.JK` fundamentals)** — tested live against 3
+      candidates (BBCA.JK, BBRI.JK, TLKM.JK, chosen as a data-source test
+      sample, NOT a universe decision). Findings:
       - `quarterly_financials`/`quarterly_balance_sheet`/`quarterly_cashflow`
-        tersedia via yfinance, data terlihat masuk akal (mis. BBCA Net
-        Income Q1 2026 ≈ Rp14,68 triliun, BBRI ≈ Rp15,49 triliun, TLKM ≈
-        Rp4,34 triliun) — TAPI **cuma ~4-5 kuartal ke belakang tersedia,
-        bukan 8** seperti target J4 — match PERSIS skenario yang kontrak
-        sendiri sudah antisipasi ("jika hanya 4 → grade jalan dengan flag
-        LOW_CONFIDENCE").
-      - `info["sector"]`/`info["industry"]` pakai istilah GICS/Inggris
-        (mis. "Financial Services"/"Banks - Regional"), BUKAN klasifikasi
-        IDX-IC — perlu mapping manual kalau IDX-IC jadi standar.
-      - Rasio bank CAR/NPL/NIM/LDR **TIDAK ADA** di line item yfinance
-        manapun (dicek balance sheet penuh) — mengonfirmasi J7 kontrak
-        sudah benar menandai ini butuh sumber terpisah (OJK/laporan bank),
-        bukan yfinance.
-      Giel bisa pakai temuan ini langsung utk validasi manual 3 emiten vs
-      laporan resmi (syarat Gerbang G3) — belum ada keputusan final dibuat
-      di sini, cuma riset pendukung.
+        are available via yfinance, data looks reasonable (e.g. BBCA Net
+        Income Q1 2026 ≈ Rp14.68 trillion, BBRI ≈ Rp15.49 trillion, TLKM ≈
+        Rp4.34 trillion) — BUT **only ~4-5 quarters back are available,
+        not 8** as targeted for J4 — matches EXACTLY the scenario the
+        contract itself already anticipated ("if only 4 → grade runs with
+        LOW_CONFIDENCE flag").
+      - `info["sector"]`/`info["industry"]` use GICS/English terms
+        (e.g. "Financial Services"/"Banks - Regional"), NOT the IDX-IC
+        classification — needs a manual mapping if IDX-IC becomes the
+        standard.
+      - Bank ratios CAR/NPL/NIM/LDR are **NOT PRESENT** in any yfinance
+        line item (checked the full balance sheet) — confirming that
+        contract J7 was already correct in flagging that this needs a
+        separate source (OJK/bank reports), not yfinance.
+      Giel can use these findings directly for manual validation of the 3
+      issuers against official reports (Gate G3 requirement) — no final
+      decision has been made here, just supporting research.
 
-**Update — Gerbang G1/G2/G3 DIJAWAB Giel (13 Jul 2026):**
-- **G1 (lane + amandemen SOP v4.1)**: ✅ **disetujui** ("amandemen OK") —
-  model `lane` per-instrumen resmi menggantikan pertanyaan biner lama
-  trade-vs-invest. Belum ada teks amandemen SOP v4.1 tertulis terpisah,
-  tapi keputusan prinsipnya sudah terkunci — cukup utk lanjut J-0b secara
-  substansi (field `lane` sudah dipakai apa adanya sejak Phase J+ kickoff).
-- **G2 (universe awal)**: ✅ **BUKAN 15-30 ticker seperti draft awal
-  kontrak** — Giel putuskan universe awal CUMA **BBCA (IDX) + TSLA (US)**,
-  sisanya ditambah manual satu-per-satu lewat scrape/intake (Panel 8)
-  belakangan, bukan batch besar sekaligus. `pipeline/seed_universe.py`
-  diperbarui (TSLA ditambah, data market_cap/free_float dari yfinance
-  dicek live: mcap ≈$1,53T, free float ≈69,91%, sector "Consumer
-  Cyclical/Auto Manufacturers"). `lot_size=1` (US, bukan 100 spt IDX),
-  `has_daily_limit=0` (LULD circuit-breaker menit-an, BUKAN ARA/ARB
-  harian), `fx_exposure="global"`, `accounting_std="US_GAAP"` — beda
-  eksplisit dari BBCA di setiap field yang relevan pasar.
-- **G3 (sumber fundamental)**: ✅ **yfinance ATAU IDX langsung, keduanya
-  diterima** — tidak ada keputusan tunggal yang memaksa satu sumber;
-  Giel terima yfinance sbg default (sudah diprototipe G3 sebelumnya utk
-  BBCA/BBRI/TLKM) dgn opsi pindah ke sumber IDX langsung kalau perlu.
-  Ini membuka J-4 (fundamentals_quarterly backfill) — BELUM dikerjakan
-  di update ini, giliran berikutnya.
+**Update — Gates G1/G2/G3 ANSWERED by Giel (13 Jul 2026):**
+- **G1 (lane + SOP v4.1 amendment)**: ✅ **approved** ("amendment OK") —
+  the per-instrument `lane` model officially replaces the old binary
+  trade-vs-invest question. There isn't a separately written SOP v4.1
+  amendment text yet, but the decision in principle is already locked —
+  enough to proceed substantively with J-0b (the `lane` field has been
+  used as-is since the Phase J+ kickoff).
+- **G2 (initial universe)**: ✅ **NOT 15-30 tickers as in the original
+  contract draft** — Giel decided the initial universe is JUST **BBCA
+  (IDX) + TSLA (US)**, the rest added manually one at a time via
+  scrape/intake (Panel 8) later, not a big batch at once.
+  `pipeline/seed_universe.py` updated (TSLA added, market_cap/free_float
+  data from yfinance checked live: mcap ≈$1.53T, free float ≈69.91%,
+  sector "Consumer Cyclical/Auto Manufacturers"). `lot_size=1` (US, not
+  100 like IDX), `has_daily_limit=0` (LULD minute-based circuit-breaker,
+  NOT daily ARA/ARB), `fx_exposure="global"`, `accounting_std="US_GAAP"` —
+  explicitly different from BBCA in every market-relevant field.
+- **G3 (fundamentals source)**: ✅ **yfinance OR direct IDX, both
+  accepted** — there's no single decision forcing one source; Giel
+  accepts yfinance as the default (already prototyped for G3 earlier for
+  BBCA/BBRI/TLKM) with the option to switch to a direct IDX source if
+  needed. This opens up J-4 (fundamentals_quarterly backfill) — NOT done
+  in this update, next turn's task.
 
-**Dampak ke build order**: J-0/J-1 (seed universe) SEKARANG **selesai**
-untuk cakupan yang diputuskan (BBCA+TSLA, bukan "belum bisa jalan tanpa
-G2" seperti sebelumnya) — J-2 (OHLCV) otomatis ikut jalan utk TSLA juga
-tanpa ubah kode (`scrapers/equity_universe.py` baca `instrument_metadata`
-dinamis, lihat entry J-2 di atas), diverifikasi live: `equity_TSLA = ok`
-di `pipeline.run_daily`, 508 baris histori (2024-07-01..2026-07-12)
-via `pipeline.backfill`, TSLA muncul di Panel 8 Universe & (setelah dipilih)
-Panel 5 chart. **J-3 (kalibrasi per-market + validasi bar-replay)** masih
-BUKAN pekerjaan otomatis — kontrak §13.1 poin 5 tetap mensyaratkan
-validasi manual per instrumen sebelum `lane_validated_at` terisi, itu
-keputusan Giel sendiri lewat review chart historis, bukan sesuatu yang
-bisa saya putuskan sepihak.
+**Impact on build order**: J-0/J-1 (seed universe) is NOW **complete** for
+the decided scope (BBCA+TSLA, not "can't run yet without G2" as before) —
+J-2 (OHLCV) automatically runs for TSLA too without code changes
+(`scrapers/equity_universe.py` reads `instrument_metadata` dynamically, see
+the J-2 entry above), verified live: `equity_TSLA = ok` in
+`pipeline.run_daily`, 508 rows of history (2024-07-01..2026-07-12) via
+`pipeline.backfill`, TSLA appears in Panel 8 Universe & (once selected) the
+Panel 5 chart. **J-3 (per-market calibration + bar-replay validation)** is
+still NOT automated work — contract §13.1 point 5 still requires manual
+validation per instrument before `lane_validated_at` is filled in, that's
+Giel's own decision via historical chart review, not something I can decide
+unilaterally.
 
-**Update — J-4 selesai (fundamentals_quarterly backfill, BBCA + TSLA):**
-- [x] **`scrapers/fundamentals_yf.py`** (BARU) — yfinance `quarterly_
-      financials`/`quarterly_balance_sheet`/`quarterly_cashflow`, field
-      real dicek live dulu (bukan ditebak) sebelum dipetakan: `Total
+**Update — J-4 complete (fundamentals_quarterly backfill, BBCA + TSLA):**
+- [x] **`scrapers/fundamentals_yf.py`** (NEW) — yfinance `quarterly_
+      financials`/`quarterly_balance_sheet`/`quarterly_cashflow`, real
+      fields checked live first (not guessed) before mapping: `Total
       Revenue`→revenue, `Net Income`→net_income, `Diluted EPS` (fallback
       `Basic EPS`)→eps, `Stockholders Equity`→total_equity, `Total
       Assets`→total_assets, `Operating Cash Flow`→operating_cash_flow,
-      `Free Cash Flow`→free_cash_flow (baris langsung, tidak dihitung
-      manual dari capex). **Temuan penting**: yfinance punya baris `Net
-      Interest Income` bahkan utk TSLA (non-bank) — ini BUKAN NIM bank
-      asli, jadi kolom `net_interest_income` sengaja di-gate lewat
-      `instrument_metadata.is_financial` (cuma diisi kalau `is_financial=1`),
-      bukan diambil mentah-mentah dari yfinance apa adanya. Kuartal yang
-      revenue DAN net_income-nya NaN di-skip (bukan disimpan sbg 0).
-- [x] **`pipeline/backfill_fundamentals.py`** (BARU) — `upsert_
+      `Free Cash Flow`→free_cash_flow (a direct row, not computed manually
+      from capex). **Important finding**: yfinance has a `Net Interest
+      Income` row even for TSLA (non-bank) — this is NOT genuine bank
+      NIM, so the `net_interest_income` column is deliberately gated by
+      `instrument_metadata.is_financial` (only filled if `is_financial=1`),
+      not taken raw from yfinance as-is. Quarters where both revenue AND
+      net_income are NaN are skipped (not stored as 0).
+- [x] **`pipeline/backfill_fundamentals.py`** (NEW) — `upsert_
       fundamentals_quarterly()` by natural key (instrument, quarter_end,
-      UNIQUE constraint sudah ada di schema), `backfill_fundamentals()`
-      proses 1 instrumen atau SEMUA di `instrument_metadata`. Dijalankan
-      manual/berkala (fundamentals berubah per-kuartal, BUKAN bagian
-      `run_daily` harian) — pola sama `seed_universe.py`.
-      `python -m pipeline.backfill_fundamentals` (semua) atau
-      `--instrument BBCA` (satu).
-- 9 test baru (`test_fundamentals_yf.py` + `test_backfill_fundamentals.py`,
-  live network pola sama scraper lain — termasuk assert eksplisit
-  `net_interest_income is None` utk TSLA semua baris, dan terisi utk
-  minimal 1 kuartal BBCA), 201 test hijau total. **Diverifikasi live
-  penuh terhadap DB asli**: `python -m pipeline.backfill_fundamentals` ->
-  BBCA 5 kuartal, TSLA 5 kuartal, KEDUANYA `LOW_CONFIDENCE` (sesuai
-  ekspektasi kontrak §16 poin 2 dan temuan prototipe G3 sebelumnya —
-  yfinance memang cuma kasih ~5 kuartal, bukan 8). Angka BBCA Net Income
-  Q1 2026 (≈Rp14,68 triliun) **cocok persis** dengan temuan prototipe G3
-  awal sebelum kickoff Phase J+ — cross-check konsistensi data.
-- **Belum dikerjakan** (di luar scope J-4 murni "backfill data"):
-  `sector_benchmark` computed dari data ini (J-5), pemakaian data ini di
-  Panel 8 Komponen B (J-15, prasyarat modul Grader J-11 belum ada), slice
-  RIVAN prompt v5 baca fundamental (J-9).
+      UNIQUE constraint already in the schema), `backfill_fundamentals()`
+      processes 1 instrument or ALL in `instrument_metadata`. Run
+      manually/periodically (fundamentals change per-quarter, NOT part of
+      the daily `run_daily`) — same pattern as `seed_universe.py`.
+      `python -m pipeline.backfill_fundamentals` (all) or
+      `--instrument BBCA` (one).
+- 9 new tests (`test_fundamentals_yf.py` + `test_backfill_fundamentals.py`,
+  live network, same pattern as other scrapers — including an explicit
+  assert that `net_interest_income is None` for all TSLA rows, and filled
+  for at least 1 BBCA quarter), 201 tests green total. **Fully verified
+  live against the real DB**: `python -m pipeline.backfill_fundamentals` ->
+  BBCA 5 quarters, TSLA 5 quarters, BOTH `LOW_CONFIDENCE` (as expected per
+  contract §16 point 2 and the earlier G3 prototype finding — yfinance
+  really only gives ~5 quarters, not 8). BBCA's Q1 2026 Net Income
+  (≈Rp14.68 trillion) **matches exactly** the earlier G3 prototype finding
+  before the Phase J+ kickoff — a data consistency cross-check.
+- **Not done yet** (outside the pure "data backfill" scope of J-4):
+  `sector_benchmark` computed from this data (J-5), using this data in
+  Panel 8 Component B (J-15, prerequisite Grader module J-11 doesn't exist
+  yet), the RIVAN prompt v5 slice reading fundamentals (J-9).
 
-**Update — J-3 groundwork (uncalibrated first pass, BUKAN validasi final):**
-Giel jawab "just do it, saya review nanti pas coba BBCA dan TSLA" — jadi
-dijalankan tanpa nunggu kalibrasi per-market (§13) selesai dulu, TAPI
-`lane_validated_at` SENGAJA TETAP NULL (validasi itu keputusan manual Giel
-sendiri lewat review chart, bukan sesuatu yang diputuskan otomatis di sini).
-- **Temuan penting**: `pipeline/run_analysis.py::run_analysis(instrument)`
-  **SUDAH generic sejak Phase B** — tidak perlu ubah kode SAMA SEKALI.
-  `INSTRUMENTS` (list default kalau tanpa `--instrument`) cuma dipakai
-  `main()`, fungsi intinya menerima instrumen APA SAJA yang ada di
-  `asset_ohlcv`. Langsung jalan: `python -m pipeline.run_analysis
-  --instrument BBCA` dan `--instrument TSLA`.
-- **Hasil live**: BBCA — 488 baris histori, 12 zona baru (10 aktif), 16
-  sinyal baru. TSLA — 508 baris histori, 13 zona baru (11 aktif), 12
-  sinyal baru. Semua `approved=0` (hardcode di `insert_signal_dedup`,
-  tidak ada jalur lain yang menulis `trade_signals` — dikonfirmasi query
-  langsung: 0 baris `approved=1` utk BBCA/TSLA). `instrument_metadata.lane`
-  tetap `INVEST`, `lane_validated_at` tetap NULL utk keduanya — dikonfirmasi
-  tidak berubah.
-- **Catatan disiplin penting**: komentar schema.sql utk `instrument_
-  metadata.lane` bilang "hanya lane TRADE/BOTH yang di-generate trade_
-  signals-nya" — itu ATURAN masa depan yang BELUM ditegakkan di kode mana
-  pun saat ini (tidak ada pengecekan `lane` sebelum generate sinyal).
-  Menjalankan engine utk instrumen lane=INVEST di sini justru SENGAJA —
-  itulah tujuan J-3 (kasih Giel bahan bar-replay review sebelum
-  `lane_validated_at` bisa terisi). Begitu J-3b/gating lane resmi
-  ditegakkan di kode nanti, aturan ini perlu direvisit supaya tidak
-  bentrok dengan alur review semacam ini.
-- Diverifikasi live di browser: Panel 5 dropdown BBCA menampilkan 16
-  baris tabel Sinyal (status "pending" semua, tombol Approve/Reject
-  berfungsi sama seperti BTC), zona S&R tergambar di chart (9/10 zona
-  relevan dgn harga saat ini).
-- **BELUM dikerjakan** (kalibrasi §13 sesungguhnya): toleransi zona S&R
-  per-fraksi-harga IDX, buffer ARA/ARB, parameter retest longgar-vs-ketat
-  per market — signal/zona di atas pakai parameter GENERIK yang sama dgn
-  BTC, BUKAN hasil kalibrasi khusus. Bar-replay review Giel di atas data
-  ini yang akan menentukan apakah parameter generik ini cukup atau perlu
-  disesuaikan sebelum lane naik ke TRADE.
+**Update — J-3 groundwork (uncalibrated first pass, NOT final validation):**
+Giel answered "just do it, I'll review later when I try BBCA and TSLA" — so
+it was run without waiting for per-market calibration (§13) to finish
+first, BUT `lane_validated_at` DELIBERATELY STAYS NULL (that validation is
+Giel's own manual decision via chart review, not something decided
+automatically here).
+- **Important finding**: `pipeline/run_analysis.py::run_analysis(instrument)`
+  **has ALREADY been generic since Phase B** — no code change was needed
+  AT ALL. `INSTRUMENTS` (the default list when no `--instrument` given) is
+  only used by `main()`, the core function accepts ANY instrument present
+  in `asset_ohlcv`. Ran directly: `python -m pipeline.run_analysis
+  --instrument BBCA` and `--instrument TSLA`.
+- **Live results**: BBCA — 488 rows of history, 12 new zones (10 active), 16
+  new signals. TSLA — 508 rows of history, 13 new zones (11 active), 12
+  new signals. All `approved=0` (hardcoded in `insert_signal_dedup`, no
+  other path writes to `trade_signals` — confirmed with a direct query: 0
+  rows `approved=1` for BBCA/TSLA). `instrument_metadata.lane` remains
+  `INVEST`, `lane_validated_at` remains NULL for both — confirmed
+  unchanged.
+- **Important discipline note**: the schema.sql comment for `instrument_
+  metadata.lane` says "only lanes TRADE/BOTH have trade_signals generated
+  for them" — that is a FUTURE rule NOT YET enforced anywhere in the code
+  today (there's no `lane` check before generating a signal). Running the
+  engine for lane=INVEST instruments here is actually INTENTIONAL —
+  that's the whole point of J-3 (give Giel material for bar-replay review
+  before `lane_validated_at` can be filled in). Once J-3b/official lane
+  gating is enforced in code later, this rule needs revisiting so it
+  doesn't conflict with this kind of review flow.
+- Verified live in the browser: Panel 5's BBCA dropdown shows 16 rows in
+  the Signals table (status "pending" for all, Approve/Reject buttons
+  work the same as BTC), S&R zones drawn on the chart (9/10 zones relevant
+  to the current price).
+- **Not done yet** (the actual §13 calibration): per-price-fraction S&R
+  zone tolerance for IDX, ARA/ARB buffer, loose-vs-tight retest parameters
+  per market — the signals/zones above use the SAME GENERIC parameters as
+  BTC, NOT the result of specific calibration. Giel's bar-replay review of
+  this data will determine whether these generic parameters are enough or
+  need adjusting before the lane can be promoted to TRADE.
 
-**Update — J-3b selesai (sizing & lot quantization engine, §14):**
-- **Keputusan Giel (13 Jul 2026)**: max risk per trade = **2.5%**.
-- [x] **`analysis/sizing.py`** (BARU) — `suggest_position_size(entry_price,
-      sl_price, capital, lot_size, max_risk_pct=2.5)`: budget risiko
-      (capital × 2.5%) ÷ jarak entry-SL = unit ideal → **bulatkan KE
-      BAWAH** ke kelipatan `lot_size` (`lot_size<=0` = fractional penuh,
-      IBKR US — tidak dibulatkan sama sekali). Kalau budget < 1 lot →
-      `skip=True, skip_reason='RISK_CAPACITY_EXCEEDED'` (kontrak §14 poin
-      2). **Tidak ada parameter/jalur apa pun utk geser SL** — modul ini
-      cuma terima `sl_price` sbg input tetap, tidak pernah mengusulkan
-      mengubahnya (kontrak §14 poin 3, "dilarang keras").
-      `MAX_RISK_PCT = 2.5` module constant (pola sama `MIN_RR = 1.5` di
-      `analysis/signals.py`) — regression-guarded lewat test eksplisit
-      supaya tidak diam-diam berubah.
-- **`capital` SENGAJA tidak disimpan/ditebak di kode** — modal riil Giel
-  privasi & bisa berubah, jadi diisi manual di `.env` (`RISK_CAPITAL_IDR`/
-  `RISK_CAPITAL_USD`, placeholder kosong ditambah ke `.env.example`,
-  segmented per kontrak §13.2 "pendanaan dari segmen USD Jago") — caller
-  (jurnal/route, belum dibangun) yang baca env itu dan teruskan sbg
-  argumen eksplisit ke fungsi.
-- 8 test baru (`test_sizing.py`) — termasuk regression guard `MAX_RISK_PCT
-  == 2.5`, pembulatan-bawah IDX (kelipatan pas & tidak pas), skip
-  `RISK_CAPACITY_EXCEEDED` saat budget < 1 lot, fractional US jarang skip
-  (kontrak §14 poin 5), dan invariant `actual_risk <= risk_budget` di
-  berbagai kombinasi angka (kontrak §14 poin 1, "tidak pernah sebaliknya").
-  209 test hijau total.
-- **Belum dikerjakan** (di luar scope "engine murni"): wiring ke UI/route
-  (mis. tombol "Approve" Panel 5 menampilkan suggested size), pengisian
-  `trading_journal.planned_size`/`actual_size`/`skip_reason` — itu J-13
-  (SOP amendment final), butuh keputusan tambahan Giel soal alur konfirmasi
-  di dashboard, bukan sekadar kalkulasi.
+**Update — J-3b complete (sizing & lot quantization engine, §14):**
+- **Giel's decision (13 Jul 2026)**: max risk per trade = **2.5%**.
+- [x] **`analysis/sizing.py`** (NEW) — `suggest_position_size(entry_price,
+      sl_price, capital, lot_size, max_risk_pct=2.5)`: risk budget
+      (capital × 2.5%) ÷ entry-SL distance = ideal units → **round DOWN**
+      to a multiple of `lot_size` (`lot_size<=0` = full fractional, IBKR
+      US — not rounded at all). If the budget < 1 lot →
+      `skip=True, skip_reason='RISK_CAPACITY_EXCEEDED'` (contract §14
+      point 2). **No parameter or path whatsoever to move the SL** — this
+      module only accepts `sl_price` as a fixed input, never proposes
+      changing it (contract §14 point 3, "strictly forbidden").
+      `MAX_RISK_PCT = 2.5` module constant (same pattern as `MIN_RR = 1.5`
+      in `analysis/signals.py`) — regression-guarded via an explicit test
+      so it doesn't silently change.
+- **`capital` is DELIBERATELY not stored/guessed in code** — Giel's real
+  capital is private & can change, so it's filled in manually via `.env`
+  (`RISK_CAPITAL_IDR`/`RISK_CAPITAL_USD`, empty placeholder added to
+  `.env.example`, segmented per contract §13.2 "funded from the USD Jago
+  segment") — the caller (journal/route, not yet built) reads that env
+  value and passes it as an explicit argument to the function.
+- 8 new tests (`test_sizing.py`) — including a regression guard for
+  `MAX_RISK_PCT == 2.5`, IDX round-down (exact and inexact multiples),
+  `RISK_CAPACITY_EXCEEDED` skip when budget < 1 lot, US fractional rarely
+  skips (contract §14 point 5), and the `actual_risk <= risk_budget`
+  invariant across various number combinations (contract §14 point 1,
+  "never the other way around"). 209 tests green total.
+- **Not done yet** (outside the "pure engine" scope): wiring into the
+  UI/route (e.g. Panel 5's "Approve" button showing the suggested size),
+  populating `trading_journal.planned_size`/`actual_size`/`skip_reason` —
+  that's J-13 (final SOP amendment), needs an additional decision from
+  Giel about the confirmation flow in the dashboard, not just the
+  calculation.
 
-**Update — J-10 selesai (seed asset_context_weight BBCA/TSLA):**
+**Update — J-10 complete (seed asset_context_weight for BBCA/TSLA):**
 - [x] `pipeline/seed_context_weight.py` — `BBCA_WEIGHTS` (ihsg_foreign_flow
       HIGH, bi_rate HIGH, usd_idr MED, sector_fundamentals MED) & `TSLA_
       WEIGHTS` (fed_path HIGH, earnings HIGH, net_liquidity MED, dxy MED) —
-      driver berbeda dari generic BTC/FOREX weights, mencerminkan karakter
-      bank-IDX vs growth-stock-US. `level` tetap default `'INSTRUMENT'`
-      (BELUM bangun pewarisan index→sector→instrument penuh dari kontrak
-      §3 — itu butuh desain lookup fallback terpisah, di luar scope seed
-      manual J-10). 4 test baru, dijalankan live: 4 baris baru masing²
-      utk BBCA/TSLA di DB asli.
+      drivers different from the generic BTC/FOREX weights, reflecting the
+      character of an IDX bank vs a US growth stock. `level` still
+      defaults to `'INSTRUMENT'` (NOT YET built: the full
+      index→sector→instrument inheritance from contract §3 — that needs a
+      separate fallback-lookup design, outside the scope of the manual
+      J-10 seed). 4 new tests, run live: 4 new rows for BBCA/TSLA
+      respectively in the real DB.
 
-**Update — J-7 selesai (earnings_calendar, BBCA + TSLA):**
-- [x] **`scrapers/earnings_yf.py`** (BARU) — `Ticker.earnings_dates`
-      yfinance (butuh dependency baru `lxml`, ditambah `requirements.txt` —
-      tanpa itu yfinance raise `ImportError` diam-diam di balik try/except
-      pandas, ditemukan live saat first-try). Field lebih lengkap dari
-      `Ticker.calendar` (yang cuma kasih 1 tanggal ke depan tanpa histori
-      surprise): `EPS Estimate`/`Reported EPS`/`Surprise(%)` per tanggal,
-      histori + 1 baris earnings BELUM rilis (`Reported EPS=NaN` → dipetakan
-      `eps_actual=None`).
+**Update — J-7 complete (earnings_calendar, BBCA + TSLA):**
+- [x] **`scrapers/earnings_yf.py`** (NEW) — yfinance's `Ticker.earnings_dates`
+      (needs a new dependency `lxml`, added to `requirements.txt` —
+      without it yfinance silently raises `ImportError` behind a
+      try/except in pandas, discovered live on the first try). Fields
+      more complete than `Ticker.calendar` (which only gives 1 upcoming
+      date with no surprise history): `EPS Estimate`/`Reported EPS`/
+      `Surprise(%)` per date, history + 1 row for earnings NOT YET
+      released (`Reported EPS=NaN` → mapped to `eps_actual=None`).
 - [x] **`db/schema.sql`**: `idx_earnings_calendar_dedup` UNIQUE(instrument,
-      earnings_date, event_type) — BARU (tabel sebelumnya tidak punya
-      index sama sekali), `CREATE UNIQUE INDEX IF NOT EXISTS` idempotent
-      utk DB lama/baru, tidak butuh `_migrate_columns()` (itu cuma utk
-      `ALTER TABLE ADD COLUMN`, bukan index).
-- [x] **`pipeline/backfill_earnings.py`** (BARU) — `upsert_earnings_
-      calendar()` UPSERT by natural key (forecast/actual ter-update kalau
-      re-run, BUKAN duplikat baris — penting krn `eps_actual` NULL→terisi
-      begitu earnings resmi rilis). `backfill_earnings()` 1 instrumen atau
-      semua di `instrument_metadata`. Dijalankan manual/berkala (bukan
-      bagian `run_daily`), pola sama `backfill_fundamentals.py`.
-- 9 test baru (`test_earnings_yf.py` + `test_backfill_earnings.py`, live
-  network — termasuk assert eksplisit ada baris `eps_actual=None` DAN ada
-  baris `eps_actual` terisi, dan test upsert re-run mengisi actual tanpa
-  duplikat), 219 test hijau total. **Diverifikasi live penuh terhadap DB
-  asli**: BBCA 25 baris, TSLA 25 baris earnings histori — **KEDUA
-  instrumen punya earnings BELUM rilis di tanggal SAMA: 2026-07-22** (9
-  hari dari hari ini, 13 Jul 2026) — langsung relevan utk rule SOP
-  terkunci "no hold through earnings" (kontrak §18 keputusan #3, versi
-  penuh utk saham AS).
-- **Belum dikerjakan** (di luar scope "data backfill" J-7): tampilan di
-  Panel 3 sumbu waktu (gabung visual dgn `econ_calendar`), WARNING utk
-  posisi `trading_journal.outcome='ONGOING'` yang mendekati earnings — itu
-  J-15 (prasyarat J-4 sudah selesai, tinggal J-11 grader + UI-nya).
+      earnings_date, event_type) — NEW (the table previously had no index
+      at all), `CREATE UNIQUE INDEX IF NOT EXISTS` idempotent for
+      old/new DBs, doesn't need `_migrate_columns()` (that's only for
+      `ALTER TABLE ADD COLUMN`, not indexes).
+- [x] **`pipeline/backfill_earnings.py`** (NEW) — `upsert_earnings_
+      calendar()` UPSERT by natural key (forecast/actual updated on
+      re-run, NOT a duplicate row — important since `eps_actual` goes
+      NULL→filled once earnings are officially released). `backfill_earnings()`
+      for 1 instrument or all in `instrument_metadata`. Run
+      manually/periodically (not part of `run_daily`), same pattern as
+      `backfill_fundamentals.py`.
+- 9 new tests (`test_earnings_yf.py` + `test_backfill_earnings.py`, live
+  network — including an explicit assert there's a row with
+  `eps_actual=None` AND a row with `eps_actual` filled, and an upsert
+  re-run test that fills in actual without duplication), 219 tests green
+  total. **Fully verified live against the real DB**: BBCA 25 rows, TSLA
+  25 rows of earnings history — **BOTH instruments have earnings NOT YET
+  released on the SAME date: 2026-07-22** (9 days from today, 13 Jul
+  2026) — directly relevant to the locked SOP rule "no hold through
+  earnings" (contract §18 decision #3, full version for US stocks).
+- **Not done yet** (outside the "data backfill" scope of J-7): display in
+  Panel 3's timeline (combined visually with `econ_calendar`), a WARNING
+  for `trading_journal.outcome='ONGOING'` positions approaching earnings —
+  that's J-15 (prerequisite J-4 already done, just need the J-11 grader +
+  its UI left).
 
-**Update — J-11 selesai (Modul Emiten Grader, DRAFT v1):**
-> ⚠️ **Rubrik DRAFT, bukan spesifikasi final Giel** — dokumen sumber "v1.1"
-> yang berisi rubrik resmi (bobot fund_score, daftar lengkap flag) TIDAK
-> tersedia saat modul ini dibangun. Disusun dari konsep umum kontrak (dua
-> sumbu: fund_score × integrity flags → kuadran), pola sama dgn 5 tabel
-> Phase J+ yang sebelumnya juga ditandai draft. **Koreksi kapan pun kalau
-> meleset dari rubrik asli Giel.**
-- [x] **`analysis/grader.py`** (BARU, pure function) —
-      **Axis 1 fund_score (0-100)**: 4 komponen @25 poin dari
-      `fundamentals_quarterly` kuartal TERBARU, kriteria beda bank
-      (`is_financial=1`: net_income>0, net_interest_income>0, net_margin>0,
-      equity>0) vs non-bank (revenue>0, net_margin>0, operating_cash_flow>0,
-      free_cash_flow>0). **Bug ditemukan & diperbaiki saat nulis test**:
-      net_margin = net_income/revenue bisa keliru "positif" kalau KEDUANYA
-      negatif (mis. -500jt/-1 = angka besar positif) — di-guard jadi cuma
-      valid kalau `revenue > 0` (bukan cuma `!= 0`).
-      **Axis 2 integrity_flags**: `UMA_ACTIVE` (RED, dari scraper baru),
-      `NEGATIVE_NET_INCOME`/`NEGATIVE_EQUITY` (RED, dari fundamentals
-      langsung), `LOW_CONFIDENCE_FUNDAMENTALS` (ORANGE, kuartal <8).
-      **Kuadran**: RED flag mana pun → **AVOID** (veto mutlak, "grader =
-      REM bukan stempel" — kontrak §16), lalu INVESTABLE (score≥70, tanpa
-      flag) / WATCH (40-69, atau ≥70 dgn ORANGE) / SPECULATIVE (<40).
-      Data fundamental kosong (belum digrade) → SPECULATIVE, BUKAN AVOID
-      (kosong ≠ red flag aktif, tidak boleh disamakan).
-- [x] **`scrapers/idx_uma.py`** (BARU, J-11a) — sumber laman berita UMA
-      idx.co.id: **SSR (server-rendered)**, BEDA dari laman "Financial
-      Data and Ratio" yang gagal diriset sesi sebelumnya (client-side) —
-      1x GET langsung dapat payload `__NUXT__` penuh berisi 1115+ referensi
-      PDF pengumuman, TANPA perlu interaksi filter/JS. Pola nama file
-      dikonfirmasi live: `YYYYMMDD-UMA_<TICKER>.pdf` / `YYYYMMDD-WAS_UMA_
-      <TICKER>.pdf`. `is_recently_flagged()` — heuristik KONSERVATIF
-      (window 90 hari, entri WAS_ TETAP dihitung krn semantik resminya
-      "UMA selesai" tidak dikonfirmasi) — asumsi eksplisit, revisit kalau
-      Giel punya kejelasan semantik resmi.
-- [x] **`pipeline/run_grader.py`** (BARU, J-11b/c/d/e orchestrator) —
-      baca fundamentals TERBARU + UMA live per instrumen → `grade_emiten()`
-      → **APPEND** ke `emiten_grade` (histori grade, bukan overwrite) +
-      **`grader_log` HANYA ditambah kalau kuadran BERUBAH** dari grade
-      sebelumnya (anti-overtuning, dites eksplisit: run 2x data sama →
-      `grader_log` tidak nambah baris, `emiten_grade` tetap append).
-- 26 test baru (`test_idx_uma.py`, `test_grader.py`, `test_run_grader.py`)
-  — termasuk regression test utk bug net_margin di atas, veto RED-flag
-  vs skor tinggi, dan anti-overtuning grader_log. 245 test hijau total.
-  **Diverifikasi live penuh terhadap DB asli**: BBCA & TSLA sama-sama
-  `fund_score=100, quadrant=WATCH` (ditahan dari INVESTABLE oleh flag
-  `LOW_CONFIDENCE_FUNDAMENTALS` — 5 kuartal data, bukan 8), tidak ada
-  `UMA_ACTIVE` utk keduanya (masuk akal, blue-chip). Panel 8 browser:
-  kolom Kuadran/Score/Flags SEKARANG terisi data asli (sebelumnya "belum
-  digrade"/`-`), tanpa console error.
-- **BELUM otomatis (J-11a lanjutan, riset lebih jauh diperlukan)**: papan
-  pemantauan khusus (laman `daftar-efek-pemantauan-khusus` ternyata JS-
-  client-side spt financial-ratio, bukan SSR spt UMA — gagal diriset
-  dgn cara yang sama) dan riwayat suspensi 12 bulan (J8-J10 kontrak) —
-  scraper BELUM dibangun, flag utk ini kalau ada bisa dimasukkan manual
-  lewat parameter `extra_flags` di `grade_emiten()`.
-- **Belum dikerjakan** (di luar scope J-11 "engine murni"): kolom
-  `emiten_grade.giel_override` (disebut di Addendum A §19.2 Komponen B
-  tapi belum ada di schema.sql — gap ditemukan saat riset, perlu
-  ditambahkan saat J-15 dibangun), UI Panel 8 Komponen B/D (detail emiten +
-  grader log view, J-15), widget "Nilai Outcome" grader_log 3/6 bulan.
+**Update — J-11 complete (Emiten Grader Module, DRAFT v1):**
+> ⚠️ **DRAFT rubric, not Giel's final spec** — the source document "v1.1"
+> containing the official rubric (fund_score weights, complete flag list)
+> was NOT available when this module was built. Composed from the
+> contract's general concepts (two axes: fund_score × integrity flags →
+> quadrant), the same pattern as the 5 Phase J+ tables previously also
+> marked draft. **Correct anytime it diverges from Giel's actual rubric.**
+- [x] **`analysis/grader.py`** (NEW, pure function) —
+      **Axis 1 fund_score (0-100)**: 4 components @25 points each from the
+      LATEST quarter of `fundamentals_quarterly`, different criteria for
+      banks (`is_financial=1`: net_income>0, net_interest_income>0,
+      net_margin>0, equity>0) vs non-banks (revenue>0, net_margin>0,
+      operating_cash_flow>0, free_cash_flow>0). **Bug found & fixed while
+      writing the test**: net_margin = net_income/revenue could
+      incorrectly come out "positive" if BOTH are negative (e.g.
+      -500M/-1 = a large positive number) — guarded to only be valid when
+      `revenue > 0` (not just `!= 0`).
+      **Axis 2 integrity_flags**: `UMA_ACTIVE` (RED, from the new
+      scraper), `NEGATIVE_NET_INCOME`/`NEGATIVE_EQUITY` (RED, directly
+      from fundamentals), `LOW_CONFIDENCE_FUNDAMENTALS` (ORANGE, quarters
+      <8). **Quadrant**: any RED flag → **AVOID** (absolute veto, "the
+      grader is a BRAKE not a rubber stamp" — contract §16), then
+      INVESTABLE (score≥70, no flag) / WATCH (40-69, or ≥70 with ORANGE) /
+      SPECULATIVE (<40). Empty fundamental data (not yet graded) →
+      SPECULATIVE, NOT AVOID (empty ≠ an active red flag, must not be
+      equated).
+- [x] **`scrapers/idx_uma.py`** (NEW, J-11a) — the idx.co.id UMA news page
+      as the source: **SSR (server-rendered)**, DIFFERENT from the
+      "Financial Data and Ratio" page that failed to be researched in a
+      previous session (client-side) — 1 GET request directly gets the
+      full `__NUXT__` payload containing 1115+ PDF announcement
+      references, WITHOUT needing to interact with filters/JS. File
+      naming pattern confirmed live: `YYYYMMDD-UMA_<TICKER>.pdf` /
+      `YYYYMMDD-WAS_UMA_<TICKER>.pdf`. `is_recently_flagged()` — a
+      CONSERVATIVE heuristic (90-day window, WAS_ entries STILL counted
+      since the official semantics of "UMA resolved" isn't confirmed) —
+      an explicit assumption, revisit if Giel has official clarity on the
+      semantics.
+- [x] **`pipeline/run_grader.py`** (NEW, J-11b/c/d/e orchestrator) — reads
+      the LATEST fundamentals + live UMA per instrument → `grade_emiten()`
+      → **APPEND** to `emiten_grade` (grade history, not overwrite) +
+      **`grader_log` is ONLY added to if the quadrant CHANGES** from the
+      previous grade (anti-overtuning, explicitly tested: running twice
+      on the same data → `grader_log` doesn't grow a row, `emiten_grade`
+      still appends).
+- 26 new tests (`test_idx_uma.py`, `test_grader.py`, `test_run_grader.py`)
+  — including a regression test for the net_margin bug above, RED-flag
+  veto vs high score, and anti-overtuning of grader_log. 245 tests green
+  total. **Fully verified live against the real DB**: BBCA & TSLA both
+  come out `fund_score=100, quadrant=WATCH` (held back from INVESTABLE by
+  the `LOW_CONFIDENCE_FUNDAMENTALS` flag — 5 quarters of data, not 8), no
+  `UMA_ACTIVE` for either (makes sense, blue-chip). Panel 8 browser: the
+  Quadrant/Score/Flags columns are NOW filled with real data (previously
+  "not graded yet"/`-`), no console errors.
+- **NOT yet automated (J-11a follow-up, more research needed)**: the
+  special monitoring board (the `daftar-efek-pemantauan-khusus` page turned
+  out to be JS-client-side like financial-ratio, not SSR like UMA — failed
+  to be researched the same way) and 12-month suspension history (J8-J10
+  of the contract) — scraper NOT built yet, a flag for this, if there is
+  one, can be entered manually via the `extra_flags` parameter in
+  `grade_emiten()`.
+- **Not done yet** (outside the "pure engine" scope of J-11): the
+  `emiten_grade.giel_override` column (mentioned in Addendum A §19.2
+  Component B but not yet in schema.sql — gap found during research, needs
+  to be added when J-15 is built), Panel 8 Component B/D UI (issuer
+  detail + grader log view, J-15), the "Outcome Score" widget for
+  grader_log at 3/6 months.
 
-**Update — J-12/J-15 Komponen C Gelombang 2 selesai (intake workflow penuh):**
-- [x] **Tabel `intake_log`** (schema.sql, BARU) — padanan `prediction_log`
-      utk keputusan intake: `instrument, decided_at, decision
-      (UNIVERSE/WATCHLIST/TOLAK), reason TEXT NOT NULL, grade_snapshot
-      JSON, created_at`. Total tabel 20→21, `EXPECTED_TABLES` +
-      `test_db.py` disesuaikan.
-- [x] **`web/writes.py::save_intake_decision()`** — guard di level fungsi
-      (bukan cuma UI): `decision` harus salah satu UNIVERSE/WATCHLIST/TOLAK,
-      **`reason` WAJIB non-kosong** (raise `ValueError` kalau tidak) —
-      kontrak §16: "emiten yang masuk karena hype/rekomendasi justru
-      paling butuh flag integritas, grader adalah REM bukan stempel."
-      `list_intake_log()` utk riwayat.
-- [x] **3 route baru `web/app.py`** — `GET /api/intake/integrity_check`
-      (reuse `scrapers.idx_uma`, READ-ONLY, tidak menulis apa pun),
-      `POST /api/intake/grade` (reuse `run_grader()` PERSIS dari J-11,
-      bukan logic terpisah — menulis ke `emiten_grade`/`grader_log` sama
-      seperti run_grader biasa), `POST /api/intake/decision` +
+**Update — J-12/J-15 Component C Wave 2 complete (full intake workflow):**
+- [x] **Table `intake_log`** (schema.sql, NEW) — the intake counterpart of
+      `prediction_log`: `instrument, decided_at, decision
+      (UNIVERSE/WATCHLIST/REJECT), reason TEXT NOT NULL, grade_snapshot
+      JSON, created_at`. Total tables 20→21, `EXPECTED_TABLES` +
+      `test_db.py` adjusted.
+- [x] **`web/writes.py::save_intake_decision()`** — guard at the function
+      level (not just the UI): `decision` must be one of
+      UNIVERSE/WATCHLIST/REJECT, **`reason` MUST be non-empty** (raises
+      `ValueError` if not) — contract §16: "an issuer that comes in
+      because of hype/recommendation is precisely the one that most needs
+      the integrity flag, the grader is a BRAKE not a rubber stamp."
+      `list_intake_log()` for history.
+- [x] **3 new routes in `web/app.py`** — `GET /api/intake/integrity_check`
+      (reuses `scrapers.idx_uma`, READ-ONLY, writes nothing), `POST
+      /api/intake/grade` (reuses `run_grader()` EXACTLY from J-11, not
+      separate logic — writes to `emiten_grade`/`grader_log` the same as a
+      regular run_grader call), `POST /api/intake/decision` +
       `GET /api/intake/log`.
-- [x] **Panel 8 UI**: section baru "Uji Kelayakan Kandidat (Gelombang 2)"
-      — input ticker + 3 tombol berurutan (Cek Integritas → Jalankan Grade
-      → catat Keputusan dgn dropdown + textarea alasan wajib), + tabel
-      "Riwayat Keputusan Intake".
-- 3 test baru (`test_web_writes.py`: reason kosong ditolak, decision tidak
-  dikenal ditolak, insert+list normal), 248 test hijau total.
-  **Diverifikasi live penuh via browser**: alur 3 langkah dicoba end-to-end
-  utk BBCA — Cek Integritas → "bersih (tidak ada UMA baru-baru ini)",
-  Jalankan Grade → "score=100, kuadran=WATCH, flags=
-  [LOW_CONFIDENCE_FUNDAMENTALS]" (match hasil J-11), Catat Keputusan →
-  muncul di tabel Riwayat Keputusan Intake dengan snapshot grade
-  ter-lampir. Data uji dibersihkan dari `intake_log` setelah verifikasi
-  (baris `emiten_grade` hasil re-grade dibiarkan — itu histori asli,
-  bukan sampah uji, `grader_log` dikonfirmasi TIDAK nambah baris karena
-  kuadran tidak berubah).
-- **Belum dikerjakan**: form fundamental manual (n kuartal, `source=
-  'manual'`) yang disebut kontrak §19.3 gelombang 2 — saat ini fundamental
-  kandidat harus sudah ada lewat `backfill_fundamentals` (yfinance) dulu
-  sebelum "Jalankan Grade" berguna; kalau kandidat tidak listed/tidak ada
-  di yfinance, perlu jalur input manual terpisah (belum dibangun).
+- [x] **Panel 8 UI**: new section "Candidate Feasibility Test (Wave 2)" —
+      ticker input + 3 sequential buttons (Check Integrity → Run Grade →
+      Record Decision with a dropdown + mandatory reason textarea), + an
+      "Intake Decision History" table.
+- 3 new tests (`test_web_writes.py`: empty reason rejected, unknown
+  decision rejected, normal insert+list), 248 tests green total.
+  **Fully verified live via browser**: the 3-step flow tried end-to-end
+  for BBCA — Check Integrity → "clean (no recent UMA)", Run Grade →
+  "score=100, quadrant=WATCH, flags=[LOW_CONFIDENCE_FUNDAMENTALS]" (matches
+  the J-11 result), Record Decision → appears in the Intake Decision
+  History table with the grade snapshot attached. Test data cleaned from
+  `intake_log` after verification (the `emiten_grade` row from the
+  re-grade was left in place — that's genuine history, not test junk,
+  `grader_log` confirmed to NOT gain a row since the quadrant didn't
+  change).
+- **Not done yet**: a manual fundamentals form (n quarters, `source=
+  'manual'`) mentioned in contract §19.3 wave 2 — currently a candidate's
+  fundamentals must already exist via `backfill_fundamentals` (yfinance)
+  before "Run Grade" is useful; if a candidate isn't listed/isn't
+  available in yfinance, a separate manual input path is needed (not yet
+  built).
 
-**Update — J-13 selesai (sizing engine wired ke Trading Journal, §14):**
-- [x] **`web/writes.py::insert_trading_journal()` extended** — 5 parameter
-      baru OPSIONAL (backward-compat): `planned_size`, `actual_size`,
-      `skip_reason`, `return_asset_ccy`, `return_idr` (kolom sudah ada di
-      schema sejak kontrak §3, tinggal disambungkan).
-- [x] **`GET /api/sizing/suggest?instrument=X&entry=&sl=`** (BARU) — reuse
-      `analysis.sizing.suggest_position_size()` (J-3b) PERSIS, tidak ada
-      logic terpisah. **Guard 2 lapis** (bukan cuma hitung asal jalan):
-      (1) instrumen HARUS ada di `instrument_metadata` (lot_size diketahui)
-      — kalau tidak, 404 dgn pesan jelas ("sizing engine cuma berlaku utk
-      universe Phase J+"); (2) capital dibaca dari `.env` (`RISK_CAPITAL_
-      IDR`/`RISK_CAPITAL_USD`, dipilih otomatis dari `instrument_metadata.
-      market`) — kalau kosong, 400 dgn pesan jelas, **TIDAK fabrikasi
-      angka**.
-- [x] **Panel 6 Trading Journal form**: tombol "Hitung Ukuran" (panggil
-      endpoint di atas, isi `planned_size` otomatis atau tampilkan alasan
-      SKIP) + 3 field baru (Planned Size/Actual Size/Skip Reason, semua
-      bisa diisi manual juga kalau mau override saran engine).
-- [x] **Panel 7 Riwayat > Jurnal Trading**: kolom baru "Size (Plan/Actual)"
-      — tampil badge SKIP kalau ada `skip_reason`, bukan cuma dua angka
-      kosong.
-- 2 test baru (`test_web_writes.py`: sizing fields tersimpan benar, skip
-  tanpa size), 250 test hijau total. **Diverifikasi live end-to-end
-  browser**: (1) `/api/sizing/suggest` utk BBCA (ada di universe) TAPI
-  `RISK_CAPITAL_IDR` belum diisi -> pesan error jelas, tidak ada angka
-  ngasal; (2) `/api/sizing/suggest` utk BTC (bukan Phase J+) -> 404 pesan
-  jelas; (3) isi `planned_size`/`actual_size` manual -> simpan ke
-  `trading_journal` -> muncul benar di Panel 7 sbg "2500 / 2500". Data uji
-  dibersihkan setelah verifikasi.
-- **Belum dikerjakan**: `return_asset_ccy`/`return_idr` (P&L ganda aset
-  USD, kontrak §13.2) belum ada UI input-nya — field sudah ada di
-  DB/fungsi tulis, tinggal ditambah ke form kalau/waktu Giel mulai
-  trading TSLA beneran dan butuh catat P&L; auto-compute dari sizing
-  engine (isi `planned_size` otomatis saat approve signal di Panel 5,
-  bukan cuma manual di Panel 6) juga belum dibangun — saat ini alurnya
-  masih 2 langkah terpisah (approve di Panel 5, hitung+catat size manual
-  di Panel 6).
+**Update — J-13 complete (sizing engine wired into the Trading Journal, §14):**
+- [x] **`web/writes.py::insert_trading_journal()` extended** — 5 new
+      OPTIONAL parameters (backward-compatible): `planned_size`,
+      `actual_size`, `skip_reason`, `return_asset_ccy`, `return_idr`
+      (columns already existed in the schema since contract §3, just
+      needed to be wired up).
+- [x] **`GET /api/sizing/suggest?instrument=X&entry=&sl=`** (NEW) — reuses
+      `analysis.sizing.suggest_position_size()` (J-3b) EXACTLY, no
+      separate logic. **2-layer guard** (not just calculate and go):
+      (1) the instrument MUST exist in `instrument_metadata` (lot_size
+      known) — if not, 404 with a clear message ("the sizing engine only
+      applies to the Phase J+ universe"); (2) capital is read from `.env`
+      (`RISK_CAPITAL_IDR`/`RISK_CAPITAL_USD`, chosen automatically from
+      `instrument_metadata.market`) — if empty, 400 with a clear message,
+      **NO fabricating numbers**.
+- [x] **Panel 6 Trading Journal form**: a "Calculate Size" button (calls the
+      endpoint above, fills in `planned_size` automatically or shows the
+      SKIP reason) + 3 new fields (Planned Size/Actual Size/Skip Reason,
+      all can also be filled in manually to override the engine's
+      suggestion).
+- [x] **Panel 7 History > Trading Journal**: a new "Size (Plan/Actual)"
+      column — shows a SKIP badge if there's a `skip_reason`, not just two
+      empty numbers.
+- 2 new tests (`test_web_writes.py`: sizing fields saved correctly, skip
+  without size), 250 tests green total. **Fully verified live end-to-end
+  in the browser**: (1) `/api/sizing/suggest` for BBCA (in the universe)
+  BUT `RISK_CAPITAL_IDR` not yet filled -> a clear error message, no
+  made-up number; (2) `/api/sizing/suggest` for BTC (not Phase J+) -> 404
+  with a clear message; (3) fill in `planned_size`/`actual_size` manually
+  -> saves to `trading_journal` -> shows up correctly in Panel 7 as
+  "2500 / 2500". Test data cleaned up after verification.
+- **Not done yet**: `return_asset_ccy`/`return_idr` (dual P&L for USD
+  assets, contract §13.2) has no UI input yet — the field already exists
+  in the DB/write function, just needs to be added to the form
+  if/when Giel actually starts trading TSLA and needs to record P&L;
+  auto-computing from the sizing engine (auto-filling `planned_size` when
+  approving a signal in Panel 5, not just manually in Panel 6) also isn't
+  built yet — currently the flow is still 2 separate steps (approve in
+  Panel 5, calculate+record size manually in Panel 6).
 
-**Update — RISK_CAPITAL_IDR/USD default placeholder (keputusan Giel: "buat
-field aja tapi kamu siapkan nilai default"):** `.env`/`.env.example` diisi
-`RISK_CAPITAL_IDR=100000000` (Rp100 juta) & `RISK_CAPITAL_USD=10000`
-($10rb) — **NILAI PLACEHOLDER, BUKAN modal riil siapa pun**, ditandai jelas
-di komentar supaya Giel ganti begitu tahu angka pastinya. Sizing engine
-sekarang jalan out-of-the-box (dicek live: `suggest_position_size` dgn
-modal placeholder BBCA menghasilkan angka masuk akal), tanpa perlu Giel
-buka .env dulu.
+**Update — RISK_CAPITAL_IDR/USD default placeholder (Giel's decision:
+"create the field but you set up a default value"):** `.env`/`.env.example`
+filled in with `RISK_CAPITAL_IDR=100000000` (Rp100 million) &
+`RISK_CAPITAL_USD=10000` ($10k) — **PLACEHOLDER VALUES, NOT anyone's real
+capital**, clearly marked in comments so Giel can replace them once he
+knows the exact numbers. The sizing engine now works out-of-the-box
+(checked live: `suggest_position_size` with the placeholder capital for
+BBCA produces a reasonable number), without Giel needing to open .env
+first.
 
-**Update — J-6 selesai (rasio prudential bank CAR/NPL/NIM/LDR, MANUAL):**
-- [x] **4 kolom baru di `fundamentals_quarterly`** (`car`, `npl_gross`,
-      `nim`, `ldr`) — BUKAN tabel terpisah, tetap "1 row per instrumen per
-      kuartal" (konsisten dgn tabel yang sudah ada), migrasi via
+**Update — J-6 complete (bank prudential ratios CAR/NPL/NIM/LDR, MANUAL):**
+- [x] **4 new columns in `fundamentals_quarterly`** (`car`, `npl_gross`,
+      `nim`, `ldr`) — NOT a separate table, still "1 row per instrument per
+      quarter" (consistent with the existing table), migrated via
       `_COLUMN_MIGRATIONS`.
 - [x] **`web/writes.py::save_bank_ratios_manual()`** — UPSERT by
-      (instrument, quarter_end) yang **HANYA menyentuh 4 kolom rasio**,
-      TIDAK PERNAH menimpa revenue/net_income/dll ATAU kolom `source` baris
-      yang sudah ada dari yfinance backfill — dites eksplisit (test +
-      verifikasi live: baris BBCA 2026-03-31 dari yfinance, isi manual
-      CAR/NPL/NIM/LDR, `source` tetap "yfinance" bukan ketimpa "manual").
-      Fungsi ini TERPISAH dari `upsert_fundamentals_quarterly` (J-4) by
-      design — scraper otomatis tidak pernah menyentuh 4 kolom ini sama
-      sekali.
-- [x] **2 route baru** `POST`/`GET /api/fundamentals/bank_ratios`.
-- [x] **Panel 8 UI**: form input (ticker+kuartal+4 rasio) + tabel riwayat
-      per-ticker.
-- 3 test baru (`test_web_writes.py`: insert baru, tidak clobber baris
-  yfinance, list cuma kuartal yang punya rasio terisi), 253 test hijau
-  total. Diverifikasi live: simpan rasio dummy utk BBCA 2026-03-31 (baris
-  sudah ada dari yfinance) -> `source` tetap "yfinance", 4 kolom rasio
-  terisi benar di tabel. Data uji (angka dummy, BUKAN rasio BBCA asli)
-  dibersihkan (di-NULL-kan lagi) setelah verifikasi — baris asli (revenue
-  dll) tidak disentuh.
-- **Catatan**: form TIDAK validasi `is_financial=1` di level backend (bisa
-  saja diisi utk instrumen non-bank kalau Giel salah ketik ticker) — kalau
-  ini jadi masalah nyata, tambahkan guard serupa `save_intake_metadata()`
-  di sesi mendatang.
+      (instrument, quarter_end) that **ONLY touches the 4 ratio columns**,
+      NEVER overwrites revenue/net_income/etc. OR the `source` column of
+      an existing row from the yfinance backfill — explicitly tested (test
+      + live verification: BBCA 2026-03-31 row from yfinance, manually
+      fill CAR/NPL/NIM/LDR, `source` stays "yfinance" not overwritten to
+      "manual"). This function is SEPARATE from
+      `upsert_fundamentals_quarterly` (J-4) by design — the automated
+      scraper never touches these 4 columns at all.
+- [x] **2 new routes** `POST`/`GET /api/fundamentals/bank_ratios`.
+- [x] **Panel 8 UI**: input form (ticker+quarter+4 ratios) + a per-ticker
+      history table.
+- 3 new tests (`test_web_writes.py`: new insert, no clobbering a yfinance
+  row, list only quarters that have ratios filled), 253 tests green
+  total. Verified live: saved dummy ratios for BBCA 2026-03-31 (row
+  already existed from yfinance) -> `source` stays "yfinance", the 4
+  ratio columns filled correctly in the table. Test data (dummy numbers,
+  NOT real BBCA ratios) cleaned up (nulled out again) after verification —
+  the original row (revenue etc.) untouched.
+- **Note**: the form does NOT validate `is_financial=1` at the backend
+  level (could be filled in for a non-bank instrument if Giel mistypes
+  the ticker) — if this becomes a real problem, add a guard similar to
+  `save_intake_metadata()` in a future session.
 
-**Update — J-15 Komponen B/D selesai (detail emiten, override, grader log):**
-- [x] **Schema**: `emiten_grade.giel_override` (TEXT JSON, kolom yang
-      sempat ditandai "gap" di update J-11 — sekarang ditambahkan),
-      `grader_log.outcome_3m`/`outcome_6m`/`outcome_notes` (BARU, utk
-      widget Nilai Outcome). Migrasi via `_COLUMN_MIGRATIONS`.
-- [x] **`web/writes.py::get_emiten_detail()`** — gabungan
-      instrument_metadata + 8 kuartal fundamentals terakhir + grade
-      terbaru (integrity_flags & giel_override diurai dari JSON).
-- [x] **`save_grade_override()`** — guard: `quadrant` harus salah satu
-      4 kuadran resmi, `reason` WAJIB non-kosong. **Kuadran mesin ASLI
-      (`quadrant`) TIDAK PERNAH ditimpa** — override disimpan terpisah di
-      `giel_override`, keduanya tampil bareng di UI (dites eksplisit +
-      diverifikasi live: override BBCA jadi INVESTABLE, kolom `quadrant`
-      di DB tetap WATCH).
-- [x] **`list_grader_log()` + `save_grader_outcome()`** — outcome 3bln/6bln
-      independen (COALESCE, isi salah satu tidak menghapus yang lain —
-      dites eksplisit).
-- [x] **4 route baru**: `GET /api/emiten/<ticker>`, `POST /api/emiten/
+**Update — J-15 Component B/D complete (issuer detail, override, grader log):**
+- [x] **Schema**: `emiten_grade.giel_override` (TEXT JSON, the column that
+      was flagged as a "gap" in the J-11 update — now added),
+      `grader_log.outcome_3m`/`outcome_6m`/`outcome_notes` (NEW, for the
+      Outcome Score widget). Migrated via `_COLUMN_MIGRATIONS`.
+- [x] **`web/writes.py::get_emiten_detail()`** — a combination of
+      instrument_metadata + last 8 quarters of fundamentals + latest grade
+      (integrity_flags & giel_override parsed from JSON).
+- [x] **`save_grade_override()`** — guard: `quadrant` must be one of the
+      4 official quadrants, `reason` MUST be non-empty. **The machine's
+      ORIGINAL quadrant (`quadrant`) is NEVER overwritten** — the override
+      is stored separately in `giel_override`, both shown together in the
+      UI (explicitly tested + verified live: BBCA override becomes
+      INVESTABLE, the `quadrant` column in the DB stays WATCH).
+- [x] **`list_grader_log()` + `save_grader_outcome()`** — the 3-month/6-month
+      outcomes are independent (COALESCE, filling one doesn't clear the
+      other — explicitly tested).
+- [x] **4 new routes**: `GET /api/emiten/<ticker>`, `POST /api/emiten/
       <ticker>/override`, `GET /api/grader_log`, `POST /api/grader_log/
       <id>/outcome`.
-- [x] **Panel 8 UI**: section "Detail Emiten" (metadata+grade+override
-      form, **playbook bank kontrak §12.1 diterapkan** — `is_financial=1`
-      tampilkan CAR/NPL/NIM/LDR, SEMBUNYIKAN revenue/OCF/FCF generik yang
-      kurang relevan utk bank) + section "Grader Log & Kalibrasi" (tabel
-      dgn dropdown outcome inline per baris).
-- 9 test baru (`test_web_writes.py`), 262 test hijau total. **Diverifikasi
-  live penuh via browser**: detail BBCA tampil benar dgn kolom bank
-  (bukan revenue generik), override ke INVESTABLE tersimpan dgn kuadran
-  mesin (WATCH) tetap terlihat berdampingan, widget outcome dropdown
-  berfungsi (pilih PARTIAL -> tersimpan, muncul di tabel). Data uji
-  (override + outcome dummy) dibersihkan setelah verifikasi.
-- **Dengan ini, J-15 (Addendum A §19) SELESAI SELURUHNYA** — Komponen
-  A (J-14), C Gelombang 1 (J-14) & 2 (J-12), B & D (giliran ini) semua
-  sudah ada.
+- [x] **Panel 8 UI**: "Issuer Detail" section (metadata+grade+override
+      form, **bank playbook from contract §12.1 applied** — `is_financial=1`
+      shows CAR/NPL/NIM/LDR, HIDES the generic revenue/OCF/FCF that's less
+      relevant for banks) + "Grader Log & Calibration" section (a table
+      with an inline outcome dropdown per row).
+- 9 new tests (`test_web_writes.py`), 262 tests green total. **Fully
+  verified live via browser**: BBCA's detail displays correctly with bank
+  columns (not the generic revenue), the override to INVESTABLE saves
+  with the machine quadrant (WATCH) still visible side by side, the
+  outcome dropdown widget works (select PARTIAL -> saves, appears in the
+  table). Test data (dummy override + outcome) cleaned up after
+  verification.
+- **With this, J-15 (Addendum A §19) is ENTIRELY COMPLETE** — Component
+  A (J-14), C Wave 1 (J-14) & 2 (J-12), B & D (this turn) all now exist.
 
-**Update — J-8 selesai (foreign flow, ternyata PER-SAHAM bukan cuma per-
-sektor — lebih detail dari yang diminta kontrak):**
-- **Riset**: percobaan pertama (tebak nama urlName API "Digital Statistic"
-  spt yang berhasil utk Track C) GAGAL — konsisten dgn dead-end
-  "papan pemantauan khusus"/"financial ratio" sebelumnya. **Endpoint yang
-  benar ditemukan lewat observasi network request BROWSER SUNGGUHAN**
-  (navigate ke laman resmi "Stock Summary" IDX, baca network request yang
-  benar-benar terpanggil) — bukan tebak nama lagi. Endpoint:
+**Update — J-8 complete (foreign flow, turned out to be PER-STOCK not just
+per-sector — more detailed than what the contract asked for):**
+- **Research**: the first attempt (guessing the urlName of the "Digital
+  Statistic" API that worked for Track C) FAILED — consistent with the
+  earlier "special monitoring board"/"financial ratio" dead-ends. **The
+  correct endpoint was found by observing a REAL BROWSER's network
+  requests** (navigate to the official IDX "Stock Summary" page, read the
+  network request that actually fires) — not guessing again. Endpoint:
   `https://www.idx.co.id/primary/TradingSummary/GetStockSummary?length=9999&start=0`
-  — BEDA family dari "Digital Statistic" (`primary/DigitalStatistic/...`)
-  yang dipakai Track C. **Tidak butuh session-cookie warmup** (beda dari
-  `idx_foreign_flow.py`) — 1x GET langsung 200. Dikonfirmasi live: 965
-  saham, termasuk BBCA (`ForeignBuy`=105.752.900, `ForeignSell`=120.664.900
-  lembar, 2026-07-10) — field VOLUME (lembar), BUKAN value Rupiah spt
+  — a DIFFERENT family from "Digital Statistic" (`primary/DigitalStatistic/...`)
+  used by Track C. **No session-cookie warmup needed** (different from
+  `idx_foreign_flow.py`) — 1 GET directly returns 200. Confirmed live: 965
+  stocks, including BBCA (`ForeignBuy`=105,752,900, `ForeignSell`=120,664,900
+  shares, 2026-07-10) — a VOLUME field (shares), NOT a Rupiah value like
   Track C.
-- [x] **`scrapers/idx_stock_foreign_flow.py`** (BARU) —
-      `fetch_idx_stock_foreign_flow(tickers)`, generic (terima list ticker,
-      tidak baca DB sendiri — beda dari `equity_universe.py`, konsisten dgn
-      pola scraper lain yang lebih umum di project ini). Output 3 metric
-      per ticker: `stock_ff_foreign_buy_vol`/`sell_vol`/`net_vol`.
-- [x] **Wired ke `pipeline/run_daily.py`** — baca ticker `market='IDX'`
-      dari `instrument_metadata` (dinamis, otomatis ikut kalau universe
-      nambah saham IDX baru), panggil scraper, gabung ke `upsert_
-      positioning` yang sudah ada (natural key dedupe otomatis, TIDAK ada
-      jalur tulis baru).
-- **TIDAK ada kode UI baru** — `positioning` table SUDAH generik, Panel 3
-  otomatis menampilkan baris baru ini begitu ada (pola persis Track C).
-- 5 test baru (`test_idx_stock_foreign_flow.py`, live network + guard
-  ticker kosong = skip network call), 267 test hijau total. **Diverifikasi
-  live penuh**: `pipeline.run_daily` -> `idx_stock_summary = ok`, 3 row
-  BBCA masuk `positioning` dgn angka PERSIS sama dgn temuan riset manual
-  (net = -14.912.000, net = buy - sell tervalidasi), muncul otomatis di
-  `/api/positioning` tanpa ubah endpoint atau Panel 3 sama sekali.
-- **Catatan cakupan**: ini PER-INSTRUMEN, bukan agregat per-sektor spt
-  yang diminta literal kontrak J-8 — dianggap LEBIH baik (bisa diagregasi
-  ke sektor kapan pun kalau perlu, granularitas turun tidak bisa
-  sebaliknya). Endpoint tidak punya parameter tanggal (selalu hari bursa
-  TERAKHIR) — histori/backfill utk tanggal lampau BELUM dibangun (di luar
-  scope turn ini, kalau perlu J-2-style backfill perlu riset ulang apakah
-  endpoint ini punya cara narik histori).
+- [x] **`scrapers/idx_stock_foreign_flow.py`** (NEW) —
+      `fetch_idx_stock_foreign_flow(tickers)`, generic (accepts a list of
+      tickers, doesn't read its own DB — different from
+      `equity_universe.py`, consistent with the more generic scraper
+      pattern in this project). 3 metrics per ticker output:
+      `stock_ff_foreign_buy_vol`/`sell_vol`/`net_vol`.
+- [x] **Wired into `pipeline/run_daily.py`** — reads tickers with
+      `market='IDX'` from `instrument_metadata` (dynamic, automatically
+      picks up new IDX stocks added to the universe), calls the scraper,
+      merges into the existing `upsert_
+      positioning` (natural key dedupe automatic, NO new write path).
+- **NO new UI code** — the `positioning` table is ALREADY generic, Panel 3
+  automatically displays these new rows once they exist (the exact same
+  pattern as Track C).
+- 5 new tests (`test_idx_stock_foreign_flow.py`, live network + guard for
+  empty ticker list = skip the network call), 267 tests green total.
+  **Fully verified live**: `pipeline.run_daily` -> `idx_stock_summary = ok`,
+  3 BBCA rows go into `positioning` with numbers EXACTLY matching the
+  manual research finding (net = -14,912,000, net = buy - sell validated),
+  automatically shows up in `/api/positioning` without changing the
+  endpoint or Panel 3 at all.
+- **Coverage note**: this is PER-INSTRUMENT, not a per-sector aggregate as
+  literally requested by contract J-8 — considered BETTER (can be
+  aggregated to sector any time if needed, granularity can't go the other
+  way). The endpoint has no date parameter (always the LATEST trading
+  day) — history/backfill for past dates NOT built yet (outside this
+  turn's scope, if needed a J-2-style backfill would need fresh research
+  into whether this endpoint has a way to pull history).
 
-**Update — lanjutan kickoff (Giel bilang "oke lanjut", isi BBCA saja dulu):**
-- [x] **5 tabel Phase J+ dibangun sebagai DRAFT** (`fundamentals_quarterly`,
+**Update — kickoff continuation (Giel said "okay go ahead", fill in BBCA
+only for now):**
+- [x] **5 Phase J+ tables built as DRAFT** (`fundamentals_quarterly`,
       `earnings_calendar`, `sector_benchmark`, `emiten_grade`, `grader_log`)
-      — karena dokumen v1.1 asli tidak tersedia, kolom disusun dari gap
-      analysis §1 + data requirements §2 + riset yfinance G3, BUKAN
-      spesifikasi final Giel. Ditandai jelas di komentar `schema.sql`
-      supaya gampang dikoreksi kalau meleset dari v1.1 asli. `asset_context_
-      weight` diperluas `+level` (INDEX/SECTOR/INSTRUMENT, pewarisan bobot)
-      — row lama di-backfill otomatis jadi `INSTRUMENT` (satu-satunya level
-      yang ada sebelum konsep ini, tidak dibiarkan NULL). Total tabel
-      14→20. 3 test count di `test_db.py` disesuaikan.
-- [x] **`pipeline/seed_universe.py`** (baru, pola sama
-      `seed_context_weight.py`) — seed manual `instrument_metadata`,
-      idempotent (`INSERT OR REPLACE` by `instrument` PK). **BBCA** entry
-      pertama: `lane='INVEST'` (BUKAN `TRADE` — kontrak §13.1 poin 5,
-      instrumen baru wajib INVEST/NONE dulu sampai validasi bar-replay
-      J-3 selesai, `lane_validated_at` sengaja NULL), `is_financial=1`,
-      `lot_size=100`, `has_daily_limit=1` (ARA/ARB), data market_cap/
-      free_float dari yfinance `.JK` (dicek live, akan basi seiring waktu —
-      field metadata lambat berubah, bukan daily_market yang di-refresh
-      tiap run). `avg_volume_20d` sengaja NULL — field ini seharusnya
-      dihitung dari histori `asset_ohlcv` riil (J-2, belum jalan utk BBCA),
-      bukan pendekatan sekali-catat dari yfinance `info`.
-- 3 test baru (`test_seed_universe.py`, termasuk assert eksplisit "instrumen
-  baru tidak boleh default ke TRADE"), 181 test hijau total.
-- **Backlog dicatat (permintaan Giel eksplisit)**: sistem input manual di
-  dashboard buat `instrument_metadata` (form UI, bukan edit `seed_universe.py`
-  langsung tiap tambah emiten) — BELUM dibangun, seed script ini pengganti
-  sementara sampai UI-nya ada.
+      — because the original v1.1 document wasn't available, the columns
+      were composed from the gap analysis §1 + data requirements §2 +
+      yfinance G3 research, NOT Giel's final spec. Clearly marked in the
+      `schema.sql` comments so it's easy to correct if it diverges from
+      the real v1.1. `asset_context_
+      weight` extended with `+level` (INDEX/SECTOR/INSTRUMENT, weight
+      inheritance) — old rows auto-backfilled to `INSTRUMENT` (the only
+      level that existed before this concept, not left NULL). Total
+      tables 14→20. 3 table-count tests in `test_db.py` adjusted.
+- [x] **`pipeline/seed_universe.py`** (new, same pattern as
+      `seed_context_weight.py`) — manual seed of `instrument_metadata`,
+      idempotent (`INSERT OR REPLACE` by `instrument` PK). First **BBCA**
+      entry: `lane='INVEST'` (NOT `TRADE` — contract §13.1 point 5, a new
+      instrument must be INVEST/NONE first until the J-3 bar-replay
+      validation is done, `lane_validated_at` deliberately NULL),
+      `is_financial=1`, `lot_size=100`, `has_daily_limit=1` (ARA/ARB),
+      market_cap/free_float data from yfinance `.JK` (checked live, will
+      go stale over time — metadata fields change slowly, unlike
+      daily_market which is refreshed on every run). `avg_volume_20d`
+      deliberately NULL — this field should be computed from real
+      `asset_ohlcv` history (J-2, not yet running for BBCA), not a
+      one-time snapshot approach from yfinance's `info`.
+- 3 new tests (`test_seed_universe.py`, including an explicit assert
+  "a new instrument must not default to TRADE"), 181 tests green total.
+- **Backlog recorded (Giel's explicit request)**: a manual input system in
+  the dashboard for `instrument_metadata` (a UI form, not editing
+  `seed_universe.py` directly each time an issuer is added) — NOT built
+  yet, this seed script is the temporary substitute until the UI exists.
 
-**Update — J-14 selesai (Tab 8 Gelombang 1, Addendum A §19.5):**
-- [x] **Panel 8 "Universe" (BARU)** — `web/templates/partials/panel8_universe.html`
-      + `web/static/js/panel8.js`, nav tab ke-8 di `index.html`.
-      **Komponen A** (tabel universe): `GET /api/universe` ->
-      `web/writes.py::list_universe()` — `instrument_metadata` + grade
-      TERBARU per instrumen dari `emiten_grade` (correlated subquery by
-      `MAX(graded_at)`, bukan window function — konsisten gaya SQL project
-      ini). Kuadran/score tampil "belum digrade"/`-` sampai modul Grader
-      (J-11) jalan — bukan bug, cuma belum ada datanya.
-      **Komponen C v1** (intake metadata): `POST /api/intake` ->
-      `save_intake_metadata()` — **guard di level fungsi** (bukan cuma UI):
-      lane HANYA boleh `INVEST`/`NONE`, `TRADE`/`BOTH` raise `ValueError`
-      (endpoint balikin 400) — mirror pola assert `test_seed_universe.py`.
-      `INSERT OR REPLACE` by `instrument` PK (idempotent, pola sama
-      `seed_universe.py`).
-- [x] **Panel 5: badge LANE** di header chart (`#instrumentLaneBadge`) —
+**Update — J-14 complete (Tab 8 Wave 1, Addendum A §19.5):**
+- [x] **Panel 8 "Universe" (NEW)** — `web/templates/partials/panel8_universe.html`
+      + `web/static/js/panel8.js`, nav tab 8 in `index.html`.
+      **Component A** (universe table): `GET /api/universe` ->
+      `web/writes.py::list_universe()` — `instrument_metadata` + the
+      LATEST grade per instrument from `emiten_grade` (a correlated
+      subquery by `MAX(graded_at)`, not a window function — consistent
+      with this project's SQL style). Quadrant/score show "not graded
+      yet"/`-` until the Grader module (J-11) runs — not a bug, just no
+      data yet.
+      **Component C v1** (intake metadata): `POST /api/intake` ->
+      `save_intake_metadata()` — **guard at the function level** (not just
+      the UI): lane may ONLY be `INVEST`/`NONE`, `TRADE`/`BOTH` raises
+      `ValueError` (endpoint returns 400) — mirrors the
+      `test_seed_universe.py` assert pattern. `INSERT OR REPLACE` by
+      `instrument` PK (idempotent, same pattern as `seed_universe.py`).
+- [x] **Panel 5: LANE badge** in the chart header (`#instrumentLaneBadge`) —
       `GET /api/instrument_meta?instrument=X` -> `get_instrument_meta()`.
-      Badge **disembunyikan** (bukan kosong-error) kalau instrumen tidak
-      punya row `instrument_metadata` — berlaku utk semua aset makro/index
-      existing (BTC/GOLD/IHSG/SP500/USDIDR/USDJPY, belum ada di universe
-      Phase J+), lane cuma relevan utk saham individual.
-- [x] **CSS**: 4 badge modifier baru (`lane-trade` hijau/`lane-both`
-      biru/`lane-invest` abu/`lane-none` dashed-border) di
-      `static/css/dashboard.css`, `LANE_CLASS` map bareng `LENS_LABELS` di
-      `core.js` (dipakai Panel 5 & Panel 8, tidak diduplikasi).
-- 6 test baru di `test_web_writes.py` (guard lane reject, insert+upsert
-  idempotent, join grade terbaru, no-grade-yet, get_instrument_meta
-  found/missing), 187 test hijau total. Diverifikasi live via browser:
-  BBCA muncul di tabel Universe dengan data asli, intake form nyimpen
-  instrumen baru (`ZZZTEST`, lane INVEST, dibersihkan setelah verifikasi),
-  badge Panel 5 kosong utk BTC (no row) dan render `LANE INVEST` yang
-  benar saat dipanggil manual utk BBCA (BBCA belum ada di dropdown
-  instrument Panel 5 krn J-2 OHLCV backfill belum jalan utk saham individual).
-- **Komponen B/D + badge KUADRAN Panel 5 + earnings Panel 3** tetap J-15,
-  prasyarat J-4 (fundamentals) & J-11 (grader engine) — TIDAK dikerjakan
-  di J-14 (di luar scope Gelombang 1 per kontrak §19.5).
+      The badge is **hidden** (not empty-error) if the instrument has no
+      `instrument_metadata` row — applies to all existing macro/index
+      assets (BTC/GOLD/IHSG/SP500/USDIDR/USDJPY, not yet in the Phase J+
+      universe), lane is only relevant for individual stocks.
+- [x] **CSS**: 4 new badge modifiers (`lane-trade` green/`lane-both`
+      blue/`lane-invest` gray/`lane-none` dashed-border) in
+      `static/css/dashboard.css`, `LANE_CLASS` map alongside `LENS_LABELS`
+      in `core.js` (used by Panel 5 & Panel 8, not duplicated).
+- 6 new tests in `test_web_writes.py` (lane guard reject, insert+upsert
+  idempotent, join latest grade, no-grade-yet, get_instrument_meta
+  found/missing), 187 tests green total. Verified live via browser: BBCA
+  shows up in the Universe table with real data, the intake form saves a
+  new instrument (`ZZZTEST`, lane INVEST, cleaned up after verification),
+  the Panel 5 badge is empty for BTC (no row) and correctly renders `LANE
+  INVEST` when called manually for BBCA (BBCA isn't in the Panel 5
+  instrument dropdown yet since the J-2 OHLCV backfill hasn't run for
+  individual stocks yet).
+- **Component B/D + the Panel 5 QUADRANT badge + Panel 3 earnings** remain
+  J-15, prerequisite J-4 (fundamentals) & J-11 (grader engine) — NOT
+  worked on in J-14 (outside Wave 1 scope per contract §19.5).
 
-**Update — J-2 selesai (OHLCV universe -> asset_ohlcv, yfinance dinamis):**
-- [x] **`scrapers/equity_universe.py`** (BARU) — beda dari `scrapers/macro_yf.py`:
-      universe DINAMIS dibaca dari `instrument_metadata` tiap run (bukan dict
-      hardcoded), jadi nambah emiten baru lewat Panel 8 intake TIDAK perlu
-      ubah kode scraper. `yf_ticker_for(instrument, market)`: IDX -> suffix
-      `.JK`, US (dan lainnya) -> ticker apa adanya. Tulis ke `asset_ohlcv`
-      SAJA (bukan `daily_market` — saham individual bukan konteks makro
-      global, Master Plan §4). Semua instrumen di `instrument_metadata`
-      di-fetch (termasuk lane INVEST/NONE, bukan cuma TRADE) — histori
-      harga tetap dibutuhkan utk validasi bar-replay J-3 nanti.
-- [x] **Wired ke `pipeline/run_daily.py`** — `fetch_equity_universe(date,
-      db_path)` dipanggil bareng scraper lain, `asset_rows` digabung ke
-      pipeline upsert existing (tidak ada jalur tulis baru, reuse
+**Update — J-2 complete (universe OHLCV -> asset_ohlcv, dynamic yfinance):**
+- [x] **`scrapers/equity_universe.py`** (NEW) — different from
+      `scrapers/macro_yf.py`: the universe is read DYNAMICALLY from
+      `instrument_metadata` on every run (not a hardcoded dict), so
+      adding a new issuer via Panel 8 intake does NOT need a scraper code
+      change. `yf_ticker_for(instrument, market)`: IDX -> `.JK` suffix,
+      US (and others) -> ticker as-is. Writes ONLY to `asset_ohlcv` (not
+      `daily_market` — an individual stock isn't global macro context,
+      Master Plan §4). Every instrument in `instrument_metadata` is
+      fetched (including lane INVEST/NONE, not just TRADE) — price
+      history is still needed for the upcoming J-3 bar-replay validation.
+- [x] **Wired into `pipeline/run_daily.py`** — `fetch_equity_universe(date,
+      db_path)` called alongside the other scrapers, `asset_rows` merged
+      into the existing pipeline upsert (no new write path, reuses
       `upsert_asset_ohlcv`).
-- [x] **`pipeline/backfill.py` extended** — instrumen yang tidak dikenal di
-      `YF_TICKERS`/`FRED_INSTRUMENTS` (hardcoded macro) sekarang fallback
-      cek `instrument_metadata`: kalau ada, ticker diturunkan dinamis lewat
-      `yf_ticker_for()` lalu reuse `_yf_history_range()` yang sudah ada.
+- [x] **`pipeline/backfill.py` extended** — an instrument not known in
+      `YF_TICKERS`/`FRED_INSTRUMENTS` (hardcoded macro) now falls back to
+      checking `instrument_metadata`: if present, the ticker is derived
+      dynamically via `yf_ticker_for()` then reuses the existing
+      `_yf_history_range()`.
       `python -m pipeline.backfill --instrument BBCA --from .. --to ..`
-      langsung jalan tanpa perlu entry baru di kode manapun.
-- 4 test baru (`test_equity_universe.py`, live network pola sama scraper
-  lain — `yf_ticker_for()` unit test + `fetch_equity_universe()` live utk
-  BBCA), 191 test hijau total. **Diverifikasi live penuh**:
-  `pipeline.run_daily` -> `equity_BBCA = ok` di source_flags, row asli
-  masuk `asset_ohlcv` (2026-07-10, close 6175); backfill CLI 2 tahun
-  (2024-07-01..2026-07-12) -> 486 baris baru; Panel 5 browser -> BBCA
-  MUNCUL di dropdown instrument (otomatis, `/api/assets` generic sejak
-  Phase C), chart candlestick render 299 elemen SVG dengan data asli, badge
-  LANE INVEST tampil benar di header chart.
-- **Catatan cakupan**: Panel 1 "Manual Backfill" dropdown HTML masih
-  hardcoded ke instrumen makro (BTC/DXY/SP500/IHSG/Gold/USD-IDR) — backfill
-  utk instrumen Phase J+ (BBCA dst) jalan via CLI `pipeline.backfill`, BUKAN
-  lewat UI Panel 1. Menambah instrumen Phase J+ ke dropdown itu bukan
-  bagian J-2 (di luar scope kontrak), dicatat sebagai potensi UX follow-up.
-- **`volume_ma20`** tetap NULL utk row BBCA hasil backfill (`backfill.py`
-  tidak menghitung ulang kolom itu, beda dari `run_daily` yang eksplisit
-  panggil `volume_ma20_for_instrument` tiap run) — TIDAK memblokir apa pun
-  sekarang (Panel 5 chart hitung MA sendiri client-side dari OHLCV mentah;
-  `analysis/*` belum menyertakan BBCA di `INSTRUMENTS` list, itu bagian J-3).
+      works directly with no new entry needed anywhere in the code.
+- 4 new tests (`test_equity_universe.py`, live network same pattern as
+  other scrapers — `yf_ticker_for()` unit test + a live
+  `fetch_equity_universe()` test for BBCA), 191 tests green total.
+  **Fully verified live**:
+  `pipeline.run_daily` -> `equity_BBCA = ok` in source_flags, a real row
+  goes into `asset_ohlcv` (2026-07-10, close 6175); a 2-year CLI backfill
+  (2024-07-01..2026-07-12) -> 486 new rows; Panel 5 browser -> BBCA
+  APPEARS in the instrument dropdown (automatic, `/api/assets` generic
+  since Phase C), the candlestick chart renders 299 SVG elements with real
+  data, the LANE INVEST badge shows correctly in the chart header.
+- **Coverage note**: the Panel 1 "Manual Backfill" HTML dropdown is still
+  hardcoded to macro instruments (BTC/DXY/SP500/IHSG/Gold/USD-IDR) —
+  backfill for Phase J+ instruments (BBCA etc.) runs via the
+  `pipeline.backfill` CLI, NOT via the Panel 1 UI. Adding Phase J+
+  instruments to the dropdown isn't part of J-2 (outside contract scope),
+  recorded as a potential UX follow-up.
+- **`volume_ma20`** remains NULL for the BBCA backfill rows
+  (`backfill.py` doesn't recompute that column, unlike `run_daily` which
+  explicitly calls `volume_ma20_for_instrument` on every run) — this
+  does NOT block anything right now (Panel 5's chart computes the MA
+  itself client-side from raw OHLCV; `analysis/*` doesn't yet include
+  BBCA in the `INSTRUMENTS` list, that's part of J-3).
 
-**Dievaluasi, sengaja tidak dikerjakan:**
-- **J-6: Bank ratio CAR/NPL/NIM/LDR via IDX** — Giel tanya "how about IDX"
-  sbg alternatif OJK. Riset dilakukan (bukan asumsi): (1) WebSearch
-  konfirmasi IDX punya laman "Financial Report and Ratio of Listed
-  Companies" di sistem Digital Statistic yang sama dgn foreign-flow API
-  yang sudah dipakai (Track C); (2) riset source code proyek open-source
-  NeaByteLab/IDX-API menemukan modul `syncFinancialRatio()` — TAPI field
-  yang disebut cuma **PER/PBV/ROE/DER** (rasio valuasi pasar umum), BUKAN
-  rasio prudential bank (CAR/NPL/NIM/LDR); (3) percobaan langsung nembak
-  beberapa nama `urlName` API (`LINK_TABLE_FINANCIAL_RATIO` dkk, pola sama
-  endpoint foreign-flow) — semua balik 503 (bukan 404, endpoint yang benar
-  memang belum ketemu); (4) percobaan lewat browser sungguhan (isi filter
-  bulan/tahun + klik "Terapkan" di laman resminya) juga tidak berhasil
-  memicu network request API-nya (kemungkinan resolusi server-side Nuxt,
-  bukan client-side fetch yang bisa diintip). **Kesimpulan**: rasio
-  prudential bank spesifik KEMUNGKINAN BESAR memang bukan data yang
-  dipublikasi di level "ratio umum" milik bursa (IDX) — biasanya itu
-  disclosure regulasi milik OJK (`ojk.go.id`, Laporan Surveillance
-  Perbankan Indonesia, ditemukan di riset yang sama). **Tetap Backlog** —
-  OJK jadi kandidat sumber paling mungkin, belum diriset lebih lanjut
-  (di luar scope turn ini). Dicatat di sini supaya riset "urlName IDX
-  utk financial ratio" tidak diulang dari nol lagi tanpa alasan baru.
-- **NewsData.io** — dicek langsung: sentiment analysis **cuma tersedia di
-  tier Professional/Corporate (berbayar)**, bukan tier gratis seperti yang
-  awalnya dikira. Historical archive (10 tahun) juga fitur berbayar. Tier
-  gratisnya (200 credit/hari) cuma jadi agregator RSS tambahan tanpa
-  sentiment asli — dinilai tidak worth effort integrasi vs nilai tambahnya.
-  Diputuskan **skip**.
-- **NewsAPI.org** — free tier "non-commercial only" (konflik dengan rencana
-  monetisasi Phase 2/3 di Master Plan), dan historical depth cuma ~1 bulan.
-  Skip.
-- **Net exchange flow (BTC)** — dicek: Glassnode/CryptoQuant memang **berbayar**
-  untuk metric ini (sesuai catatan awal), dan tidak ada pengganti gratis yang
-  setara kualitasnya. Metric ini butuh database alamat exchange yang
-  di-labeling & di-maintain terus-menerus (siapa pemilik alamat mana) — justru
-  itu yang jadi nilai jual berbayar Glassnode/CryptoQuant, bukan sekadar akses
-  data blockchain (yang publik/gratis). Opsi yang ada, semua kurang layak:
-  - **Dune Analytics** (gratis) — beberapa dashboard komunitas replikasi
-    netflow-style CryptoQuant via SQL query atas data on-chain ter-indeks,
-    tapi ini "pakai/adaptasi query orang lain" bukan REST endpoint stabil —
-    bentuk integrasi beda sendiri dari semua scraper lain di project ini.
-  - **DIY** (maintain sendiri daftar alamat exchange + query chain indexer) —
-    effort tinggi, kualitas data di bawah vendor berbayar, tidak sepadan untuk
-    dashboard personal. **Tetap Backlog** — tidak ada jalan gratis yang worth
-    effort-nya saat ini.
-  - **Update (dicoba CryptoQuant API key berbayar milik Giel, diverifikasi
-    LIVE)**: key valid (endpoint lain seperti `market-data/price-ohlcv`
-    berhasil 200 + data asli), TAPI seluruh kategori `exchange-flows`
-    (`netflow`, `inflow`, `outflow`, `reserve`, dll — 6 endpoint dicoba
-    semua) balikin 403 "no authority for this request". Bukan soal free vs
-    berbayar lagi — plan CryptoQuant yang Giel punya SEKARANG tidak
-    mencakup kategori ini sama sekali, kemungkinan butuh tier lebih
-    tinggi/add-on terpisah (granularitas entitlement per-endpoint, bukan
-    per-tier rapi — `open-interest` juga 403 padahal sama-sama "market-data"
-    dengan `price-ohlcv` yang jalan). Tidak ada workaround (coba hitung
-    manual dari inflow−outflow juga mentok, keduanya sama-sama 403). **Giel
-    putuskan drop** — tidak worth dikejar lebih jauh. Tetap Backlog.
-- **Whale / long-term holder (LTH) accumulation (BTC)** — sama, Coin Metrics
-  punya tier "Community" gratis, TAPI metric age-band/LTH-split spesifik
-  (`SOPRLth`, realized cap by coin age, dll) ternyata di-gate ke tier
-  "Network Data Pro" (berbayar) — tier gratisnya tidak mencakup ini. Satu-
-  satunya proxy yang genuinely gratis & bisa dipakai:
-  - **Whale Alert API** (free tier) — feed transaksi besar individual
-    real-time (mis. "$X pindah dari wallet A ke exchange B"). Ini proxy
-    **pergerakan whale**, BUKAN metric "LTH supply accumulating" yang
-    sebenarnya (beda konsep: transfer individual vs UTXO age analysis), tapi
-    arahnya related (whale pindahin dana ke/dari exchange). Rate limit tier
-    gratis belum dikonfirmasi persis — perlu dicek dokumentasi resminya
-    kalau mau dipakai. **Tetap Backlog** — kalau nanti mau proxy kasar, Whale
-    Alert adalah pilihan paling realistis, bukan metric asli LTH.
-  - **Update**: dicoba juga lewat CryptoQuant API key Giel (endpoint
-    `network-indicator/utxo-age-distribution`, proxy LTH/STH via UTXO age) —
-    403 sama seperti `exchange-flows` di atas, tidak termasuk plan yang
-    dipunya. **Giel putuskan drop** bareng item di atas — tidak worth
-    dikejar lebih jauh. Tetap Backlog.
+**Evaluated, deliberately not done:**
+- **J-6: Bank ratios CAR/NPL/NIM/LDR via IDX** — Giel asked "how about
+  IDX" as an alternative to OJK. Research was done (not assumed): (1)
+  WebSearch confirmed IDX has a "Financial Report and Ratio of Listed
+  Companies" page on the same Digital Statistic system already used for
+  the foreign-flow API (Track C); (2) researching the open-source
+  NeaByteLab/IDX-API project's source code found a `syncFinancialRatio()`
+  module — BUT the fields it mentions are only **PER/PBV/ROE/DER**
+  (general market valuation ratios), NOT bank prudential ratios
+  (CAR/NPL/NIM/LDR); (3) directly trying several `urlName` API guesses
+  (`LINK_TABLE_FINANCIAL_RATIO` etc., same pattern as the foreign-flow
+  endpoint) — all returned 503 (not 404, the correct endpoint really
+  hasn't been found yet); (4) trying via a real browser (filling in the
+  month/year filter + clicking "Apply" on the official page) also failed
+  to trigger the API's network request (likely server-side Nuxt
+  resolution, not a client-side fetch that can be intercepted).
+  **Conclusion**: specific bank prudential ratios are MOST LIKELY not
+  data published at the exchange's (IDX's) "general ratio" level —
+  that's usually a regulatory disclosure owned by OJK (`ojk.go.id`,
+  Indonesian Banking Surveillance Report, found in the same research).
+  **Still Backlog** — OJK is the most likely candidate source, not
+  researched further yet (outside this turn's scope). Recorded here so
+  the "IDX urlName for financial ratio" research isn't repeated from
+  scratch without a new reason.
+- **NewsData.io** — checked directly: sentiment analysis is **only
+  available on the Professional/Corporate (paid) tier**, not the free
+  tier as originally thought. The historical archive (10 years) is also a
+  paid feature. The free tier (200 credits/day) is just an extra RSS
+  aggregator with no real sentiment. Judged not worth the integration
+  effort vs. the added value. Decided to **skip**.
+- **NewsAPI.org** — free tier is "non-commercial only" (conflicts with the
+  Phase 2/3 monetization plans in the Master Plan), and historical depth
+  is only ~1 month. Skip.
+- **Net exchange flow (BTC)** — checked: Glassnode/CryptoQuant really are
+  **paid** for this metric (as noted earlier), and there's no free
+  substitute of comparable quality. This metric needs a database of
+  labeled, continuously maintained exchange addresses (who owns which
+  address) — that's exactly the paid value proposition of
+  Glassnode/CryptoQuant, not just access to blockchain data (which is
+  public/free). Available options, all less than ideal:
+  - **Dune Analytics** (free) — some community dashboards replicate
+    CryptoQuant-style netflow via SQL queries over indexed on-chain data,
+    but this is "using/adapting someone else's query" not a stable REST
+    endpoint — a different integration shape from every other scraper in
+    this project.
+  - **DIY** (maintain your own list of exchange addresses + query a chain
+    indexer) — high effort, data quality below paid vendors, not worth it
+    for a personal dashboard. **Still Backlog** — no free path currently
+    worth the effort.
+  - **Update (tried Giel's paid CryptoQuant API key, verified LIVE)**: the
+    key is valid (other endpoints like `market-data/price-ohlcv`
+    succeeded with 200 + real data), BUT the entire `exchange-flows`
+    category (`netflow`, `inflow`, `outflow`, `reserve`, etc. — 6
+    endpoints all tried) returns 403 "no authority for this request". Not
+    a free-vs-paid issue anymore — the CryptoQuant plan Giel currently has
+    doesn't cover this category at all, likely needing a higher
+    tier/separate add-on (entitlement granularity is per-endpoint, not
+    neatly per-tier — `open-interest` is also 403 even though it's
+    equally "market-data" like the `price-ohlcv` that works). No
+    workaround (trying to compute manually from inflow−outflow also hits
+    a wall, both are 403). **Giel decided to drop it** — not worth
+    pursuing further. Still Backlog.
+- **Whale / long-term holder (LTH) accumulation (BTC)** — same story, Coin
+  Metrics has a free "Community" tier, BUT the specific age-band/LTH-split
+  metric (`SOPRLth`, realized cap by coin age, etc.) turns out to be
+  gated behind the "Network Data Pro" (paid) tier — the free tier doesn't
+  cover it. The only genuinely free proxy that could be used:
+  - **Whale Alert API** (free tier) — a real-time feed of individual large
+    transactions (e.g. "$X moved from wallet A to exchange B"). This is a
+    proxy for **whale movement**, NOT the actual "LTH supply accumulating"
+    metric (a different concept: individual transfer vs. UTXO age
+    analysis), but the direction is related (a whale moving funds
+    to/from an exchange). The free tier's exact rate limit hasn't been
+    confirmed — needs checking the official docs if it's ever used.
+    **Still Backlog** — if a rough proxy is wanted later, Whale Alert is
+    the most realistic choice, not a genuine LTH metric.
+  - **Update**: also tried via Giel's CryptoQuant API key (the
+    `network-indicator/utxo-age-distribution` endpoint, an LTH/STH proxy
+    via UTXO age) — 403 same as `exchange-flows` above, not included in
+    the plan owned. **Giel decided to drop** this along with the item
+    above — not worth pursuing further. Still Backlog.
 
-**Update — J-3: ARA/ARB sizing buffer (§18 keputusan #4, LOCKED) + fraksi harga
-zone tolerance (§13.1 poin 4, DRAFT) selesai (13 Jul 2026):**
-- **ARA/ARB buffer 1.5×** (`analysis/sizing.py`) — `suggest_position_size()`
-  terima parameter baru `has_daily_limit: bool`. Kalau `True` (dibaca otomatis
-  dari `instrument_metadata.has_daily_limit`, bukan input manual user), jarak
-  SL dikalikan `ARA_ARB_BUFFER_MULT = 1.5` sebelum dipakai hitung ukuran posisi
-  — mengecilkan `suggested_units` supaya risiko riil tidak melebihi budget
-  kalau harga gap lewat SL saat kena ARA/ARB (auto-rejection order IDX, beda
-  dari LULD circuit-breaker US yang masih bisa closed-out). Ini keputusan
-  **terkunci §18**, bukan draft — tidak perlu revisi Giel lagi. Respons API
-  `/api/sizing/suggest` sekarang sertakan `nominal_risk_per_unit` (jarak SL
-  asli, tanpa buffer) berdampingan dengan `risk_per_unit` (sudah dibuffer) —
-  Panel 6 (`panel6.js`) tampilkan keduanya eksplisit kalau buffer dipakai
-  ("buffer ARA/ARB 1.5x diterapkan: jarak nominal X → Y") supaya Giel bisa
-  lihat transparansi hitungannya, bukan cuma angka akhir. 3 test baru
-  (`test_sizing.py`), diverifikasi live: BBCA (`has_daily_limit=1`) tampilkan
-  nominal 100 → buffered 150 dengan benar di Panel 6 browser.
-- **Fraksi harga (tick size) zone tolerance** (`analysis/calibration.py`,
-  file baru) — tabel resmi Peraturan No. II-A BEI (dikonfirmasi WebSearch,
-  bukan tebakan): harga <Rp200 → fraksi Rp1; Rp200-500 → Rp2; Rp500-2rb →
-  Rp5; Rp2rb-5rb → Rp10; ≥Rp5rb → Rp25. `idx_zone_tolerance_pct()` hitung
-  toleransi clustering S&R sbg persentase relatif (`fraksi × 2 ticks ÷ harga
-  acuan`) — **DRAFT**, `IDX_ZONE_TOLERANCE_TICKS = 2` masih perlu dikonfirmasi/
-  direvisi Giel setelah bar-replay validation per §13.1 poin 5 ("engine teruji
-  di BTC ≠ teruji di BBRI"), BEDA dari buffer ARA/ARB di atas yang sudah final.
-  `pipeline/run_analysis.py::run_analysis()` cek `instrument_metadata.market`
-  — kalau `'IDX'`, toleransi dihitung dari close TERBARU via fungsi ini;
-  instrumen lain (semua makro/index existing: BTC/GOLD/IHSG/SP500/USDIDR/
-  USDJPY, tidak punya row `instrument_metadata`) tetap pakai `CLUSTER_TOLERANCE`
-  default 0.5% persis seperti sebelumnya — **dijamin nol regresi** (diverifikasi
-  baik lewat code inspection maupun re-run test suite existing sebelum nambah
-  test baru). `upsert_sr_zone()` terima `tolerance` yang SAMA dgn dipakai
-  `detect_zones()` supaya `zone_bucket_key()` konsisten antar re-run (tidak
-  drift). Summary dict + `_print_summary()` tampilkan persentase toleransi
-  aktual dgn catatan "(kalibrasi IDX, DRAFT)" vs "(default)". 4 test baru
-  (`test_calibration.py`) + 2 test baru (`test_run_analysis.py`, regression
-  guard non-IDX + assert toleransi IDX terpakai benar), 276 test total hijau.
-  **Diverifikasi live**: `python -m pipeline.run_analysis --instrument BBCA`
-  -> toleransi 0.816% (25×2÷6175, sesuai harga BBCA riil ~Rp6175), 0 zona baru
-  (bucket existing tetap match, tidak drift); `--instrument TSLA` -> tetap
-  0.500% default (bukan IDX, tidak terpengaruh sama sekali).
+**Update — J-3: ARA/ARB sizing buffer (§18 decision #4, LOCKED) + price
+fraction zone tolerance (§13.1 point 4, DRAFT) complete (13 Jul 2026):**
+- **ARA/ARB 1.5× buffer** (`analysis/sizing.py`) — `suggest_position_size()`
+  takes a new parameter `has_daily_limit: bool`. If `True` (read
+  automatically from `instrument_metadata.has_daily_limit`, not manual user
+  input), the SL distance is multiplied by `ARA_ARB_BUFFER_MULT = 1.5`
+  before being used to calculate position size — shrinking
+  `suggested_units` so real risk doesn't exceed budget if the price gaps
+  past the SL when hit by ARA/ARB (an auto-rejected order on IDX, unlike
+  the US's LULD circuit-breaker which can still be closed out). This is a
+  **§18 locked** decision, not a draft — no further Giel revision needed.
+  The `/api/sizing/suggest` API response now includes
+  `nominal_risk_per_unit` (the original SL distance, unbuffered) alongside
+  `risk_per_unit` (already buffered) — Panel 6 (`panel6.js`) explicitly
+  shows both when the buffer is applied ("ARA/ARB 1.5x buffer applied:
+  nominal distance X → Y") so Giel can see the calculation transparently,
+  not just the final number. 3 new tests (`test_sizing.py`), verified
+  live: BBCA (`has_daily_limit=1`) correctly shows nominal 100 →
+  buffered 150 in the Panel 6 browser.
+- **Price fraction (tick size) zone tolerance** (`analysis/calibration.py`,
+  new file) — the official table from BEI Regulation No. II-A (confirmed
+  via WebSearch, not guessed): price <Rp200 → Rp1 fraction; Rp200-500 →
+  Rp2; Rp500-2k → Rp5; Rp2k-5k → Rp10; ≥Rp5k → Rp25.
+  `idx_zone_tolerance_pct()` computes the S&R clustering tolerance as a
+  relative percentage (`fraction × 2 ticks ÷ reference price`) — **DRAFT**,
+  `IDX_ZONE_TOLERANCE_TICKS = 2` still needs Giel's confirmation/revision
+  after bar-replay validation per §13.1 point 5 ("an engine tested on BTC
+  ≠ tested on BBRI"), DIFFERENT from the ARA/ARB buffer above which is
+  already final. `pipeline/run_analysis.py::run_analysis()` checks
+  `instrument_metadata.market` — if `'IDX'`, tolerance is computed from
+  the LATEST close via this function; other instruments (all existing
+  macro/index: BTC/GOLD/IHSG/SP500/USDIDR/
+  USDJPY, no `instrument_metadata` row) still use the default
+  `CLUSTER_TOLERANCE` of 0.5% exactly as before — **guaranteed zero
+  regression** (verified both via code inspection and re-running the
+  existing test suite before adding new tests). `upsert_sr_zone()` takes
+  the `tolerance` that is the SAME one used by `detect_zones()` so
+  `zone_bucket_key()` stays consistent across re-runs (no drift). The
+  summary dict + `_print_summary()` show the actual tolerance percentage
+  with a note "(IDX calibration, DRAFT)" vs "(default)". 4 new tests
+  (`test_calibration.py`) + 2 new tests (`test_run_analysis.py`,
+  regression guard for non-IDX + assert IDX tolerance correctly used),
+  276 tests green total. **Verified live**: `python -m pipeline.run_analysis
+  --instrument BBCA` -> tolerance 0.816% (25×2÷6175, matching BBCA's real
+  price ~Rp6175), 0 new zones (existing buckets still match, no drift);
+  `--instrument TSLA` -> stays at the 0.500% default (not IDX, unaffected
+  entirely).
 
-**Update — Mekanisme validasi lane / bar-replay sign-off selesai (13 Jul
-2026, kontrak §13.1 poin 5):** Giel review "Tidak usah, saya review langsung
-dari Panel 5" utk materi persiapan bar-replay (tidak butuh dibangunkan alat
-bantu khusus) — TAPI dia tetap butuh **jalur untuk merekam hasil** review itu
-begitu selesai, karena `instrument_metadata.lane`/`lane_validated_at`
-sebelumnya tidak ada UI/API sama sekali buat menulisnya (cuma terisi manual
-lewat `sqlite3` langsung, tidak scalable & tidak ada jejak audit). Dibangun:
-- **Tabel baru `lane_validation_log`** (`db/schema.sql`, append-only, pola
-  sama `intake_log`/`grader_log`) — `evidence TEXT NOT NULL`, jejak
-  instrument/old_lane/new_lane/validated_at per keputusan. `db/connection.py`
-  `EXPECTED_TABLES` + `tests/test_db.py` diupdate (21 → 22 tabel).
-- **`web/writes.py::validate_lane()`** — SATU-SATUNYA jalur yang boleh
-  mengubah `instrument_metadata.lane` / mengisi `lane_validated_at`. Guard di
-  level fungsi (bukan cuma UI, pola sama `save_intake_metadata`/
-  `save_grade_override`): `evidence` wajib non-kosong, `new_lane` harus salah
-  satu TRADE/INVEST/BOTH/NONE, return `None` kalau instrumen belum ada di
-  `instrument_metadata` (harus intake dulu). TIDAK PERNAH dipanggil otomatis
-  oleh `run_analysis`/`seed_universe`/backfill manapun — murni tindakan
-  manual lewat form. `list_lane_validation_log()` utk riwayat, filter
-  opsional per instrumen.
-- **Routes baru** `POST /api/emiten/<ticker>/validate_lane` +
+**Update — Lane validation / bar-replay sign-off mechanism complete (13 Jul
+2026, contract §13.1 point 5):** Giel's review was "No need, I'll review
+directly from Panel 5" for bar-replay prep material (no special tool
+needed) — BUT he still needs **a path to record the result** of that review
+once done, because `instrument_metadata.lane`/`lane_validated_at`
+previously had NO UI/API at all to write it (only fillable manually via
+direct `sqlite3`, not scalable & no audit trail). Built:
+- **New table `lane_validation_log`** (`db/schema.sql`, append-only, same
+  pattern as `intake_log`/`grader_log`) — `evidence TEXT NOT NULL`, a
+  trail of instrument/old_lane/new_lane/validated_at per decision.
+  `db/connection.py`'s `EXPECTED_TABLES` + `tests/test_db.py` updated
+  (21 → 22 tables).
+- **`web/writes.py::validate_lane()`** — the ONLY path allowed to change
+  `instrument_metadata.lane` / fill `lane_validated_at`. Guarded at the
+  function level (not just the UI, same pattern as
+  `save_intake_metadata`/`save_grade_override`): `evidence` mandatory
+  non-empty, `new_lane` must be one of TRADE/INVEST/BOTH/NONE, returns
+  `None` if the instrument doesn't yet exist in `instrument_metadata`
+  (must be intaken first). NEVER called automatically by any
+  `run_analysis`/`seed_universe`/backfill — purely a manual action via the
+  form. `list_lane_validation_log()` for history, with optional
+  per-instrument filter.
+- **New routes** `POST /api/emiten/<ticker>/validate_lane` +
   `GET /api/lane_validation_log` (`web/app.py`).
-- **Panel 8 UI baru** (`panel8_universe.html`/`panel8.js`): section "Validasi
-  Lane (Bar-Replay Sign-off)" (ticker + dropdown lane baru + textarea
-  evidence wajib) + tabel "Riwayat Validasi Lane" (kolom lane lama→baru +
-  evidence), wired ke `refreshAll()` di `main.js`.
-- 7 test baru (`test_web_writes.py`: reject lane tidak dikenal, reject
-  evidence kosong, return None kalau belum intake, update metadata + log
-  evidence dgn benar, filter log per instrumen), 281 test total hijau.
-  **Diverifikasi live** via browser (fetch langsung, bukan klik form, supaya
-  tidak menyentuh judgment BBCA/TSLA yang sebenarnya): intake ticker
-  disposable `ZZTEST` → validasi TRADE dgn evidence → cek log tercatat benar
-  → **dibersihkan lagi dari DB produksi** (0 row tersisa, dikonfirmasi
-  query). BBCA & TSLA TETAP `lane=INVEST`, `lane_validated_at=NULL` seperti
-  semula — mekanisme sudah siap, tapi keputusan bar-replay yang sebenarnya
-  tetap milik Giel sepenuhnya, tidak difabrikasi di sini.
+- **New Panel 8 UI** (`panel8_universe.html`/`panel8.js`): a "Lane
+  Validation (Bar-Replay Sign-off)" section (ticker + new-lane dropdown +
+  mandatory evidence textarea) + a "Lane Validation History" table
+  (columns for old→new lane + evidence), wired into `refreshAll()` in
+  `main.js`.
+- 7 new tests (`test_web_writes.py`: reject unknown lane, reject empty
+  evidence, return None if not yet intaken, correctly updates metadata +
+  logs evidence, filter log per instrument), 281 tests green total.
+  **Verified live** via browser (a direct fetch, not clicking the form, so
+  as not to touch the real BBCA/TSLA judgment): intake a disposable
+  `ZZTEST` ticker → validate to TRADE with evidence → check the log
+  recorded correctly → **cleaned back out of the production DB** (0 rows
+  left, confirmed by query). BBCA & TSLA REMAIN `lane=INVEST`,
+  `lane_validated_at=NULL` as before — the mechanism is ready, but the
+  actual bar-replay decision remains entirely Giel's, not fabricated here.
 
-**Update — J-9 data plumbing + draft prompt equity slice (13 Jul 2026):**
-Giel minta "lanjutkan" 3 hal sekaligus (bar-replay validation, kalibrasi
-§13, prompt J-9) — utk J-9, split lagi jadi "mekanisme" (bisa dibangun) vs
-"suara/kata-kata prompt" (harus Giel sendiri, sama seperti keputusan
-sebelumnya di Track D bahwa prompt persona adalah cara berpikir Giel).
+**Update — J-9 data plumbing + draft equity slice prompt (13 Jul 2026):**
+Giel asked to "go ahead" on 3 things at once (bar-replay validation, §13
+calibration, the J-9 prompt) — for J-9, this was again split into
+"mechanism" (can be built) vs. "voice/prompt wording" (must be Giel
+himself, same as the earlier decision in Track D that the persona prompt is
+Giel's own way of thinking).
 - **Data plumbing** (`pipeline/compose_persona_context.py`) —
   `_equity_fundamentals_lines()` (fundamentals_quarterly + emiten_grade +
-  foreign-flow-per-saham J-8, per instrumen di `instrument_metadata`) dan
-  `_earnings_calendar_lines()` (earnings_calendar J-7, peruntukannya utk
-  AKELA sudah ditulis eksplisit di komentar schema sejak J-7 dibangun) —
-  ditambahkan ke `_slice_rivan()` dan `_slice_akela()`. Instrumen bank
-  (`is_financial=1`) tampil NII/CAR/NPL/NIM/LDR, non-bank tampil
-  Revenue/NetIncome/FCF + flag `confidence` (FULL/LOW_CONFIDENCE). Grade
-  tampil kuadran+score+override Giel (kalau ada, ASLI tetap terlihat
-  bareng). GEMA/LEON TIDAK disentuh (disiplin slice, konsisten dgn pola
-  IHSG foreign flow yg sudah ada). 9 test baru
-  (`test_compose_persona_context.py`), 287 test total hijau. **Diverifikasi
-  live** thd DB produksi: RIVAN slice tampil BBCA (bank, CAR/NPL/NIM/LDR
-  masih `n/a` krn belum diisi manual Giel, NII terisi dari yfinance,
-  grade WATCH score=100, foreign flow -14.912.000 lembar) + TSLA (Revenue/
-  NetIncome/FCF terisi, confidence=LOW_CONFIDENCE, grade WATCH score=100);
-  AKELA slice tampil earnings BBCA & TSLA 2026-07-22 dgn forecast EPS.
-- **Prompt teks itu sendiri BELUM diubah** — didraft terpisah di
-  `docs/j9_equity_slice_prompt_draft.md` (proposal, BUKAN ditulis ke
-  `prompts/persona_rivan.txt`/`persona_akela.txt` yang gitignored/personal
-  IP Giel). Draft mengusulkan RIVAN dapat penjelasan data equity + panduan
-  "grade bukan vonis final", AKELA dapat penjelasan earnings-date sbg event
-  risk terjadwal. GEMA/LEON sengaja tidak diusulkan berubah sama sekali.
-  Giel yang putuskan apakah dipakai, diedit, atau dibuang.
+  the J-8 per-stock foreign-flow, per instrument in `instrument_metadata`)
+  and `_earnings_calendar_lines()` (earnings_calendar J-7, its intended use
+  for AKELA was already explicitly written in the schema comment since
+  J-7 was built) — added to `_slice_rivan()` and `_slice_akela()`. Bank
+  instruments (`is_financial=1`) show NII/CAR/NPL/NIM/LDR, non-banks show
+  Revenue/NetIncome/FCF + a `confidence` flag (FULL/LOW_CONFIDENCE). Grade
+  shows quadrant+score+Giel's override (if any, the ORIGINAL still
+  visible alongside). GEMA/LEON are UNTOUCHED (slice discipline,
+  consistent with the existing IHSG foreign flow pattern). 9 new tests
+  (`test_compose_persona_context.py`), 287 tests green total. **Verified
+  live** against the production DB: the RIVAN slice shows BBCA (bank,
+  CAR/NPL/NIM/LDR still `n/a` since not yet manually filled by Giel, NII
+  filled from yfinance, grade WATCH score=100, foreign flow -14,912,000
+  shares) + TSLA (Revenue/NetIncome/FCF filled, confidence=LOW_CONFIDENCE,
+  grade WATCH score=100); the AKELA slice shows BBCA & TSLA earnings
+  2026-07-22 with forecast EPS.
+- **The prompt text itself has NOT been changed** — drafted separately in
+  `docs/j9_equity_slice_prompt_draft.md` (a proposal, NOT written into
+  `prompts/persona_rivan.txt`/`persona_akela.txt` which are gitignored/
+  Giel's personal IP). The draft proposes giving RIVAN an explanation of
+  the equity data + guidance that "a grade isn't a final verdict", and
+  giving AKELA an explanation of the earnings date as a scheduled event
+  risk. GEMA/LEON are deliberately not proposed to change at all. It's
+  Giel's call whether to use it, edit it, or discard it.
 
-**Update — Panel 1 "Cek & Backfill Semua Gap" (14 Jul 2026):** Giel menunjuk
-sistem deteksi gap yang sudah ada (`/api/data_gaps`, per-instrument dropdown)
-sudah informatif — pertanyaannya kenapa masih harus pilih instrument satu-satu
-kalau sistem sudah tahu semua yang bolong. Dibangun:
-- **`web/app.py::_all_instruments_with_gaps(conn)`** — fungsi pure (DB-only,
-  tanpa network) yang deteksi gap utk SEMUA instrument sekaligus: macro
-  (`INSTRUMENT_SOURCE`, 13 instrumen) + universe ekuitas Phase J+
-  (`instrument_metadata`, kalender WEEKDAY). Instrumen tanpa histori sama
-  sekali (`total_rows=0`) DILEWATI sengaja — itu backfill awal yang butuh
-  keputusan sadar (instrument mana, dari tanggal berapa), bukan "isi gap"
-  otomatis. Kalender `WEEKLY_WED` juga dilewati (pola sama `/api/data_gaps`).
-- **`POST /api/backfill/all/preview`** — pakai fungsi di atas utk cari
-  kandidat, lalu panggil `backfill_mod.backfill(..., preview_only=True)`
-  (network fetch asli) per instrument utk range gap-nya masing-masing.
-  Instrument yang gagal fetch dicatat error-nya, TIDAK menghentikan
-  instrument lain (pola sama `safe_call` scraper).
-- **`POST /api/backfill/all/commit`** — commit HANYA item yang sudah
-  di-preview (body `{"items": [...]}`, bukan deteksi ulang) — menghindari
-  drift kalau gap berubah di antara 2 request, request/response symmetric
-  dgn alur single-instrument existing.
-- **Panel 1 UI** (`panel1_snapshot.html`/`panel1.js`) — tombol baru "Cek &
-  Preview Semua Gap" di bawah form Manual Backfill existing, render tabel
-  instrument/range-gap/baru/duplikat + tombol "Commit Semua (N instrument)".
-  Setelah commit, `loadDataGaps()` dipanggil ulang supaya info gap dropdown
-  yang sedang dipilih ikut ter-refresh.
-- 5 test baru (`test_web_app.py`, DB-seeded, tanpa network — mirror pola
-  `_detect_gaps` existing): gap macro, skip instrument tanpa histori, skip
-  kalender WEEKLY_WED, include universe ekuitas (WEEKDAY), no-gap→hasil
-  kosong. 292 test total hijau. **Diverifikasi live thd DB produksi**: preview
-  menemukan gap asli BTC (2026-07-11 s.d. 2026-07-12, 2 baris), commit
-  menulis 2 baris baru (4.316→4.318), info gap dropdown BTC otomatis
-  ter-refresh jadi "tidak ada gap terdeteksi" — data yang ditulis REAL
-  (bukan dummy, tidak perlu dibersihkan).
+**Update — Panel 1 "Check & Backfill All Gaps" (14 Jul 2026):** Giel pointed out
+that the existing gap-detection system (`/api/data_gaps`, per-instrument dropdown)
+is already informative — the question was why you still have to pick instruments
+one by one when the system already knows everything that's missing. Built:
+- **`web/app.py::_all_instruments_with_gaps(conn)`** — a pure function (DB-only,
+  no network) that detects gaps for ALL instruments at once: macro
+  (`INSTRUMENT_SOURCE`, 13 instruments) + the Phase J+ equity universe
+  (`instrument_metadata`, WEEKDAY calendar). Instruments with no history at all
+  (`total_rows=0`) are SKIPPED on purpose — that's an initial backfill that needs
+  a conscious decision (which instrument, from what date), not an automatic
+  "fill the gap". The `WEEKLY_WED` calendar is also skipped (same pattern as
+  `/api/data_gaps`).
+- **`POST /api/backfill/all/preview`** — uses the function above to find
+  candidates, then calls `backfill_mod.backfill(..., preview_only=True)` (real
+  network fetch) per instrument for its own gap range. Instruments that fail to
+  fetch have their error recorded, WITHOUT stopping the other instruments (same
+  pattern as the scraper's `safe_call`).
+- **`POST /api/backfill/all/commit`** — commits ONLY the items that were already
+  previewed (body `{"items": [...]}`, not a re-detection) — avoids drift if the
+  gap changes between the 2 requests, request/response symmetric with the
+  existing single-instrument flow.
+- **Panel 1 UI** (`panel1_snapshot.html`/`panel1.js`) — new "Check & Preview All
+  Gaps" button below the existing Manual Backfill form, renders a table of
+  instrument/gap-range/new/duplicate + a "Commit All (N instruments)" button.
+  After commit, `loadDataGaps()` is called again so the gap info for the
+  currently selected dropdown also gets refreshed.
+- 5 new tests (`test_web_app.py`, DB-seeded, no network — mirrors the existing
+  `_detect_gaps` pattern): macro gap, skip instrument with no history, skip the
+  WEEKLY_WED calendar, include the equity universe (WEEKDAY), no-gap → empty
+  result. 292 tests total green. **Verified live against the production DB**:
+  preview found a real BTC gap (2026-07-11 through 2026-07-12, 2 rows), commit
+  wrote 2 new rows (4,316→4,318), the BTC gap-info dropdown auto-refreshed to
+  "no gap detected" — the data written is REAL (not dummy, no need to clean up).
 
-**Update — Migrasi FE ke Vue 3 + Vite, Fase 0-2 selesai (14 Jul 2026):** Giel
-minta "jalankan semua fase build FE" mengikuti rencana `docs/migrationFE.md`
-(app paralel + strangler cutover, keputusan sebelumnya: Vue 3 + Vite +
-PrimeVue, chart dibungkus apa adanya, backend tidak disentuh). Node/npm
-ternyata sudah diinstall Giel sendiri via nvm sebelum sesi ini (`v24.16.0`);
-scaffold Vite+Vue juga sudah pernah dijalankan Giel tapi ke-nested salah
-lokasi (`web/frontend/web/frontend/`, kemungkinan dijalankan dari dalam
-`web/frontend/`) — dipindah ke lokasi benar (`web/frontend/`), node_modules
-yang sudah ter-install dipertahankan.
-- **Fase 0** (scaffold): Vue Router (8 route 1:1 dgn tab lama) + Pinia +
-  PrimeVue (preset Aura) + proxy dev `/api` → Flask. Diverifikasi live:
-  data asli `/api/latest` termuat lewat proxy, routing SPA jalan.
-- **Fase 1** (fondasi bersama): `src/lib/api.js`, `src/lib/format.js`,
-  `src/components/DataTable.vue` (wrap PrimeVue DataTable, dipakai ~11
-  tabel), `src/composables/useAppToast.js`.
-- **Fase 2** (migrasi 8 panel): SEMUA 8 view selesai & diverifikasi live thd
-  DB produksi (bukan data dummy) — Snapshot (cards+backfill+backfill-semua-
-  gap), News, Forward (paling banyak form: econ calendar inline-edit,
-  expectations, positioning, policy tracker, disonansi), Reading (persona
-  cards + PrimeVue Dialog), Chart (SVG candlestick DIBUNGKUS APA ADANYA,
-  `rollingMA`/`drawCandleChart`/`drawMiniLine` dipindah ke
-  `src/lib/chartMath.js` nyaris verbatim, dimigrasi TERAKHIR sesuai
-  rencana), Synthesis, Riwayat (4 sub-tab), Universe (paling besar, 8
-  sub-bagian termasuk validasi lane & grader log). **Bug ditemukan &
-  diperbaiki SEBELUM produksi**: `ForwardView` awal pakai 1 `ref` bersama
-  utk semua input econ calendar "Actual" yang kosong — salah kalau >1 baris
-  butuh diisi bersamaan (kasus nyata, econ calendar biasa banyak event
-  future tanpa actual) — diperbaiki jadi state per-baris.
-- Verifikasi live mencakup: switch instrument BTC↔BBCA di Chart (harga +
-  lane badge ikut berubah benar), Detail Emiten BBCA di Universe (tabel
-  fundamentals bank-spesifik + LOW_CONFIDENCE flag tampil benar), search/
-  sort/paginate DataTable, Economic Calendar dgn actual sudah terisi vs
-  kosong. `npm run build` sukses (~200KB gzip total, code-split per view).
-- **Fase 3 (cutover + login) SELESAI (14 Jul 2026)**. Dijeda dulu utk
-  konfirmasi eksplisit Giel sebelum menghapus kode lama (lihat update di
-  bawah) — setelah dikonfirmasi, dieksekusi penuh:
-  - **Auth**: `@app.before_request` di `web/app.py` menolak (401) semua
-    `/api/*` kecuali `/api/auth/{login,status}` sampai `session["authed"]`.
-    `DASHBOARD_PASSWORD` wajib diisi manual di `.env` — TIDAK PERNAH
-    di-generate/default oleh kode (beda dari `RISK_CAPITAL_*` yang memang
-    placeholder angka; ini kredensial, aku tidak pernah mengetik/menguji
-    nilai aslinya sendiri). Kosong -> login endpoint menolak dgn pesan
-    jelas. `FLASK_SECRET_KEY` opsional. Password dibanding pakai
-    `secrets.compare_digest` (constant-time).
-  - **Serving**: route SPA catch-all (didaftarkan paling akhir) menyajikan
-    `web/frontend/dist/` — Flask `/` sekarang SATU proses/port utk API +
-    frontend, tidak perlu Vite dev server terpisah utk pemakaian sehari-hari.
-  - **Vue**: `src/stores/auth.js` (Pinia) + `src/views/LoginView.vue` +
-    router guard (`src/router/index.js`) + redirect otomatis ke `/login`
-    kalau sesi expired (`src/lib/api.js`).
-  - Kode vanilla lama (`web/templates/`, `web/static/` — 8 partial HTML +
-    10 file JS + 1 CSS) **dihapus**, Giel sendiri yang commit (`f7168f2
-    "Migrate to Vue JS"`), bukan auto-commit dariku — tetap recoverable
-    via `git show bcfa625:web/templates/index.html` dkk kalau perlu.
-  - **Diverifikasi**: redirect ke `/login` saat belum auth, 401 di `/api/*`
-    tanpa cookie, semua asset ke-serve benar (network tab: 200/304, nol
-    404), dan SETELAH Giel isi password & login sendiri — sidebar+tombol
-    Keluar+data real tampil benar dari sesi ter-autentikasi. Backend/API +
-    292 test Python tetap tidak berubah sama sekali di seluruh proses ini.
+**Update — FE migration to Vue 3 + Vite, Phases 0-2 complete (14 Jul 2026):**
+Giel asked to "run all FE build phases" following the plan in
+`docs/migrationFE.md` (parallel app + strangler cutover, prior decision: Vue 3 +
+Vite + PrimeVue, chart wrapped as-is, backend untouched). Node/npm turned out to
+already be installed by Giel himself via nvm before this session (`v24.16.0`);
+the Vite+Vue scaffold had also already been run by Giel but nested in the wrong
+location (`web/frontend/web/frontend/`, likely run from inside `web/frontend/`)
+— moved to the correct location (`web/frontend/`), the already-installed
+node_modules were kept.
+- **Phase 0** (scaffold): Vue Router (8 routes 1:1 with the old tabs) + Pinia +
+  PrimeVue (Aura preset) + dev proxy `/api` → Flask. Verified live: real
+  `/api/latest` data loaded through the proxy, SPA routing works.
+- **Phase 1** (shared foundation): `src/lib/api.js`, `src/lib/format.js`,
+  `src/components/DataTable.vue` (wraps PrimeVue DataTable, used by ~11
+  tables), `src/composables/useAppToast.js`.
+- **Phase 2** (migration of 8 panels): ALL 8 views done & verified live against
+  the production DB (not dummy data) — Snapshot (cards+backfill+backfill-all-
+  gaps), News, Forward (the form-heaviest one: inline-edit econ calendar,
+  expectations, positioning, policy tracker, dissonance), Reading (persona
+  cards + PrimeVue Dialog), Chart (SVG candlestick WRAPPED AS-IS,
+  `rollingMA`/`drawCandleChart`/`drawMiniLine` moved to `src/lib/chartMath.js`
+  nearly verbatim, migrated LAST per the plan), Synthesis, History (4
+  sub-tabs), Universe (the biggest, 8 sub-sections including lane validation &
+  grader log). **Bug found & fixed BEFORE production**: `ForwardView` initially
+  used 1 shared `ref` for all empty "Actual" econ-calendar inputs — wrong if
+  >1 row needs to be filled at the same time (a real case, econ calendars
+  commonly have many future events without an actual) — fixed to per-row
+  state.
+- Live verification covered: switching instrument BTC↔BBCA in Chart (price +
+  lane badge change correctly), Issuer Detail for BBCA in Universe
+  (bank-specific fundamentals table + LOW_CONFIDENCE flag display correctly),
+  DataTable search/sort/paginate, Economic Calendar with actuals already
+  filled in vs empty. `npm run build` succeeds (~200KB gzip total, code-split
+  per view).
+- **Phase 3 (cutover + login) COMPLETE (14 Jul 2026)**. Paused first for
+  explicit confirmation from Giel before deleting the old code (see the
+  update below) — after being confirmed, fully executed:
+  - **Auth**: `@app.before_request` in `web/app.py` rejects (401) all
+    `/api/*` except `/api/auth/{login,status}` until `session["authed"]`.
+    `DASHBOARD_PASSWORD` must be filled in manually in `.env` — NEVER
+    generated/defaulted by code (different from `RISK_CAPITAL_*`, which
+    really is a placeholder number; this is a credential, I never
+    typed/tested its actual value myself). Empty → login endpoint rejects
+    with a clear message. `FLASK_SECRET_KEY` optional. Password is compared
+    using `secrets.compare_digest` (constant-time).
+  - **Serving**: an SPA catch-all route (registered last) serves
+    `web/frontend/dist/` — Flask `/` is now ONE process/port for both API +
+    frontend, no separate Vite dev server needed for everyday use.
+  - **Vue**: `src/stores/auth.js` (Pinia) + `src/views/LoginView.vue` + a
+    router guard (`src/router/index.js`) + automatic redirect to `/login` if
+    the session expires (`src/lib/api.js`).
+  - The old vanilla code (`web/templates/`, `web/static/` — 8 partial HTML
+    files + 10 JS files + 1 CSS) was **deleted**, Giel himself committed it
+    (`f7168f2 "Migrate to Vue JS"`), not an auto-commit from me — still
+    recoverable via `git show bcfa625:web/templates/index.html` etc. if
+    needed.
+  - **Verified**: redirect to `/login` when not authenticated, 401 on
+    `/api/*` without a cookie, all assets served correctly (network tab:
+    200/304, zero 404s), and AFTER Giel filled in the password & logged in
+    himself — the sidebar + Logout button + real data displayed correctly
+    from the authenticated session. The backend/API + 292 Python tests
+    remained completely unchanged throughout this entire process.
 
-**Update — Snapshot: 2 trigger (Berita + Backfill) + rapikan Manual Backfill
-(28 Jul 2026):** Giel minta "2 trigger" yang jalan sekarang: Berita (tidak
-bisa di-backfill tanggal lampau, RSS cuma sajikan yang live) dan Backfill
-(data market, isi gap tanggal lampau) — dipisah krn tujuan beda, bukan
-duplikat.
-- **`POST /api/run_daily_now`** (baru) — panggil `pipeline.run_daily.
-  run_daily()` langsung dari tombol "Trigger Berita (Sekarang)" di
-  `SnapshotView.vue`. Sebelumnya Giel harus minta run manual lewat terminal
-  tiap kali cron WSL tidak jalan (kejadian berulang, lihat entri di atas) —
-  sekarang bisa dipicu sendiri dari UI.
-- **Checkbox di "Cek & Preview Semua Gap"** — tabel hasil sekarang punya
-  kolom centang per instrument (default semua tercentang), tombol jadi
-  "Commit Terpilih (N instrument)" — bisa uncheck instrument yang tidak mau
-  di-commit, tidak lagi all-or-nothing.
-- **Form Manual Backfill per-instrument DIHAPUS** (dropdown Instrument +
-  Dari/Sampai tanggal + Preview/Commit) — Giel bilang redundan dengan "Cek &
-  Preview Semua Gap" yang sudah cek semua instrument sekaligus. Endpoint
-  backend yang jadi tidak terpakai ikut dihapus: `GET /api/data_gaps`,
-  `POST /api/backfill/preview`, `POST /api/backfill/commit` (fungsi
-  `_detect_gaps`/`INSTRUMENT_SOURCE` TETAP ada, masih dipakai
-  `_all_instruments_with_gaps` utk jalur "semua gap").
-- Diverifikasi: 404 test Python hijau, `npm run build` bersih, endpoint baru
-  diverifikasi via Flask test-client (temp DB, `run_daily` di-monkeypatch
-  supaya tidak fetch network beneran).
+**Update — Snapshot: 2 triggers (News + Backfill) + tidy up Manual Backfill
+(28 Jul 2026):** Giel asked for "2 triggers" that run now: News (can't be
+backfilled for past dates, RSS only serves what's live) and Backfill (market
+data, fills gaps for past dates) — kept separate because their purposes
+differ, not a duplicate.
+- **`POST /api/run_daily_now`** (new) — calls `pipeline.run_daily.
+  run_daily()` directly from the "Trigger News (Now)" button in
+  `SnapshotView.vue`. Previously Giel had to ask for a manual run via
+  terminal every time the WSL cron didn't run (a recurring occurrence, see
+  the entry above) — now it can be triggered from the UI itself.
+- **Checkbox in "Check & Preview All Gaps"** — the results table now has a
+  check column per instrument (all checked by default), the button becomes
+  "Commit Selected (N instruments)" — you can uncheck an instrument you
+  don't want to commit, no longer all-or-nothing.
+- **Manual Backfill per-instrument form REMOVED** (Instrument dropdown +
+  From/To date + Preview/Commit) — Giel said it was redundant with "Check &
+  Preview All Gaps", which already checks all instruments at once. The
+  backend endpoints that became unused were removed too: `GET
+  /api/data_gaps`, `POST /api/backfill/preview`, `POST /api/backfill/commit`
+  (the `_detect_gaps`/`INSTRUMENT_SOURCE` functions STILL exist, still used
+  by `_all_instruments_with_gaps` for the "all gaps" path).
+- Verified: 404 Python tests green, `npm run build` clean, the new endpoints
+  verified via the Flask test client (temp DB, `run_daily` monkeypatched so
+  it doesn't actually hit the network).
 
-**Update — News Threads: batas 7 ACTIVE dicabut (28 Jul 2026):** Giel coba
-aktifkan/bikin thread, kena blok batas 7 (keputusan #5, §20.1 kontrak) —
-minta eksplisit batasan dihapus, dia sendiri yang tentukan berapa banyak
-thread & mana yang ACTIVE/DORMANT lewat status field yang sudah ada.
-- `MAX_ACTIVE_THREADS` + guard COUNT-check di `save_thread()` (`web/writes.py`)
-  dihapus total. `patch_thread()` (reaktivasi DORMANT→ACTIVE) tidak pernah
-  punya guard serupa, jadi tidak ada perubahan di situ.
-- Frontend: teks "Maksimal 7 thread ACTIVE" + "{{activeCount}}/7 thread
-  ACTIVE" di `ThreadsView.vue` diubah jadi cuma nampilkan jumlah, tidak
-  nyebut batas lagi. `active_count`/`list_threads_with_stats` tetap ada
-  (masih berguna sebagai info, cuma bukan lagi angka thd batas keras).
-- Test lama `test_save_thread_enforces_max_active` diganti
-  `test_save_thread_no_longer_caps_active_count` (bikin 8 thread ACTIVE
-  sekaligus, harus sukses semua).
-- `docs/phase_j_build_contract_v1_3_LOCKED.md` §20.1: teks keputusan #5
-  di-strikethrough + dianotasi (bukan dihapus, historinya tetap kelihatan).
-- Diverifikasi: pytest full suite hijau, `npm run build` bersih.
+**Update — News Threads: the 7-ACTIVE cap lifted (28 Jul 2026):** Giel tried
+to activate/create a thread, hit the cap of 7 (decision #5, §20.1 of the
+contract) — explicitly asked for the limit to be removed, he wants to decide
+himself how many threads there are and which ones are ACTIVE/DORMANT via the
+existing status field.
+- `MAX_ACTIVE_THREADS` + the COUNT-check guard in `save_thread()`
+  (`web/writes.py`) were removed entirely. `patch_thread()` (DORMANT→ACTIVE
+  reactivation) never had a similar guard, so nothing changed there.
+- Frontend: the text "Maximum 7 ACTIVE threads" + "{{activeCount}}/7 ACTIVE
+  threads" in `ThreadsView.vue` was changed to just show the count, no longer
+  mentioning a limit. `active_count`/`list_threads_with_stats` are unchanged
+  (still useful as info, just no longer a count against a hard limit).
+- The old test `test_save_thread_enforces_max_active` was replaced with
+  `test_save_thread_no_longer_caps_active_count` (creates 8 ACTIVE threads at
+  once, all must succeed).
+- `docs/phase_j_build_contract_v1_3_LOCKED.md` §20.1: decision #5's text is
+  struck through + annotated (not deleted, its history stays visible).
+- Verified: full pytest suite green, `npm run build` clean.
 
-**Update — Mode Ringkas & PWA Mobile v1.0 disimpan + Langkah 1 dieksekusi
-(28 Jul 2026):** Giel tulis dokumen desain penuh (`docs/mode_ringkas_pwa_
-mobile_v1.md`) — sesi habit 5-menit untuk hari sibuk (BAGIAN A) + wadah PWA
-mobile-nya (BAGIAN B), dengan urutan garapan murah-dulu (BAGIAN C, 5 langkah,
-mulai NOL kode). Prinsip pengikat: app ini habit engine, metrik sukses =
-streak harian, bukan kelengkapan fitur.
-- Langkah 1 (NOL kode) dieksekusi: section baru "Mode Ringkas — sesi 5 menit
-  (hari sibuk)" ditambahkan ke `docs/SOP.md` §1 (versi dibump 1.1→1.2) --
-  aksi WAJIB (catat/nilai 1 prediksi), INTI, BONUS, dan daftar yang TIDAK ada
-  di Mode Ringkas, sama persis strukturnya dgn dokumen sumber.
-- Langkah 2-5 (view `/m`, PWA manifest+service worker, capture ringan, APK
-  native) SENGAJA belum digarap — masing-masing menunggu bukti pemakaian
-  dari langkah sebelumnya (pola "pakai-lalu-bangun" yang Giel tulis sendiri),
-  bukan dibangun sekaligus di muka.
+**Update — Mode Ringkas (Quick Mode) & Mobile PWA v1.0 design saved + Step 1
+executed (28 Jul 2026):** Giel wrote a full design document
+(`docs/mode_ringkas_pwa_mobile_v1.md`) — a 5-minute habit session for busy
+days (PART A) + its mobile PWA container (PART B), with a cheap-first build
+order (PART C, 5 steps, starting from ZERO code). Guiding principle: this app
+is a habit engine, success metric = daily streak, not feature completeness.
+- Step 1 (ZERO code) executed: a new section "Mode Ringkas — 5-minute session
+  (busy day)" added to `docs/SOP.md` §1 (version bumped 1.1→1.2) — the
+  MANDATORY action (log/score 1 prediction), CORE, BONUS, and the list of
+  what's NOT in Mode Ringkas, with exactly the same structure as the source
+  document.
+- Steps 2-5 (the `/m` view, PWA manifest+service worker, light capture,
+  native APK) were DELIBERATELY not built yet — each waits for evidence of
+  usage from the previous step (the "use-then-build" pattern Giel wrote
+  himself), rather than being built all at once up front.
 
-**Update — PWA + `/m` Mode Ringkas dibangun sekaligus (31 Jul 2026):** Giel
-eksplisit minta skip Langkah 2 (pakai `/m` polos 1-2 minggu dulu) dan
-langsung Langkah 3 (PWA penuh) — override urutan "pakai-lalu-bangun" yang
-dia tulis sendiri di `docs/mode_ringkas_pwa_mobile_v1.md`.
-- **`web/frontend/src/views/MobileView.vue`** (baru, route `/m`) — layar
-  tunggal scroll vertikal sesuai wireframe §B.2: header status data
-  (source_flags 🟢/🔴), WAJIB (catat/nilai prediksi), INTI (berita HIGH +
-  for_reading + konfirmasi tag/thread SUGGESTED inline), BONUS (ringkasan
-  thread ACTIVE, klik → timeline), Posisi ONGOING (silang dgn earnings
-  warning). **100% reuse endpoint yang sudah ada** (§B.4) — `/api/latest`,
-  `/api/prediction/{due,add,score}`, `/api/news`, `/api/content_tags/*`,
-  `/api/threads/*`, `/api/journal`, `/api/earnings/warnings` — nol endpoint
-  baru. Endpoint keputusan (approve, sizing, backfill, settings, jalankan
-  persona) sengaja tidak pernah dipanggil dari view ini.
-- **`App.vue`/`router/index.js`** — `/m` render standalone tanpa sidebar
-  shell (sama seperti `/login`), bukan bagian dari 7 nav group desktop.
-- **PWA** (`vite.config.js`, plugin `vite-plugin-pwa`) — manifest
-  (`start_url: /m`, `display: standalone`, warna gelap sesuai tema),
-  service worker `registerType: autoUpdate`, `navigateFallbackDenylist`
-  utk `/api/*` (SW tidak pernah cache/serve response API — data selalu
-  fresh dari network, app ini installable bukan offline-first). Ikon
-  di-generate dari 1 source SVG (`@vite-pwa/assets-generator`, dev-only
-  tool) — huruf "K" di atas warna `--bg` gelap, set lengkap 64/192/512 +
+**Update — PWA + `/m` Mode Ringkas built all at once (31 Jul 2026):** Giel
+explicitly asked to skip Step 2 (use plain `/m` for 1-2 weeks first) and go
+straight to Step 3 (full PWA) — overriding the "use-then-build" order he
+wrote himself in `docs/mode_ringkas_pwa_mobile_v1.md`.
+- **`web/frontend/src/views/MobileView.vue`** (new, route `/m`) — a single
+  vertically-scrolling screen per wireframe §B.2: data-status header
+  (source_flags 🟢/🔴), MANDATORY (log/score prediction), CORE (HIGH news +
+  for_reading + inline SUGGESTED tag/thread confirmation), BONUS (ACTIVE
+  thread summary, click → timeline), ONGOING Positions (crossed with
+  earnings warnings). **100% reuse of existing endpoints** (§B.4) —
+  `/api/latest`, `/api/prediction/{due,add,score}`, `/api/news`,
+  `/api/content_tags/*`, `/api/threads/*`, `/api/journal`,
+  `/api/earnings/warnings` — zero new endpoints. Decision endpoints
+  (approve, sizing, backfill, settings, run persona) are deliberately never
+  called from this view.
+- **`App.vue`/`router/index.js`** — `/m` renders standalone without the
+  sidebar shell (same as `/login`), not part of the 7 desktop nav groups.
+- **PWA** (`vite.config.js`, `vite-plugin-pwa` plugin) — manifest
+  (`start_url: /m`, `display: standalone`, dark color matching the theme),
+  service worker `registerType: autoUpdate`, `navigateFallbackDenylist` for
+  `/api/*` (the SW never caches/serves API responses — data is always fresh
+  from the network, this app is installable, not offline-first). Icons
+  generated from 1 source SVG (`@vite-pwa/assets-generator`, dev-only tool)
+  — the letter "K" over the dark `--bg` color, a full set of 64/192/512 +
   maskable + apple-touch-icon.
-- Diverifikasi: `npm run build` bersih (manifest.webmanifest + sw.js +
-  workbox chunk ter-generate), pytest 404 tetap hijau (backend tidak
-  disentuh sama sekali sesi ini), dicek langsung di browser (build produksi
-  via `kastara-web`): manifest ter-serve benar, keempat ikon 200 OK, service
-  worker script terpasang, nol console error sampai halaman login. Tidak
-  bisa verifikasi konten `/m` di baliknya (aturan kredensial) atau install
-  home-screen sungguhan (butuh HTTPS asli dari HP, belum dites Tailscale) —
-  keduanya menunggu Giel coba sendiri.
+- Verified: `npm run build` clean (manifest.webmanifest + sw.js + workbox
+  chunk generated), pytest 404 still green (backend untouched at all this
+  session), checked directly in the browser (production build via
+  `kastara-web`): the manifest served correctly, all four icons 200 OK, the
+  service worker script installed, zero console errors up to the login
+  page. Could NOT verify the content of `/m` behind it (credential rule) or
+  a real home-screen install (needs real HTTPS from a phone, not yet tested
+  via Tailscale) — both await Giel trying it himself.
 
-**Update — Track A: Railway deploy scaffolding, tetap SQLite (31 Jul 2026):**
-Giel putuskan deploy ke Railway TANPA migrasi Postgres (ARCHITECTURE §6.1
-trigger "cloud managed" fired, tapi app tetap single-user/single-writer,
-jadi diselesaikan pakai Railway Volume, bukan ganti database) — lihat
-`docs/deploy.md` §7 utk rasional & checklist Railway lengkap.
-- **`Dockerfile`** (baru, multi-stage) + **`.dockerignore`** (baru) —
-  `node:22-alpine` build frontend, `python:3.12-slim` runtime, `gunicorn
-  web.app:app --workers 2 --timeout 300` (timeout digenerouskan utk
-  `/api/run_daily_now`, lihat entri Snapshot 28 Jul di atas).
-- **`requirements.txt`** — tambah `gunicorn`.
-- **`web/app.py`** — `init_db()` dipindah ke level modul (dari dalam
-  `main()`) -- WAJIB krn gunicorn import modul langsung, tidak pernah
-  eksekusi `if __name__ == "__main__"`. Tanpa ini, Volume kosong di deploy
-  pertama bikin API pertama gagal (tabel belum ada).
-- **`tests/test_web_app.py`** — set `KASTARA_DB_PATH` ke file temp SEBELUM
-  `from web.app import ...`, krn perubahan di atas berarti sekadar
-  IMPORT modul ini sekarang memicu `init_db()` — tanpa guard ini, test
-  akan diam-diam nyentuh DB produksi asli via `.env` lokal Giel (ditemukan
-  saat verifikasi sesi ini, DB produksi TIDAK sempat berubah krn skema
-  sudah fully-migrated jadi `init_db()` jadi no-op idempoten kebetulan —
-  tapi tetap bug laten yang harus ditutup, bukan dibiarkan).
-- **`.env.example`** — catatan `FLASK_SECRET_KEY` sekarang WAJIB diisi
-  eksplisit utk deploy Railway (opsional cuma utk dev lokal) -- tanpa ini,
-  tiap redeploy invalidate semua sesi login.
-- Diverifikasi: `docker build` sukses, `docker run` + smoke test end-to-end
-  (`/` 200, `/api/auth/login` + `/api/auth/status` + `/api/latest`
-  authenticated semua jalan benar di dalam container), image test dihapus
-  setelah verifikasi. `pytest` full suite tetap 404 hijau.
-- **Belum dieksekusi** (butuh akun Railway Giel sendiri): buat project,
-  attach Volume, set env vars, deploy pertama, upload DB asli via `railway
-  ssh`, tambah service cron kedua — checklist lengkap di `docs/deploy.md`
-  §7.3.
+**Update — Track A: Railway deploy scaffolding, staying on SQLite (31 Jul
+2026):** Giel decided to deploy to Railway WITHOUT a Postgres migration
+(ARCHITECTURE §6.1's "cloud managed" trigger fired, but the app is still
+single-user/single-writer, so it's solved with a Railway Volume, not a
+database swap) — see `docs/deploy.md` §7 for the full rationale & Railway
+checklist.
+- **`Dockerfile`** (new, multi-stage) + **`.dockerignore`** (new) —
+  `node:22-alpine` builds the frontend, `python:3.12-slim` runtime,
+  `gunicorn web.app:app --workers 2 --timeout 300` (the timeout was made
+  generous for `/api/run_daily_now`, see the Snapshot 28 Jul entry above).
+- **`requirements.txt`** — added `gunicorn`.
+- **`web/app.py`** — `init_db()` moved to module level (out of `main()`) —
+  MANDATORY because gunicorn imports the module directly and never executes
+  `if __name__ == "__main__"`. Without this, an empty Volume on first
+  deploy makes the very first API call fail (table doesn't exist yet).
+- **`tests/test_web_app.py`** — set `KASTARA_DB_PATH` to a temp file BEFORE
+  `from web.app import ...`, because the change above means merely
+  IMPORTING this module now triggers `init_db()` — without this guard,
+  tests would silently touch the real production DB via Giel's local
+  `.env` (found during this session's verification; the real production DB
+  did NOT end up changing, since the schema was already fully migrated so
+  `init_db()` happened to be an idempotent no-op — but still a latent bug
+  that had to be closed, not left alone).
+- **`.env.example`** — a note that `FLASK_SECRET_KEY` is now REQUIRED to be
+  set explicitly for Railway deploys (optional only for local dev) —
+  without this, every redeploy invalidates all login sessions.
+- Verified: `docker build` succeeds, `docker run` + an end-to-end smoke test
+  (`/` 200, `/api/auth/login` + `/api/auth/status` + `/api/latest` all
+  working correctly, authenticated, inside the container), the test image
+  deleted after verification. `pytest` full suite still 404 green.
+- **Not yet executed** (needs Giel's own Railway account): create project,
+  attach Volume, set env vars, first deploy, upload the real DB via
+  `railway ssh`, add a second cron service — full checklist in
+  `docs/deploy.md` §7.3.
 
-Sesuai `plan.txt`: **jangan lompat phase tanpa instruksi baru.** Kalau ada
-kebutuhan mendesak di luar urutan (seperti Phase 1 kemarin), itu boleh — tapi
-harus tercatat di sini dengan jelas kenapa keluar urutan, supaya roadmap tetap
-mencerminkan kenyataan, bukan rencana ideal yang sudah basi.
+Per `plan.txt`: **don't skip phases without new instructions.** If there's an
+urgent need outside the order (like Phase 1 the other day), that's allowed —
+but it must be recorded here clearly, explaining why it went out of order, so
+the roadmap keeps reflecting reality rather than a stale ideal plan.
 
-**Update — /universe: Langkah 1 restrukturisasi 4 tab (31 Jul 2026):** Giel
-tulis dokumen desain penuh (`docs/universe_portfolio_restructure_v1.md`) --
-diagnosis kenapa halaman /universe pusing dibaca (8 section campur frekuensi
-harian/kuartalan, 5 form ticker-scoped berdiri sendiri, tidak ada hierarki
-baca), plus rencana Portfolio/Holdings tracker (komponen baru, Langkah 4-6,
-belum digarap). Disepakati eksekusi Langkah 1 saja sesi ini (murah, cepat
-lega) -- Langkah 2-6 (drawer per-ticker, tabel holdings, alokasi vs SOP,
-guard) menunggu instruksi lanjutan.
-- **`UniverseView.vue`** direstruktur jadi 4 tab (custom tab-bar, bukan
-  PrimeVue TabView -- konsisten gaya hand-rolled sidebar `App.vue`): Universe
-  (tabel + Detail Emiten/Override + Validasi Lane + Rasio Bank -- 4 section
-  ticker-scoped ini SEMENTARA tetap di sini, belum pindah ke drawer),
-  Portofolio (placeholder, isi menyusul Langkah 4), Intake (Intake Kandidat
-  + Uji Kelayakan + Riwayat Keputusan Intake), Log & Audit (Riwayat Validasi
-  Lane + Grader Log). **Isi tiap section TIDAK diubah sama sekali** --
-  murni regroup + reorder, sesuai batasan eksplisit Langkah 1 di dokumen.
-- Diverifikasi: `npm run build` bersih, pytest 403 hijau (1 skip pre-existing
-  tidak terkait). Tidak ada perubahan backend sesi ini.
-- (Catatan operasional, tidak terkait konten): ditemukan alias `nvm default`
-  di WSL menunjuk versi Node yang tidak terpasang (`lts/*` -> v24.18.1,
-  padahal cuma v24.16.0/v20.20.2 yang ada) -- itu sebabnya `npm run build`
-  sempat gagal "command not found" di tengah sesi. Diperbaiki dengan
-  `nvm alias default v24.16.0`. Bukan bug kode, murni environment lokal.
+**Update — /universe: Step 1, restructuring into 4 tabs (31 Jul 2026):** Giel
+wrote a full design document (`docs/universe_portfolio_restructure_v1.md`) —
+a diagnosis of why the /universe page is dizzying to read (8 sections mixing
+daily/quarterly frequency, 5 standalone ticker-scoped forms, no reading
+hierarchy), plus a plan for a Portfolio/Holdings tracker (new component,
+Steps 4-6, not yet built). Agreed to execute only Step 1 this session (cheap,
+quick relief) — Steps 2-6 (per-ticker drawer, holdings table, allocation vs
+SOP, guards) await further instruction.
+- **`UniverseView.vue`** restructured into 4 tabs (custom tab-bar, not
+  PrimeVue TabView — consistent with the hand-rolled `App.vue` sidebar
+  style): Universe (table + Issuer Detail/Override + Lane Validation + Bank
+  Ratios — these 4 ticker-scoped sections TEMPORARILY stay here, not yet
+  moved to the drawer), Portfolio (placeholder, content to follow in Step
+  4), Intake (Intake Candidates + Feasibility Test + Intake Decision
+  History), Log & Audit (Lane Validation History + Grader Log). **The
+  content of each section was NOT changed at all** — purely regroup +
+  reorder, per the explicit constraint of Step 1 in the document.
+- Verified: `npm run build` clean, pytest 403 green (1 pre-existing
+  unrelated skip). No backend changes this session.
+- (Operational note, unrelated to content): found that the `nvm default`
+  alias in WSL pointed to a Node version that wasn't installed (`lts/*` ->
+  v24.18.1, when only v24.16.0/v20.20.2 were actually present) — that's why
+  `npm run build` briefly failed with "command not found" mid-session.
+  Fixed with `nvm alias default v24.16.0`. Not a code bug, purely a local
+  environment issue.
 
-**Update — /universe: Langkah 2, Detail Emiten jadi drawer (3 Agustus
-2026):** Lanjutan restrukturisasi (`docs/universe_portfolio_restructure_v1.md`).
-- **`DataTable.vue`** (komponen shared, dipakai ~10 view lain) — tambah
-  `v-bind="$attrs"` ke `PDataTable` internal, supaya listener/attribute
-  yang dilempar ke wrapper (mis. `@row-click`, `class`) diteruskan ke tabel
-  PrimeVue asli. Komponen ini multi-root (fragment), jadi tanpa ini
-  fallthrough attrs Vue 3 otomatis dibuang. Backward-compatible penuh --
-  view lain yang tidak lempar attrs tambahan tidak berubah perilakunya
-  (dikonfirmasi: prop yang sudah dideklarasikan tidak pernah masuk $attrs).
-- **`UniverseView.vue`** — tabel Universe sekarang `@row-click` buka
-  `<Drawer>` (PrimeVue, posisi kanan) berisi persis isi section "Detail
-  Emiten (Komponen B)" lama (termasuk form Override yang sudah menempel di
-  situ sejak sebelumnya) -- ticker otomatis dari baris yang diklik, form
-  input ticker manual + tombol "Lihat Detail" dihapus total. Validasi Lane
-  & Rasio Bank BELUM dipindah (masih section standalone) -- itu Langkah 3.
-  Baris tabel dapat `cursor:pointer` (`.clickable-rows :deep(tbody tr)`).
-- Diverifikasi LANGSUNG di browser (Giel login sendiri, aku hanya baca
-  halaman setelahnya — aturan kredensial tetap): klik baris BBCA membuka
-  drawer berisi metadata/lane/grade/fundamentals/override BBCA dengan
-  benar, screenshot dikonfirmasi. Sempat ketemu halaman ter-cache oleh
-  service worker PWA (Langkah 3 Aug sesi sebelumnya) yang menyajikan bundle
-  lama meski sudah `npm run build` ulang -- diperbaiki dgn unregister SW +
-  clear cache workbox via console, bukan bug kode.
-- `npm run build` bersih, pytest 403 hijau (1 skip pre-existing).
+**Update — /universe: Step 2, Issuer Detail becomes a drawer (3 August
+2026):** Continuation of the restructuring
+(`docs/universe_portfolio_restructure_v1.md`).
+- **`DataTable.vue`** (shared component, used by ~10 other views) — added
+  `v-bind="$attrs"` to the internal `PDataTable`, so listeners/attributes
+  passed to the wrapper (e.g. `@row-click`, `class`) are forwarded to the
+  actual PrimeVue table. This component is multi-root (a fragment), so
+  without this, Vue 3's automatic fallthrough attrs get dropped. Fully
+  backward-compatible — other views that don't pass extra attrs have
+  unchanged behavior (confirmed: props already declared never end up in
+  $attrs).
+- **`UniverseView.vue`** — the Universe table's `@row-click` now opens a
+  `<Drawer>` (PrimeVue, right-side position) containing exactly the content
+  of the old "Issuer Detail (Component B)" section (including the Override
+  form that had already been attached there since before) — the ticker
+  comes automatically from the clicked row, the manual ticker-input field +
+  "View Detail" button were removed entirely. Lane Validation & Bank Ratios
+  have NOT been moved yet (still standalone sections) — that's Step 3.
+  Table rows get `cursor:pointer` (`.clickable-rows :deep(tbody tr)`).
+- Verified DIRECTLY in the browser (Giel logged in himself, I only read the
+  page afterward — credential rule maintained): clicking the BBCA row opens
+  a drawer containing BBCA's metadata/lane/grade/fundamentals/override
+  correctly, confirmed by screenshot. Ran into a page cached by the PWA
+  service worker (Step 3 Aug, previous session) that served an old bundle
+  even after `npm run build` was rerun — fixed by unregistering the SW +
+  clearing the workbox cache via the console, not a code bug.
+- `npm run build` clean, pytest 403 green (1 pre-existing skip).
 
-**Update — /universe: Langkah 3, Validasi Lane + Rasio Bank pindah ke
-drawer (3 Agustus 2026):** Lanjutan langsung dari Langkah 2 di atas, sesi
-yang sama.
-- **`UniverseView.vue`** — section standalone "Validasi Lane" dan "Rasio
-  Bank" dihapus total; isinya pindah ke drawer yang sama dgn Detail
-  Emiten/Override (di bawah tombol Simpan Override, dipisah `<hr>` +
-  `<h4>`). Field ticker masing-masing dihapus -- `validateLane()`,
-  `saveBankRatios()`, `loadBankRatios()` sekarang pakai `detailTicker`
-  (state drawer) sebagai satu-satunya sumber ticker. `openDetailDrawer()`
-  reset `bankRatios`/`lane.evidence` tiap buka ticker baru, supaya tidak
-  ketinggalan data ticker sebelumnya.
-  Rasio Bank **cuma tampil kalau `detail.metadata.is_financial`** (docs §3:
-  "Rasio Bank -> form + riwayat (if bank)") -- guard baru yang tidak ada di
-  section standalone lama.
-  Drawer sekarang jadi satu-satunya tempat semua aksi ticker-scoped
-  (Ringkasan, Fundamental, Override, Lane, Rasio Bank) -- persis struktur
-  §3 dokumen, Langkah 2+3 selesai penuh.
-- Diverifikasi LANGSUNG di browser (bukan cuma build): klik BBCA -> drawer
-  tampilkan Override + Validasi Lane + Rasio Bank (BBCA bank, semua
-  section muncul); klik TSLA -> drawer ganti isi jadi TSLA, section Rasio
-  Bank correctly hilang (dicek via `document.querySelector` langsung,
-  bukan cuma accessibility tree yang sempat stale krn CSS transition
-  tersendat -- kemungkinan besar artefak pane browser yang tidak
-  ter-render aktif saat itu, bukan bug aplikasi).
-- `npm run build` bersih, pytest 403 hijau (1 skip pre-existing) -- tidak
-  ada perubahan backend.
-- **Sisa urutan garapan** (`docs/universe_portfolio_restructure_v1.md`
-  §5): Langkah 4 (tabel `holdings` + form + Per Provider), Langkah 5
-  (Alokasi vs SOP + Per Mata Uang), Langkah 6 (guard book/konversi/basi/
-  jurnal) -- Portfolio/Holdings tracker, belum digarap, menunggu instruksi.
+**Update — /universe: Step 3, Lane Validation + Bank Ratios move to the
+drawer (3 August 2026):** Direct continuation of Step 2 above, same session.
+- **`UniverseView.vue`** — the standalone "Lane Validation" and "Bank
+  Ratios" sections were removed entirely; their content moved into the same
+  drawer as Issuer Detail/Override (below the Save Override button,
+  separated by `<hr>` + `<h4>`). Their individual ticker fields were
+  removed — `validateLane()`, `saveBankRatios()`, `loadBankRatios()` now
+  use `detailTicker` (the drawer's state) as the single source of ticker.
+  `openDetailDrawer()` resets `bankRatios`/`lane.evidence` each time a new
+  ticker is opened, so leftover data from the previous ticker doesn't
+  linger.
+  Bank Ratios now **only shows if `detail.metadata.is_financial`** (per §3
+  of the docs: "Bank Ratios -> form + history (if bank)") — a new guard
+  that didn't exist in the old standalone section.
+  The drawer is now the single place for all ticker-scoped actions
+  (Summary, Fundamentals, Override, Lane, Bank Ratios) — exactly matching
+  the §3 document structure, Steps 2+3 fully complete.
+- Verified DIRECTLY in the browser (not just build): clicking BBCA ->
+  drawer shows Override + Lane Validation + Bank Ratios (BBCA is a bank,
+  all sections appear); clicking TSLA -> drawer switches content to TSLA,
+  the Bank Ratios section correctly disappears (checked via
+  `document.querySelector` directly, not just the accessibility tree,
+  which was briefly stale due to a stuttering CSS transition — most likely
+  a browser-pane rendering artifact that wasn't actively rendered at that
+  moment, not an app bug).
+- `npm run build` clean, pytest 403 green (1 pre-existing skip) — no
+  backend changes.
+- **Remaining work** (`docs/universe_portfolio_restructure_v1.md` §5): Step
+  4 (`holdings` table + form + Per Provider), Step 5 (Allocation vs SOP +
+  Per Currency), Step 6 (book/conversion/staleness/journal guards) — the
+  Portfolio/Holdings tracker, not yet built, awaiting instructions.
 
-**Update — /universe: Langkah 4, tabel `holdings` + form + Per Provider
-(3 Agustus 2026):** Komponen baru Portfolio/Holdings tracker (bukan
-lanjutan struktur tab, ini isi TAB 2 yang sebelumnya placeholder).
-- **`db/schema.sql`** — tabel ke-28, `holdings` (universal utk semua jenis
-  aset: saham/emas/kripto/reksadana/valas, pola sama `asset_ohlcv`).
-  `book` (TRADE/INVEST) NOT NULL di level schema DAN divalidasi di write
-  function (pesan error jelas, bukan raw IntegrityError). `linked_journal_id`
-  BOLEH NULL sekalipun book=TRADE -- flag "TRADE tanpa jurnal" itu Langkah
-  6, bukan blocker di Langkah 4. `EXPECTED_TABLES` (db/connection.py) +
-  `tests/test_db.py` (27→28) diupdate.
-- **`web/writes.py`**: `create_holding()` (guard instrument/provider/unit
-  non-kosong, book ∈ {TRADE,INVEST}, currency ∈ {IDR,USD,SGD}, quantity>0)
-  + `list_holdings()` (filter book/provider, sembunyikan is_closed=1 by
-  default).
+**Update — /universe: Step 4, `holdings` table + form + Per Provider (3
+August 2026):** New component, the Portfolio/Holdings tracker (not a
+continuation of the tab structure, this is the content of TAB 2 that was
+previously a placeholder).
+- **`db/schema.sql`** — table #28, `holdings` (universal for all asset
+  types: stocks/gold/crypto/mutual funds/forex, same pattern as
+  `asset_ohlcv`). `book` (TRADE/INVEST) NOT NULL at the schema level AND
+  validated in the write function (a clear error message, not a raw
+  IntegrityError). `linked_journal_id` MAY be NULL even if book=TRADE — the
+  "TRADE without a journal" flag is Step 6, not a blocker in Step 4.
+  `EXPECTED_TABLES` (db/connection.py) + `tests/test_db.py` (27→28)
+  updated.
+- **`web/writes.py`**: `create_holding()` (guards non-empty
+  instrument/provider/unit, book ∈ {TRADE,INVEST}, currency ∈
+  {IDR,USD,SGD}, quantity>0) + `list_holdings()` (filter by book/provider,
+  hides is_closed=1 by default).
 - **`web/app.py`**: `POST /api/holdings`, `GET /api/holdings`.
-- **`UniverseView.vue`** tab Portofolio: form input minimal (instrument,
-  provider, book, quantity, unit, avg_price opsional, currency, opened_at
-  opsional, notes opsional) + view "Per Provider" (grouped, badge book
-  reuse `LANE_CLASS` krn value TRADE/INVEST sama persis dgn
-  `instrument_metadata.lane`). Panel "Yang belum dibangun (Langkah 5-6)"
-  ditinggal sebagai catatan eksplisit di UI, bukan cuma di dokumen.
-- **Bug ditemukan+diperbaiki SEBELUM sempat kena production**: 4 test baru
-  yang ditulis sempat pakai `get_connection()` tanpa path (bukan
-  `get_connection(db)`) -- artinya nyambung ke DB produksi asli, bukan
-  tmp_path. Ketahuan dari error "no such table: holdings" (test db belum
-  di-init), bukan dari eksekusi diam-diam ke prod -- tapi tetap correctness
-  bug yang harus ditutup. Diperbaiki, mtime DB produksi dicek sebelum &
-  sesudah (tidak berubah, terkonfirmasi aman).
-- Diverifikasi LANGSUNG di browser (Giel restart server-nya sendiri stale
-  sempat kena pola gunicorn/dev-reload yang sama sekali ini juga --
-  `python -m web.app` tidak hot-reload, harus restart manual tiap ubah
-  backend): submit holding nyata (BTC/Cold Wallet/INVEST/0.083 coin/USD,
-  Giel eksplisit setuju krn ini dev environment) via form, langsung muncul
-  benar di "Per Provider". `npm run build` bersih, pytest 407 hijau (1 skip
-  pre-existing).
-- **Sisa**: Langkah 5 (Alokasi vs SOP + Per Mata Uang -- butuh lebih
-  banyak data holding dulu supaya bermakna) & Langkah 6 (guard book wajib
-  di UI/konversi terkunci+alasan, indikator basi >30 hari, flag TRADE
-  tanpa linked_journal_id) -- menunggu instruksi lanjutan.
+- **`UniverseView.vue`** Portfolio tab: minimal input form (instrument,
+  provider, book, quantity, unit, optional avg_price, currency, optional
+  opened_at, optional notes) + a "Per Provider" view (grouped, book badge
+  reusing `LANE_CLASS` since the TRADE/INVEST values match
+  `instrument_metadata.lane` exactly). A "Not yet built (Steps 5-6)" panel
+  was left as an explicit note in the UI itself, not just in the document.
+- **Bug found+fixed BEFORE it could reach production**: 4 new tests written
+  briefly used `get_connection()` without a path (instead of
+  `get_connection(db)`) — meaning they connected to the actual production
+  DB, not tmp_path. Caught from a "no such table: holdings" error (the
+  test db hadn't been init'd), not from a silent execution against prod —
+  but still a correctness bug that had to be closed. Fixed, production DB
+  mtime checked before & after (unchanged, confirmed safe).
+- Verified DIRECTLY in the browser (Giel restarted his server himself —
+  this session also happened to hit the same gunicorn/dev-reload pattern
+  — `python -m web.app` doesn't hot-reload, must be restarted manually
+  every backend change): submitted a real holding (BTC/Cold Wallet/INVEST/
+  0.083 coin/USD, Giel explicitly agreed since this is a dev environment)
+  via the form, appeared correctly in "Per Provider" immediately. `npm run
+  build` clean, pytest 407 green (1 pre-existing skip).
+- **Remaining**: Step 5 (Allocation vs SOP + Per Currency — needs more
+  holding data first to be meaningful) & Step 6 (mandatory book guard in
+  the UI/locked conversion+reason, staleness indicator >30 days,
+  TRADE-without-linked_journal_id flag) — awaiting further instructions.
 
-**Update — /universe: Langkah 6, guard book conversion + indikator (3
-Agustus 2026):** Penyelesaian penuh restrukturisasi /universe + Portfolio
-Tracker (`docs/universe_portfolio_restructure_v1.md`, Langkah 1-6 semua
-selesai).
-- **`holding_book_conversion_log`** (29 tabel) -- pola sama
-  `lane_validation_log`: satu-satunya jalur ubah `book`, alasan wajib,
-  append-only, `pnl_check` mencatat hasil verifikasi P&L saat konversi
-  terjadi (bukan disembunyikan).
-- **`convert_holding_book()`** -- diblokir kalau posisi SEDANG RUGI (avg_price
-  vs close terbaru `asset_ohlcv`, §4.4 "konversi paspor saat merah selalu
-  punya motif menghindari mengakui salah"). Kalau instrumen TIDAK terlacak
-  di `asset_ohlcv` (emas fisik, cash, dll) -- P&L tidak bisa diverifikasi,
-  konversi tetap DIIZINKAN (bukan diblokir default) tapi dicatat jujur di
-  `pnl_check`, bukan diam-diam dianggap untung.
-- **Indikator basi (🟡, >30 hari) + flag TRADE-tanpa-jurnal (🔴)** -- murni
-  computed di frontend dari field yang sudah dikembalikan `list_holdings()`
-  (`last_updated`, `book`, `linked_journal_id`), nol perubahan backend
-  utk ini.
-- **"book wajib"** (poin 1 §4.4) sudah ditegakkan sejak Langkah 4 -- tidak
-  ada perubahan tambahan diperlukan, dikonfirmasi ulang saat audit Langkah 6.
-- **`POST /api/holdings/<id>/convert_book`**, **`GET /api/holdings/conversions`**
-  + section baru "Riwayat Konversi Book" di tab Log & Audit.
-- Diverifikasi LANGSUNG di browser (bukan cuma test): drawer Konversi Book
-  dibuka dari baris BTC/Cold Wallet, diisi alasan, disubmit -- book berubah
-  INVEST→TRADE, flag 🔴 langsung muncul (krn belum ada linked_journal_id),
-  dan baris log konversi muncul benar di tab Log & Audit dengan pnl_check
-  "tidak diverifikasi (instrumen tidak ada di asset_ohlcv)" -- sesuai
-  ekspektasi krn BTC memang tidak match instrument apa pun di asset_ohlcv
-  test data saat itu.
-- 5 test baru (block-saat-rugi, izinkan-saat-untung, izinkan-saat-tak-
-  terverifikasi, 4 guard error, urutan+join log) + 1 skenario tambahan di
-  test_db.py (28→29 tabel).
-- Backend perlu di-restart 2x lagi selama sesi ini (endpoint baru tiap
-  kali) -- pola yang sama berulang terus, dicatat lagi supaya tidak lupa:
-  `python -m web.app` TIDAK hot-reload.
+**Update — /universe: Step 6, book conversion guard + indicators (3 August
+2026):** Full completion of the /universe restructuring + Portfolio Tracker
+(`docs/universe_portfolio_restructure_v1.md`, Steps 1-6 all complete).
+- **`holding_book_conversion_log`** (table #29) — same pattern as
+  `lane_validation_log`: the single path to change `book`, a reason is
+  required, append-only, `pnl_check` records the outcome of the P&L
+  verification during conversion (surfaced, not hidden).
+- **`convert_holding_book()`** — blocked if the position is CURRENTLY AT A
+  LOSS (avg_price vs the latest close in `asset_ohlcv`, §4.4 "converting a
+  book while in the red always carries a motive of avoiding admitting a
+  mistake"). If the instrument is NOT tracked in `asset_ohlcv` (physical
+  gold, cash, etc.) — P&L can't be verified, the conversion is STILL
+  ALLOWED (not blocked by default) but is honestly recorded in `pnl_check`,
+  rather than silently assumed profitable.
+- **Staleness indicator (🟡, >30 days) + TRADE-without-journal flag (🔴)**
+  — purely computed on the frontend from fields already returned by
+  `list_holdings()` (`last_updated`, `book`, `linked_journal_id`), zero
+  backend changes needed for this.
+- **"Mandatory book"** (point 1, §4.4) has been enforced since Step 4 — no
+  additional change needed, re-confirmed during the Step 6 audit.
+- **`POST /api/holdings/<id>/convert_book`**, **`GET
+  /api/holdings/conversions`** + a new "Book Conversion History" section in
+  the Log & Audit tab.
+- Verified DIRECTLY in the browser (not just tests): the Book Conversion
+  drawer opened from the BTC/Cold Wallet row, a reason filled in,
+  submitted — book changed INVEST→TRADE, the 🔴 flag appeared immediately
+  (since there's no linked_journal_id yet), and the conversion log row
+  appeared correctly in the Log & Audit tab with pnl_check "not verified
+  (instrument not in asset_ohlcv)" — as expected since BTC genuinely
+  doesn't match any instrument in the asset_ohlcv test data at the time.
+- 5 new tests (block-while-losing, allow-while-profiting,
+  allow-while-unverifiable, 4 guard errors, log ordering+join) + 1
+  additional scenario in test_db.py (28→29 tables).
+- The backend needed restarting 2 more times during this session (new
+  endpoint each time) — the same recurring pattern, noted again so it
+  isn't forgotten: `python -m web.app` does NOT hot-reload.
 
-**Update — Addendum F, F-1: Secondary Opinions fondasi (4 Agustus 2026):**
-`docs/phase_j_build_contract_v1_3_LOCKED.md` §24 (Addendum F) -- lapisan
-opini sekunder (video/buku/paper/podcast) yang TERPISAH dari bukti thread,
-sesuai keputusan F1-F5 terkunci di kontrak.
-- **`secondary_opinions`** (30 tabel) -- `source_type`, `source_ref`,
-  `author`, `my_summary` (destilasi Giel, F2 -- bukan transkrip mentah),
-  `core_claim`, `testable` (TESTABLE/SPEKULATIF, F3), `my_stance`,
-  `conflict_of_interest` (F4), `thread_id` opsional. `EXPECTED_TABLES` +
-  `tests/test_db.py` (29→30 tabel) diupdate.
-- **`create_secondary_opinion()`/`list_secondary_opinions()`** di
-  `web/writes.py` + `POST`/`GET /api/secondary_opinions` di `web/app.py`.
-- **Guard F1 (non-negotiable)**: opini sekunder TIDAK PERNAH masuk
-  penghitung komposisi stance thread (`thread_stats`) -- dijamin BY
-  CONSTRUCTION (tabel terpisah, tidak pernah di-JOIN oleh `thread_stats`)
-  DAN oleh test regresi eksplisit
-  (`test_secondary_opinion_never_leaks_into_thread_stats`, sengaja isi
-  `my_stance` dengan teks "MENDUKUNG" utk pastikan tidak ada jalur yang
-  salah-baca kolom ini sebagai stance link).
-- **`ThreadDetailView.vue`**: rak "Opini Sekunder" baru, posisinya
-  SENGAJA terpisah dari section "Timeline (link CONFIRMED)" (§24.3,
-  "dilarang dicampur ke timeline") -- form 8 field lengkap + daftar opini
-  existing per thread.
-- Diverifikasi LANGSUNG di browser (Giel login manual, kredensial tidak
-  pernah dipegang sendiri): submit 1 opini video nyata ke thread "Rezim
-  Warsh Dovish" (thread_id=4) via UI -- muncul benar di rak, lalu
-  `GET /api/threads/stats` dicek ULANG setelahnya: `composition.MENDUKUNG`
-  tetap 4 (jumlah sebelum opini ditambah, tidak berubah) meski `my_stance`
-  opini yang baru disimpan sengaja berisi kata "MENDUKUNG" -- guard F1
-  terbukti jalan di data produksi asli, bukan cuma di test.
-- 5 test baru (`pytest -q`: 419 passed, 1 skipped pre-existing).
-  `npm run build` bersih.
+**Update — Addendum F, F-1: Secondary Opinions foundation (4 August 2026):**
+`docs/phase_j_build_contract_v1_3_LOCKED.md` §24 (Addendum F) — a
+secondary-opinion layer (video/book/paper/podcast) that is SEPARATE from
+thread evidence, per the locked decisions F1-F5 in the contract.
+- **`secondary_opinions`** (table #30) — `source_type`, `source_ref`,
+  `author`, `my_summary` (Giel's distillation, F2 — not a raw transcript),
+  `core_claim`, `testable` (TESTABLE/SPECULATIVE, F3), `my_stance`,
+  `conflict_of_interest` (F4), optional `thread_id`. `EXPECTED_TABLES` +
+  `tests/test_db.py` (29→30 tables) updated.
+- **`create_secondary_opinion()`/`list_secondary_opinions()`** in
+  `web/writes.py` + `POST`/`GET /api/secondary_opinions` in `web/app.py`.
+- **Guard F1 (non-negotiable)**: secondary opinions NEVER count toward a
+  thread's stance-composition tally (`thread_stats`) — guaranteed BY
+  CONSTRUCTION (separate table, never JOINed by `thread_stats`) AND by an
+  explicit regression test
+  (`test_secondary_opinion_never_leaks_into_thread_stats`, deliberately
+  fills `my_stance` with the text "MENDUKUNG" ["SUPPORTS"] to make sure no
+  path mis-reads this column as a stance link).
+- **`ThreadDetailView.vue`**: a new "Secondary Opinions" shelf, deliberately
+  placed SEPARATE from the "Timeline (CONFIRMED links)" section (§24.3,
+  "must not be mixed into the timeline") — a full 8-field form + a list of
+  existing opinions per thread.
+- Verified DIRECTLY in the browser (Giel logged in manually, credentials
+  never handled myself): submitted 1 real video opinion to the "Warsh
+  Dovish Regime" thread (thread_id=4) via the UI — appeared correctly on
+  the shelf, then `GET /api/threads/stats` was checked AGAIN afterward:
+  `composition.MENDUKUNG` ("SUPPORTS") stayed at 4 (the count before the
+  opinion was added, unchanged) even though the newly saved opinion's
+  `my_stance` deliberately contained the word "MENDUKUNG" ("SUPPORTS") —
+  the F1 guard proven to work on real production data, not just in tests.
+- 5 new tests (`pytest -q`: 419 passed, 1 pre-existing skip). `npm run
+  build` clean.
 
-**Update — Addendum F, F-2: Thread Readability (4 Agustus 2026, sesi sama):**
-`docs/phase_j_build_contract_v1_3_LOCKED.md` §24.4 -- lapis keterbacaan
-thread (hierarki, BUKAN kategori -- prinsip eksplisit kontrak: kategori
-memecah daftar & merusak busur waktu).
-- **Field baru di luar skema F-1 asli**: `secondary_opinions.relation_to_view`
-  (SEJALAN/MENANTANG, opsional). Contoh teks kontrak §24.3/24.4 butuh pecahan
-  "2 sejalan · 1 menantang" per thread -- data ini TIDAK ADA di skema F-1
-  (cuma `my_stance` bebas teks). Ditanyakan eksplisit ke Giel via
-  AskUserQuestion (bukan ditebak dari `my_stance` pakai keyword match --
-  klasifikasi editorial begini butuh keputusan Giel, bukan rule-based) --
-  Giel pilih "tambah field baru" (bukan "cukup jumlah total"). Migrasi
-  nullable, opini F-1 lama (termasuk 1 opini live-test) otomatis "belum
-  diklasifikasi", bukan ditebak masuk salah satu sisi.
-- **`news_thread_links`**: 2 kolom baru `is_milestone` (toggle manual Giel,
-  Lapis 2 §24.4 -- TIDAK PERNAH otomatis) + `is_backfill` (1 kalau link lahir
-  dari `tools/backfill_tag.py`, dipakai filter). `EXPECTED_TABLES` TIDAK
-  berubah (kolom baru di tabel lama, bukan tabel baru) -- masuk
-  `_COLUMN_MIGRATIONS` di `db/connection.py`.
-- **`web/writes.py`**: `thread_opinion_summary()` (total/sejalan/menantang/
-  unclassified per thread, reuse F1 guard -- baca `secondary_opinions` saja,
-  tidak pernah `news_thread_links`), `set_link_milestone()`, `suggest_thread_
-  links(..., is_backfill=False)` (param baru, default False = jalur pipeline
-  harian, `tools/backfill_tag.py` pass `True`), `thread_stats()` diperluas:
-  `trend_30d` (komposisi CONFIRMED 30 hari terakhir, dari `linked_at`),
-  `shift_warning` (True kalau mayoritas 30-hari beda dari mayoritas
-  keseluruhan), `milestone_count`, `opinions` (via `thread_opinion_summary`).
-  `list_thread_links()` diperluas: `is_milestone`/`is_backfill` + `tags`
-  (facet tag berita asal -- HANYA daily_news/manual_articles, policy_tracker
-  jujur array kosong krn memang bukan taggable, bukan error).
+**Update — Addendum F, F-2: Thread Readability (4 August 2026, same
+session):** `docs/phase_j_build_contract_v1_3_LOCKED.md` §24.4 — a thread
+readability layer (hierarchy, NOT categories — the contract's explicit
+principle: categories fragment the list & break the timeline arc).
+- **New field beyond the original F-1 schema**: `secondary_opinions.
+  relation_to_view` (ALIGNED/CHALLENGES, optional). The contract's example
+  text §24.3/24.4 needs a breakdown like "2 aligned · 1 challenging" per
+  thread — this data does NOT exist in the F-1 schema (only free-text
+  `my_stance`). Explicitly asked to Giel via AskUserQuestion (rather than
+  guessed from `my_stance` via keyword matching — this kind of editorial
+  classification needs Giel's decision, not a rule-based guess) — Giel
+  chose "add a new field" (not "just a total count"). Nullable migration,
+  old F-1 opinions (including the 1 live-test opinion) are automatically
+  "not yet classified", not guessed into either side.
+- **`news_thread_links`**: 2 new columns, `is_milestone` (manual toggle by
+  Giel, Layer 2 §24.4 — NEVER automatic) + `is_backfill` (1 if the link
+  originated from `tools/backfill_tag.py`, used for filtering).
+  `EXPECTED_TABLES` UNCHANGED (new columns on an old table, not a new
+  table) — went into `_COLUMN_MIGRATIONS` in `db/connection.py`.
+- **`web/writes.py`**: `thread_opinion_summary()` (total/aligned/
+  challenging/unclassified per thread, reuses the F1 guard — reads
+  `secondary_opinions` only, never `news_thread_links`),
+  `set_link_milestone()`, `suggest_thread_links(..., is_backfill=False)`
+  (new param, default False = the daily pipeline path,
+  `tools/backfill_tag.py` passes `True`), `thread_stats()` extended:
+  `trend_30d` (CONFIRMED composition over the last 30 days, from
+  `linked_at`), `shift_warning` (True if the 30-day majority differs from
+  the overall majority), `milestone_count`, `opinions` (via
+  `thread_opinion_summary`). `list_thread_links()` extended:
+  `is_milestone`/`is_backfill` + `tags` (the source news article's tag
+  facet — ONLY daily_news/manual_articles, policy_tracker honestly returns
+  an empty array since it genuinely isn't taggable, not an error).
 - **`web/app.py`**: `POST /api/threads/link/<id>/milestone`; `GET
-  /api/threads/<id>` sekarang sertakan `thread_stats()` langsung (head block
-  butuh semua field ini di 1 request, bukan panggil `/api/threads/stats`
-  yang isinya SEMUA thread).
+  /api/threads/<id>` now includes `thread_stats()` directly (the header
+  block needs all these fields in 1 request, rather than calling
+  `/api/threads/stats`, whose content is for ALL threads).
 - **`pipeline/compose_persona_context.py`**: `_thread_opinion_digest_lines()`
-  -- 1 baris per thread ACTIVE yang `persona_tags`-nya cocok lens DAN punya
-  opini (thread tanpa opini di-skip, bukan tampil "0 opini"). Larangan keras
-  §24.3 ditegakkan: TIDAK PERNAH kirim `my_summary` penuh (cuma jalur manual
-  §21.4 yang begitu), TIDAK PERNAH sentuh `news_thread_links` (F1 tetap).
-- **`ThreadDetailView.vue`**: blok ringkasan kepala thread (Lapis 1, persis
-  format kontrak: Bukti/Tren 30 hari + ⚠/Opini sekunder/umur), grup bulanan
-  `<details>` collapsible (Lapis 3 -- bulan terbaru terbuka, lama terlipat)
-  dgn toggle ★ milestone per link (Lapis 2), filter stance/tag/milestone-
-  saja/backfill-saja (client-side, murni sementara -- tidak ubah data).
-- **SENGAJA belum dibangun**: judul naratif per grup bulan (contoh kontrak
-  "Nominasi & syok harga awal") -- butuh tulisan manual Giel per periode,
-  tidak ada field/mekanisme input utk itu; grup bulanan sekarang cuma
-  hitungan+komposisi, bukan narasi. `thread_relations` (§20.1 GELOMBANG 2)
-  tetap schema-only.
-- Diverifikasi LANGSUNG di browser (restart server sendiri via preview tool
-  krn proses lama Giel sudah tidak jalan; Giel login manual): head block
-  tampil benar ("Bukti: 4 MENDUKUNG...", "Opini sekunder: 1 (0 sejalan ·
-  0 menantang) · 1 belum diklasifikasi"), toggle ★ milestone pada link nyata
-  (thread_id=4) -- `milestone_count` di head block langsung naik jadi 1,
-  filter "Milestone saja" langsung memangkas timeline 4 tautan -> 1, filter
-  tag dropdown terisi tag asli (`geo:us`/`org:fed`/`theme:inflation`/
-  `who:warsh`) dari data produksi.
-- 9 test baru writes.py (is_backfill flag, milestone toggle, tags attach,
-  trend_30d/shift_warning/milestone_count, opinion summary, relation_to_view
-  validasi) + 1 test backfill_tag.py (is_backfill=1 dari jalur backfill) +
-  2 test compose_persona_context.py (digest muncul utk lens cocok & thread
-  berisi, skip thread kosong) + 2 test test_db.py (kolom baru). Guard test
-  F1 lama (`test_secondary_opinion_never_leaks_into_thread_stats`) diupdate
-  -- `opinions` MEMANG berubah (itu tujuan F-2), tapi `composition`/
-  `trend_30d`/`shift_warning` tetap terbukti beku. `pytest -q`: 430 passed,
-  1 skipped pre-existing. `npm run build` bersih.
+  — 1 line per ACTIVE thread whose `persona_tags` match the lens AND that
+  has an opinion (threads without an opinion are skipped, not shown as "0
+  opinions"). §24.3's hard prohibition is enforced: NEVER send the full
+  `my_summary` (only the manual §21.4 path does that), NEVER touch
+  `news_thread_links` (F1 preserved).
+- **`ThreadDetailView.vue`**: a thread-header summary block (Layer 1,
+  exactly matching the contract's format: Evidence/30-day trend + ⚠/
+  secondary opinions/age), collapsible monthly `<details>` groups (Layer 3
+  — the most recent month open, older ones folded) with a ★ milestone
+  toggle per link (Layer 2), stance/tag/milestone-only/backfill-only
+  filters (client-side, purely temporary — doesn't change data).
+- **DELIBERATELY not built yet**: a narrative title per month group (per
+  the contract's example, "Nomination & initial price shock") — needs
+  Giel's manual writing per period, there's no field/mechanism for that
+  input; monthly groups currently only have counts+composition, not
+  narrative. `thread_relations` (§20.1 WAVE 2) remains schema-only.
+- Verified DIRECTLY in the browser (restarted the server myself via the
+  preview tool since Giel's old process wasn't running anymore; Giel
+  logged in manually): the header block displayed correctly ("Evidence: 4
+  SUPPORTS...", "Secondary opinions: 1 (0 aligned · 0 challenging) · 1
+  unclassified"), toggled the ★ milestone on a real link (thread_id=4) —
+  the head block's `milestone_count` immediately rose to 1, the
+  "Milestones only" filter immediately trimmed the timeline from 4 links
+  -> 1, the tag dropdown filled with real tags (`geo:us`/`org:fed`/
+  `theme:inflation`/`who:warsh`) from production data.
+- 9 new writes.py tests (is_backfill flag, milestone toggle, tags attach,
+  trend_30d/shift_warning/milestone_count, opinion summary,
+  relation_to_view validation) + 1 backfill_tag.py test (is_backfill=1
+  from the backfill path) + 2 compose_persona_context.py tests (digest
+  appears for matching, non-empty-thread lenses, skips empty threads) + 2
+  test_db.py tests (new columns). The old F1 guard test
+  (`test_secondary_opinion_never_leaks_into_thread_stats`) was updated —
+  `opinions` DOES change (that's the point of F-2), but `composition`/
+  `trend_30d`/`shift_warning` are still proven frozen. `pytest -q`: 430
+  passed, 1 pre-existing skip. `npm run build` clean.
 
-**Update — ThreadDetailView.vue: pindah ke tab (4 Agustus 2026, sesi sama):**
-Giel minta halaman thread tidak banyak scroll -- 5 section (Ringkasan,
-Saran, Timeline, Opini Sekunder, Tautkan Manual) sebelumnya numpuk vertikal
-dalam 1 halaman, terparah section "Saran" bisa 86 item tanpa tab. Diubah ke
-tab-bar (pola sama `UniverseView.vue`, `activeTab` ref + tombol), label tab
-dinamis pakai hitungan hidup ("Saran (86)", "Timeline (4)", "Opini Sekunder
-(1)") supaya isi tab kelihatan tanpa harus dibuka. Murni frontend, nol
-perubahan backend/API -- CSS `.tab-bar`/`.tab-btn` disalin ke `<style
-scoped>` `ThreadDetailView.vue` sendiri (tadinya cuma scoped ke
-`UniverseView.vue`, tidak otomatis kebagi). Diverifikasi live: build bersih,
-`pytest -q` tetap 430 passed (tidak ada logic backend yang berubah), klik
-antar-tab di browser (thread_id=4 nyata) -- data & state (filter, toggle
-milestone yang sudah di-set sebelumnya) tetap benar per tab.
+**Update — ThreadDetailView.vue: moved to tabs (4 August 2026, same
+session):** Giel asked for the thread page to not require so much
+scrolling — 5 sections (Summary, Suggestions, Timeline, Secondary Opinions,
+Manual Link) previously stacked vertically on 1 page, the worst being the
+"Suggestions" section which could have 86 items with no tabs. Changed to a
+tab bar (same pattern as `UniverseView.vue`, an `activeTab` ref + buttons),
+tab labels use live counts ("Suggestions (86)", "Timeline (4)", "Secondary
+Opinions (1)") so tab content is visible without opening it. Purely
+frontend, zero backend/API changes — the `.tab-bar`/`.tab-btn` CSS was
+copied into `ThreadDetailView.vue`'s own `<style scoped>` (it was
+previously only scoped to `UniverseView.vue`, not automatically shared).
+Verified live: build clean, `pytest -q` still 430 passed (no backend logic
+changed), clicked between tabs in the browser (a real thread_id=4) — data &
+state (filters, previously-set milestone toggles) stayed correct per tab.
 
-**Update — Railway deploy pertama + koreksi rencana cron (4 Agustus 2026):**
-Giel selesai deploy pertama ke Railway. 2 temuan lapangan yang mengoreksi
-rencana `docs/deploy.md` §7 lama:
-- **Volume belum ke-attach** -- error boot pertama
-  (`sqlite3.OperationalError: unable to open database file`) krn Volume
-  Railway ternyata dibuat lewat right-click canvas project atau Command
-  Palette (Ctrl+K), BUKAN "Settings -> Volumes" seperti dugaan awal --
-  panduan sebelumnya salah, dikoreksi setelah cek docs Railway langsung.
-- **Rencana cron via service kedua TIDAK BISA DIPAKAI** -- dicek ke docs
-  Railway (`docs.railway.com/reference/volumes`): **satu Volume cuma bisa
-  attach ke satu service**. Service kedua utk `pipeline.run_daily` (rencana
-  §7.3 langkah 7 lama) otomatis butuh Volume sendiri = DB SQLite terpisah
-  kosong, melanggar aturan §3.2 "SATU DATABASE".
-- **Solusi pengganti**: bot Telegram 2 arah, 1 command (`/run_daily`) yang
-  memicu `run_daily_mod.run_daily()` di SERVICE YANG SAMA (yang sudah punya
-  Volume asli) -- bukan proses/service terpisah. Endpoint baru
-  `POST /api/telegram/webhook` (`web/app.py`), exempt dari session auth
-  (Telegram yang panggil, bukan browser) tapi digerbangi chat_id (harus
-  sama dgn `TELEGRAM_CHAT_ID`, diam-diam diabaikan kalau beda) + opsional
-  secret token header (`TELEGRAM_WEBHOOK_SECRET`). Command jalan di
-  background thread (Telegram retry kalau webhook lambat balas,
-  `run_daily()` bisa lama) -- ack cepat dulu, ringkasan/error dikirim
-  susulan lewat `notify/telegram.py::send_message()` yang sudah ada
-  (reuse, bukan modul baru).
-- **Fresh start** (keputusan Giel) -- DB lokal lama TIDAK diupload ke
-  Railway, tetap jadi data dev; production mulai dari `init_db()` kosong.
-- 4 test baru (`tests/test_web_app.py`): ignore chat_id asing, ignore
-  command tak dikenal, trigger sukses (thread di-mock synchronous +
-  `run_daily_mod`/`send_message` di-monkeypatch, bukan network beneran),
-  guard secret token wajib kalau dikonfigurasi. `pytest -q`: 434 passed,
-  1 skipped pre-existing.
-- `docs/deploy.md` §7.3 dikoreksi (langkah upload-DB & service-kedua
-  dicoret, alasan ditulis eksplisit bukan dihapus diam-diam) + §8 baru
-  (Cron Harian via Telegram) ditambahkan lengkap dgn langkah setup manual
-  (`setWebhook` sekali via curl, butuh token/domain asli Giel -- tidak
-  dieksekusi olehku, itu kredensial/aksi publik).
-- **Belum dieksekusi** (butuh Giel jalankan sendiri): registrasi webhook ke
-  Telegram (`setWebhook` API call), verifikasi kirim `/run_daily` beneran
-  dari HP setelah service Railway hidup dgn benar.
+**Update — First Railway deploy + correction to the cron plan (4 August
+2026):** Giel finished the first Railway deploy. 2 field findings that
+corrected the old `docs/deploy.md` §7 plan:
+- **Volume wasn't attached** — a first-boot error
+  (`sqlite3.OperationalError: unable to open database file`) because a
+  Railway Volume turns out to be created via right-clicking the project
+  canvas or the Command Palette (Ctrl+K), NOT "Settings -> Volumes" as
+  originally assumed — the earlier guidance was wrong, corrected after
+  checking the Railway docs directly.
+- **The plan for cron via a second service CANNOT BE USED** — checked
+  against the Railway docs (`docs.railway.com/reference/volumes`): **one
+  Volume can only attach to one service**. A second service for
+  `pipeline.run_daily` (the old §7.3 step 7 plan) would automatically need
+  its own Volume = a separate, empty SQLite DB, violating the §3.2 "ONE
+  DATABASE" rule.
+- **Replacement solution**: a 2-way Telegram bot, 1 command (`/run_daily`)
+  that triggers `run_daily_mod.run_daily()` on the SAME SERVICE (the one
+  that already has the real Volume) — not a separate process/service. New
+  endpoint `POST /api/telegram/webhook` (`web/app.py`), exempt from
+  session auth (Telegram calls it, not a browser) but gated by chat_id
+  (must match `TELEGRAM_CHAT_ID`, silently ignored if different) + an
+  optional secret token header (`TELEGRAM_WEBHOOK_SECRET`). The command
+  runs on a background thread (Telegram retries if the webhook responds
+  slowly, `run_daily()` can take a while) — acks quickly first, the
+  summary/error is sent afterward via the existing
+  `notify/telegram.py::send_message()` (reused, not a new module).
+- **Fresh start** (Giel's decision) — the old local DB was NOT uploaded to
+  Railway, it stays as dev data; production starts from an empty
+  `init_db()`.
+- 4 new tests (`tests/test_web_app.py`): ignore foreign chat_id, ignore
+  unknown command, successful trigger (the thread mocked synchronous +
+  `run_daily_mod`/`send_message` monkeypatched, not a real network call),
+  guard requiring the secret token when configured. `pytest -q`: 434
+  passed, 1 pre-existing skip.
+- `docs/deploy.md` §7.3 corrected (the upload-DB & second-service steps
+  struck through, the reason written explicitly rather than silently
+  deleted) + a new §8 (Daily Cron via Telegram) added in full with manual
+  setup steps (`setWebhook` once via curl, needs Giel's real token/domain
+  — not executed by me, that's a credential/public action).
+- **Not yet executed** (needs Giel to run himself): registering the
+  webhook with Telegram (the `setWebhook` API call), verifying a real
+  `/run_daily` send from his phone once the Railway service is properly
+  up.
 
-**Update — Backfill berita historis via search on-site (4 Agustus 2026):**
-Setelah deploy Railway, 29 dari 43 hari `daily_news` lokal kosong (cron WSL
-tidak jalan konsisten). RSS tidak bisa mengisi ulang tanggal lampau (rolling
-window "sekarang" doang) -- 3 pendekatan dicek LANGSUNG (bukan asumsi
-dokumentasi) sebelum bangun apa pun, lihat rencana tersimpan di sesi ini:
-- **Wayback Machine CDX API** -- di-`curl` langsung ke 7 URL feed asli
-  proyek ini: nyaris nol coverage (1 snapshot dari Fed FOMC, di luar
-  jendela gap pula). Ditolak.
-- **Paid news API** (NewsAPI.org $449/bln, NewsData.io/Currents/GNews
-  lebih murah) -- tidak ada yang menjamin index sumber spesifik proyek ini
-  tanpa bayar dulu utk tes, dan langganan bulanan utk gap satu-kali tidak
-  sepadan. Ditolak.
-- **Search on-site tiap sumber sendiri** -- DITERIMA, live-tes ke 2 dari 7
-  sumber (CNBC Indonesia, ANTARA) dgn hasil positif nyata sebelum bangun
-  apa pun.
+**Update — Backfilling historical news via on-site search (4 August
+2026):** After the Railway deploy, 29 of the local `daily_news`'s 43 days
+were empty (the WSL cron didn't run consistently). RSS can't refill past
+dates (a rolling "now" window only) — 3 approaches checked DIRECTLY (not
+assumed from docs) before building anything, see the plan saved in this
+session:
+- **Wayback Machine CDX API** — `curl`'d directly against 7 of this
+  project's actual feed URLs: nearly zero coverage (1 snapshot from Fed
+  FOMC, and even that outside the gap window). Rejected.
+- **Paid news API** (NewsAPI.org $449/mo, NewsData.io/Currents/GNews
+  cheaper) — none guarantees indexing this project's specific sources
+  without paying first to test, and a monthly subscription for a one-time
+  gap isn't worth it. Rejected.
+- **On-site search per source** — ACCEPTED, live-tested against 2 of 7
+  sources (CNBC Indonesia, ANTARA) with real positive results before
+  building anything.
 
-**Yang dibangun** (`scrapers/news_archive.py`, `tools/backfill_news_
-archive.py`):
-- **CNBC Indonesia**: API JSON publik `api/v2/search-result` ditemukan
-  lewat Network tab (BUKAN didokumentasikan) -- field `dtnewsdate` (tanggal
-  terbit asli) memungkinkan filter rentang akurat, tanpa perlu headless
-  browser.
-- **ANTARA Ekonomi**: halaman search server-rendered, `requests`+
-  `BeautifulSoup` biasa cukup (diverifikasi live -- headline muncul di raw
-  HTML tanpa eksekusi JS). Tanggal di listing berupa teks relatif ("3 jam
-  lalu"/"5 hari lalu"/"kemarin"/tanggal absolut Indonesia) -- di-parse ke
-  tanggal absolut via `_parse_antara_relative_date()`, akurasi level-hari
-  (sama seperti presisi `daily_news.date`).
-- **5 sumber lain** (Investing ID, Bisnis.com, CNBC Finance/Economy, Fed
-  FOMC) SENGAJA belum ditambah -- masing-masing perlu verifikasi live yang
-  sama sebelum diasumsikan bekerja serupa (CNBC Market section, misalnya,
-  ternyata JS-rendered/infinite-scroll saat dicek).
-- Query pakai kamus `IMPACT_KEYWORDS` yang SUDAH ADA (`scrapers/feeds_
-  config.py`), bukan daftar kata baru -- targeted subset (apa yang dianggap
-  penting di pipeline ini), BUKAN replikasi "semua artikel hari itu" (itu
-  butuh listing per-tanggal yang ternyata JS-rendered, di luar scope
-  sesi ini).
-- `tools/backfill_news_archive.py` -- pola preview→konfirmasi→commit sama
-  seperti `pipeline/backfill.py`, `--yes` utk skip prompt, hasil masuk lewat
-  `insert_news_dedup()` yang sudah ada (tidak ada jalur insert baru).
-- 16 test baru (`tests/test_news_archive.py` + `tests/test_backfill_news_
-  archive.py`) -- termasuk test LIVE NETWORK (pola sama `test_news.py`
-  yang sudah ada, bukan mock) utk kedua fungsi pencarian, mock hanya utk
-  test orkestrasi CLI (dedup, source-gagal-tidak-hentikan-yang-lain,
-  preview/commit flow) supaya tidak spam request eksternal tiap test run.
-  `pytest -q`: 450 passed, 1 skipped pre-existing.
-- **Diverifikasi hidup, bukan simulasi**: dijalankan sungguhan (temp DB,
-  bukan produksi) thd gap asli 2026-06-16..2026-06-24 -- **33 artikel nyata
-  ditemukan di 8 dari 9 hari gap**. Bukti konkret, bukan klaim teoretis.
-- **DIEKSEKUSI ke DB lokal asli** (4 Agustus 2026, `--since 2026-06-16
-  --until 2026-07-26`, satu panggilan cakup semua 6 jendela gap terpisah --
-  `INSERT OR IGNORE` aman utk hari yang sudah terisi di antaranya, 5 dari
-  189 kandidat kena dedup): **184 baris baru masuk `daily_news` (3311 ->
-  3495)**. Hasil: 39 dari 43 hari sekarang punya berita (naik dari 14
-  sebelumnya), sisa 4 hari kosong (2026-06-21, 06-27, 07-11, 07-12) --
-  kemungkinan memang hari sepi utk 26 kata kunci HIGH/MED yang dipakai,
-  belum dicoba kata kunci lebih luas.
-- **Belum dieksekusi**: replikasi ke DB Railway (fresh-start production) --
-  perlu export+apply ulang pola yang sama seperti migrasi news/chart
-  sebelumnya, kapan Giel siap. Giel eksplisit minta scope lebih luas dari
-  sekadar isi gap ("data is power, mungkin bisa belajar dari masa lalu")
-  tapi memilih tetap prioritaskan 29 hari gap dulu (bukan tarik sejauh
-  mungkin ke belakang) -- opsi tarik lebih jauh (~6-12 bulan realistis,
-  BUKAN sampai 2010 -- kedalaman search API CNBC dites langsung: capped
-  10.000 hasil, utk keyword umum cuma tembus ~11 bulan ke belakang;
-  paginasi ANTARA juga tidak reliable lewat ~page 100) masih terbuka
-  kalau nanti diminta.
+**What was built** (`scrapers/news_archive.py`,
+`tools/backfill_news_archive.py`):
+- **CNBC Indonesia**: a public JSON API `api/v2/search-result` found via
+  the Network tab (NOT documented) — the `dtnewsdate` field (real publish
+  date) allows accurate range filtering, no headless browser needed.
+- **ANTARA Ekonomi**: a server-rendered search page, plain
+  `requests`+`BeautifulSoup` is enough (verified live — headlines appear
+  in the raw HTML without executing JS). The date in the listing is
+  relative text ("3 hours ago"/"5 days ago"/"yesterday"/an absolute
+  Indonesian-format date) — parsed to an absolute date via
+  `_parse_antara_relative_date()`, day-level accuracy (same precision as
+  `daily_news.date`).
+- **5 other sources** (Investing ID, Bisnis.com, CNBC Finance/Economy, Fed
+  FOMC) DELIBERATELY not added yet — each needs the same live verification
+  before assuming it works similarly (CNBC's Market section, for example,
+  turned out to be JS-rendered/infinite-scroll when checked).
+- Queries use the ALREADY-EXISTING `IMPACT_KEYWORDS` dictionary
+  (`scrapers/feeds_config.py`), not a new word list — a targeted subset
+  (what this pipeline considers important), NOT a replication of "every
+  article that day" (that would need a per-date listing that turned out to
+  be JS-rendered, out of scope for this session).
+- `tools/backfill_news_archive.py` — a preview→confirm→commit pattern same
+  as `pipeline/backfill.py`, `--yes` to skip the prompt, results go in
+  through the existing `insert_news_dedup()` (no new insert path).
+- 16 new tests (`tests/test_news_archive.py` +
+  `tests/test_backfill_news_archive.py`) — including LIVE NETWORK tests
+  (same pattern as the existing `test_news.py`, not mocked) for both
+  search functions, mocking only for the CLI orchestration tests (dedup,
+  one-source-failing-doesn't-stop-others, preview/commit flow) to avoid
+  spamming external requests on every test run. `pytest -q`: 450 passed,
+  1 pre-existing skip.
+- **Verified live, not simulated**: run for real (temp DB, not production)
+  against the real gap 2026-06-16..2026-06-24 — **33 real articles found
+  across 8 of 9 gap days**. Concrete evidence, not a theoretical claim.
+- **EXECUTED against the real local DB** (4 August 2026, `--since
+  2026-06-16 --until 2026-07-26`, one call covering all 6 separate gap
+  windows — `INSERT OR IGNORE` safely handles days already filled in
+  between, 5 of 189 candidates got deduped): **184 new rows into
+  `daily_news` (3311 -> 3495)**. Result: 39 of 43 days now have news (up
+  from 14 before), the remaining 4 empty days (2026-06-21, 06-27, 07-11,
+  07-12) — likely genuinely quiet days for the 26 HIGH/MED keywords used,
+  hasn't been tried with broader keywords yet.
+- **Not yet executed**: replicating to the Railway DB (fresh-start
+  production) — needs an export+re-apply of the same pattern as the
+  earlier news/chart migration, whenever Giel is ready. Giel explicitly
+  asked for broader scope than just filling the gap ("data is power, maybe
+  we can learn from the past") but chose to prioritize the 29-day gap
+  first (not pull as far back as possible) — the option to pull further
+  back (~6-12 months realistic, NOT all the way to 2010 — the depth of
+  CNBC's search API was tested directly: capped at 10,000 results, for
+  common keywords that only reaches back ~11 months; ANTARA's pagination
+  is also unreliable past ~page 100) remains open if requested later.
 
-**Update — Perluas backfill sampai 1 Januari 2026 (4 Agustus 2026, sesi
-sama):** Giel minta lengkapi lebih jauh ke belakang. `search_cnbcindonesia`
-di-upgrade dari 1-halaman relevance-sort (`isrelevance=1`, top-20 doang) ke
-paginasi bertingkat date-sort (`isrelevance=0`, diverifikasi live urut
-tanggal-terbaru-dulu bersih) -- `page_size`/`max_pages` (default 15, dari
-10) menggantikan param `limit` lama, berhenti begitu 1 halaman penuh sudah
-lebih tua dari `date_from`.
-- **Dites dulu keterbatasan nyata sebelum dijalankan lebar-lebar**:
-  keyword umum ("bank indonesia") butuh ~7.200 item (360 halaman) utk
-  tembus Januari -- TIDAK REALISTIS. Tapi keyword frekuensi sedang ("cpi",
-  "earnings") tembus Januari cuma dgn 300 item (15 halaman) -- jadi
-  cakupan penuh mustahil per-keyword, tapi cakupan PARSIAL-TAPI-NYATA lewat
-  gabungan 21 keyword tetap berharga.
-- **Dijalankan ke DB lokal asli**: `--since 2026-01-01 --until 2026-06-14`
-  -- **516 baris baru** (0 duplikat, semua kandidat baru krn rentang belum
-  pernah disentuh). `daily_news` sekarang **2026-01-01 s/d 2026-07-27,
-  4011 baris total** (dari 3495 sebelumnya).
-- **Hasil akhir cakupan 208 hari (1 Jan - 27 Jul)**: 186 hari ADA berita,
-  22 hari masih kosong (banyak yg kemungkinan akhir pekan/hari sepi genuine
-  utk 21 kata kunci HIGH/MED yang dipakai, bukan berarti scraper gagal --
-  belum diverifikasi satu-satu mana yang akhir pekan vs beneran kelewat).
-- Data yang TERSEDIA tapi BELUM dipakai (lihat respons ke Giel soal
-  "data apa saja yg bisa di-scrape"): CNBC Indonesia API JSON balikin FULL
-  body artikel (`strisi`, HTML lengkap), nama+profil penulis, kategori/
-  kanal, tag topik (`strkeyword_name`), gambar -- proyek ini cuma ambil
-  headline+URL+tanggal+ringkasan (sama seperti field yang dipakai RSS asli,
-  §22.1 D3 "HIGH saja"), sengaja tidak menyimpan body lengkap (prinsip F2/
-  D2 di kontrak: destilasi/ekstraktif, bukan transkrip mentah/artikel utuh
-  tersimpan berlebih).
+**Update — Extend the backfill to January 1, 2026 (4 August 2026, same
+session):** Giel asked to go further back. `search_cnbcindonesia` was
+upgraded from single-page relevance-sort (`isrelevance=1`, top-20 only) to
+tiered date-sort pagination (`isrelevance=0`, verified live to sort cleanly
+newest-first) — `page_size`/`max_pages` (default 15, up from 10) replace
+the old `limit` param, stopping once a full page is already older than
+`date_from`.
+- **Real limits tested first before running broadly**: a common keyword
+  ("bank indonesia") needs ~7,200 items (360 pages) to reach January — NOT
+  REALISTIC. But medium-frequency keywords ("cpi", "earnings") reach
+  January with just 300 items (15 pages) — so full coverage per-keyword is
+  impossible, but PARTIAL-BUT-REAL coverage via a combination of 21
+  keywords is still worthwhile.
+- **Run against the real local DB**: `--since 2026-01-01 --until
+  2026-06-14` — **516 new rows** (0 duplicates, all candidates new since
+  the range had never been touched). `daily_news` is now **2026-01-01
+  through 2026-07-27, 4011 total rows** (up from 3495).
+- **Final result, 208 days of coverage (Jan 1 - Jul 27)**: 186 days HAVE
+  news, 22 days still empty (many likely weekends/genuinely quiet days for
+  the 21 HIGH/MED keywords used, not necessarily a scraper failure — not
+  yet verified day-by-day which are weekends vs. actually missed).
+- Data that's AVAILABLE but NOT YET used (see the response to Giel about
+  "what data can be scraped"): the CNBC Indonesia JSON API returns the
+  FULL article body (`strisi`, full HTML), author name+profile,
+  category/channel, topic tags (`strkeyword_name`), images — this project
+  only takes headline+URL+date+summary (the same fields used by the
+  original RSS, §22.1 D3 "HIGH only"), deliberately not storing the full
+  body (the contract's F2/D2 principle: distillation/extractive, not a raw
+  transcript/excessively stored full article).
 
-**Update -- Sapuan dalam sampai 2010 (5 Agustus 2026, sesi sama):** Giel
-minta ditarik lebih jauh lagi ("ambil per tahun sampai 2010 tapi dengan
-cara santai. buat jeda tidak apa apa"). Sebelum jalan, diprobe live `total`
-tiap 1 dari 21 kata kunci HIGH/MED lewat API CNBC langsung -- **8 kata
-kunci volume tinggi kena cap keras 10.000 hasil** (`bank indonesia`, `fed`,
-`ihsg`, `inflasi`, `obligasi`, `rupiah`, `suku bunga`, `the fed`) --
-2010 **provably unreachable** utk ini berapa pun `max_pages`/kesabaran
-diberikan (batas platform, bukan lambat). **13 kata kunci sisanya** (`bi
-rate`, `cpi`, `earnings`, `etf`, `fomc`, `gdp`, `inflation`, `nasdaq`,
-`powell`, `rate cut`, `rate hike`, `unemployment`, `yield`) total-nya jauh
-di bawah cap (123-9530) -- punya peluang nyata tembus 2010, jadi hanya 13
-ini yang dijalankan (dilewati 8 yg mustahil drpd buang jam request sia-sia).
-- **Bukan literal per-tahun**: `search_cnbcindonesia`/`search_antaranews`
-  urut terbaru-dulu tanpa offset absolut per tanggal -- panggil terpisah
-  per tahun berarti tiap tahun HARUS paging ulang semua tahun yang lebih
-  baru dulu sebelum sampai target (mis. 2010 lewat 2011..2026 dulu), lalu
-  diulang lagi dari nol utk 2011, dst -- boros drastis. Dipakai SATU
-  sapuan per keyword dari sekarang mundur ke 2010-01-01 (paging berhenti
-  begitu 1 halaman penuh sudah lebih tua dari `date_from`) -- tiap halaman
-  cuma pernah diminta sekali, hasil tetap mencakup semua tahun turun ke
-  2010, cuma cara eksekusinya beda dari permintaan harfiah bukan cakupannya.
-- **`tools/deep_backfill_2010.py`** (baru, one-off) -- checkpoint per-
-  keyword (commit ke DB stlh tiap keyword selesai, bukan nunggu semua 13x2
-  sumber kelar) supaya kalau job berhenti di tengah (network/timeout),
-  progress yg sudah masuk tidak hilang. `delay=1.5` detik antar-request
-  ("santai", sesuai permintaan Giel), `max_pages` digenerosi (CNBC 400,
-  ANTARA 100) supaya paging benar-benar bisa tembus ke 2010 utk keyword
-  yang totalnya besar tapi belum kena cap (mis. `nasdaq` total 9530).
-  `tools/backfill_news_archive.py` juga di-upgrade (`--keywords`/
-  `--max-pages`/`--delay`, semua opsional & backward-compatible) supaya
-  kemampuan ini bisa dipakai lagi lewat CLI biasa nanti, bukan cuma
-  script sekali-pakai.
-- **Dijalankan ke DB lokal asli** (5 Agustus 2026, `python -m
-  tools.deep_backfill_2010`, ~13 keyword x 2 sumber, delay 1.5s/request):
-  **40.016 baris baru** (0 gagal per-source/keyword, semua 13 keyword
-  selesai). `daily_news` sekarang **44.027 baris total** (dari 4.011),
-  rentang **2010-01-19 s/d 2026-08-05**, **3.583 hari distinct punya
-  berita**. Sumber: CNBC Indonesia + ANTARA Ekonomi (2 sumber yg
-  terverifikasi live 4 Agustus 2026 -- 5 sumber lain di
-  `feeds_config.py` masih belum diverifikasi utk jalur search ini).
-  Breakdown per tahun (rows / hari-ada-berita): 2010: 80/69 · 2011:
-  111/95 · 2012: 19/17 · 2013: 108/88 · 2014: 69/59 · 2015: 64/58 ·
-  2016: 61/57 · 2017: 149/106 · 2018: 3007/331 · 2019: 4300/350 · 2020:
-  4235/356 · 2021: 4762/351 · 2022: 5716/355 · 2023: 5764/359 · 2024:
-  4908/363 · 2025: 4695/358 · 2026: 5979/211. Cakupan 2010-2017 jarang
-  (rendah krn hanya 13 dari 21 keyword yg dipakai, dan sumber yg lebih
-  tua kemungkinan artikel lebih sedikit terindeks di search API-nya
-  sendiri), 2018 ke atas jauh lebih padat (>300 hari/tahun, mendekati
-  cakupan harian penuh).
-- **Belum dieksekusi**: replikasi ke DB Railway (masih fresh-start
-  production, lihat catatan sebelumnya) -- hanya DB lokal yang diperkaya
-  sejauh ini.
+**Update -- Deep sweep back to 2010 (5 August 2026, same session):** Giel
+asked to pull even further back ("pull year by year all the way to 2010
+but take it easy. pauses are fine"). Before running, live-probed the
+`total` for each of the 21 HIGH/MED keywords directly via the CNBC API —
+**8 high-volume keywords hit a hard cap of 10,000 results** (`bank
+indonesia`, `fed`, `ihsg`, `inflasi`, `obligasi`, `rupiah`, `suku bunga`,
+`the fed`) — 2010 is **provably unreachable** for these no matter how much
+`max_pages`/patience is given (a platform limit, not slowness). **The
+remaining 13 keywords** (`bi rate`, `cpi`, `earnings`, `etf`, `fomc`,
+`gdp`, `inflation`, `nasdaq`, `powell`, `rate cut`, `rate hike`,
+`unemployment`, `yield`) have totals well below the cap (123-9530) — a
+real chance of reaching 2010, so only these 13 were run (the 8 impossible
+ones skipped rather than wasting hours of requests for nothing).
+- **Not literally year-by-year**: `search_cnbcindonesia`/
+  `search_antaranews` sort newest-first with no absolute per-date offset
+  — calling separately per year would mean each year has to re-page
+  through all the more-recent years first before reaching the target (e.g.
+  reaching 2010 means paging through 2011..2026 first), then repeating
+  again from scratch for 2011, etc. — drastically wasteful. Instead ONE
+  sweep per keyword was used, from now back to 2010-01-01 (paging stops
+  once a full page is already older than `date_from`) — each page is only
+  ever requested once, the result still covers all years down to 2010,
+  just executed differently from the literal request, not differently in
+  coverage.
+- **`tools/deep_backfill_2010.py`** (new, one-off) — per-keyword
+  checkpointing (commits to the DB after each keyword finishes, rather
+  than waiting for all 13x2 sources to finish) so that if the job stops
+  partway (network/timeout), progress already saved isn't lost.
+  `delay=1.5` seconds between requests ("take it easy", per Giel's
+  request), `max_pages` made generous (CNBC 400, ANTARA 100) so paging can
+  genuinely reach 2010 for keywords with a large total that aren't yet
+  capped (e.g. `nasdaq` total 9530). `tools/backfill_news_archive.py` was
+  also upgraded (`--keywords`/`--max-pages`/`--delay`, all optional &
+  backward-compatible) so this capability can be reused later via the
+  regular CLI, not just a one-off script.
+- **Run against the real local DB** (5 August 2026, `python -m
+  tools.deep_backfill_2010`, ~13 keywords x 2 sources, 1.5s delay/request):
+  **40,016 new rows** (0 failures per-source/keyword, all 13 keywords
+  completed). `daily_news` is now **44,027 total rows** (up from 4,011),
+  range **2010-01-19 through 2026-08-05**, **3,583 distinct days with
+  news**. Sources: CNBC Indonesia + ANTARA Ekonomi (the 2 sources verified
+  live on 4 August 2026 — 5 other sources in `feeds_config.py` still
+  unverified for this search path). Breakdown per year (rows /
+  days-with-news): 2010: 80/69 · 2011: 111/95 · 2012: 19/17 · 2013:
+  108/88 · 2014: 69/59 · 2015: 64/58 · 2016: 61/57 · 2017: 149/106 ·
+  2018: 3007/331 · 2019: 4300/350 · 2020: 4235/356 · 2021: 4762/351 ·
+  2022: 5716/355 · 2023: 5764/359 · 2024: 4908/363 · 2025: 4695/358 ·
+  2026: 5979/211. Coverage for 2010-2017 is sparse (low because only 13 of
+  21 keywords were used, and older sources likely have fewer articles
+  indexed in their own search API to begin with), 2018 and up is much
+  denser (>300 days/year, close to full daily coverage).
+- **Not yet executed**: replicating to the Railway DB (still fresh-start
+  production, see the earlier note) — only the local DB has been enriched
+  so far.
 
-**Update -- Migrasi Threads/Tags/News ke Railway + bot Telegram 2 command
-baru (5-6 Agustus 2026):** Giel lapor Threads & Tags "hilang" di Railway --
-setelah dicek `/api/threads` balikin `[]` bersih (bukan error), ternyata
-memang belum pernah diisi (keputusan fresh-start awal Railway sengaja
-skip threads/tags, cuma news/chart). Giel minta dimigrasikan.
-- **`kastara_migration.json` + `apply_migration.py`** (one-off, tidak
-  masuk repo permanen): payload JSON (44.027 baris `daily_news` s/d
-  2026-08-05, 11 threads, 72 tags, 718 thread_links, 253 content_tags)
-  diupload ke `/tmp` container Railway lewat `railway ssh -- "cat >
-  /tmp/kastara_migration.json"` < file`, lalu diterapkan lewat `railway
-  ssh -- python3 - < apply_migration.py` (pola stdin-pipe yang sudah
-  terbukti aman dari insiden `KASTARA_DB_PATH`/"ambiguous redirect"
-  sebelumnya). `ref_id` di thread_links/content_tags di-resolve ulang via
-  natural key (date+headline utk daily_news, title utk threads) -- BUKAN
-  disalin mentah, krn id lokal vs Railway beda urutan/nilai. Idempoten
-  (INSERT OR IGNORE via UNIQUE index yang sudah ada) -- dites jalan 2x
-  thd DB simulasi, run kedua 0 baris baru semua tabel. `usage_count`
-  tag_dictionary di-recompute di akhir (bukan cuma disalin) krn baris
-  content_tags yg dimigrasi tidak lewat `apply_tag()`.
-- **Bot Telegram diperluas dari 1 command jadi 3** -- Giel kirim `/start`
-  dan `/status` yang sebelumnya diam-diam diabaikan (`web/app.py:488-492`
-  cuma match `/run_daily` persis, command lain jatuh ke `return
-  jsonify({"ok": True})` tanpa aksi). Ditambah:
-  - `/start` -- balas teks bantuan daftar command (statis, tidak query DB).
-  - `/status` -- `web/writes.py::telegram_status_summary()` baru: baca
-    baris `daily_market` TERBARU (sumber "kapan run_daily terakhir jalan",
-    beda dari `daily_news` yang bisa nol baris di hari sepi) + decode
-    `source_flags` JSON jadi hitungan ok/gagal + jumlah `daily_news`
-    tanggal itu + jumlah `news_thread_links` status SUGGESTED yang nunggu
-    review Giel -- semua dari data yang SUDAH ada, tidak ada tabel/kolom
-    baru.
-  - Insiden webhook (dicatat krn berulang -- pola kegagalan Railway
-    project ini): `getWebhookInfo` awalnya balikin `last_error_message:
-    "Wrong response from webhook: 403 Forbidden"` -- akar masalah di
-    `web/app.py:479-481`, `X-Telegram-Bot-Api-Secret-Token` header dari
-    Telegram tidak cocok `TELEGRAM_WEBHOOK_SECRET` Railway (kemungkinan
-    var itu di-set tapi belum di-deploy, staged changes Railway tidak
-    auto-apply -- sama seperti insiden `KASTARA_DB_PATH` sebelumnya).
-    Giel pilih jalan simpel: `setWebhook` ULANG TANPA `secret_token`
-    (masih digerbangi chat_id check) drpd debug 2 nilai lintas sistem --
-    kerja setelah itu.
-- 7 test baru (`tests/test_web_app.py` 3 baru utk `/start`/`/status`/
-  no-pipeline-data-yet, `tests/test_web_writes.py` 2 baru utk
-  `telegram_status_summary`) -- full suite tetap hijau.
+**Update -- Migrate Threads/Tags/News to Railway + 2 new Telegram bot
+commands (5-6 August 2026):** Giel reported Threads & Tags "missing" on
+Railway — after checking, `/api/threads` returns a clean `[]` (not an
+error), turns out they'd genuinely never been populated (the initial
+Railway fresh-start decision deliberately skipped threads/tags, only
+news/chart). Giel asked for them to be migrated.
+- **`kastara_migration.json` + `apply_migration.py`** (one-off, not going
+  into the permanent repo): a JSON payload (44,027 rows of `daily_news`
+  through 2026-08-05, 11 threads, 72 tags, 718 thread_links, 253
+  content_tags) uploaded to the Railway container's `/tmp` via `railway
+  ssh -- "cat > /tmp/kastara_migration.json"` < file`, then applied via
+  `railway ssh -- python3 - < apply_migration.py` (the stdin-pipe pattern
+  already proven safe from the earlier `KASTARA_DB_PATH`/"ambiguous
+  redirect" incident). `ref_id` in thread_links/content_tags was
+  re-resolved via a natural key (date+headline for daily_news, title for
+  threads) — NOT copied raw, since local vs Railway ids differ in
+  order/value. Idempotent (INSERT OR IGNORE via the existing UNIQUE index)
+  — tested run twice against a simulated DB, the second run produced 0 new
+  rows in every table. `tag_dictionary`'s `usage_count` was recomputed at
+  the end (not just copied) since the migrated content_tags rows didn't go
+  through `apply_tag()`.
+- **The Telegram bot expanded from 1 command to 3** — Giel had sent
+  `/start` and `/status`, which were previously silently ignored
+  (`web/app.py:488-492` only matched `/run_daily` exactly, other commands
+  fell through to `return jsonify({"ok": True})` with no action). Added:
+  - `/start` -- replies with a static help text listing commands (no DB
+    query).
+  - `/status` -- a new `web/writes.py::telegram_status_summary()`: reads
+    the LATEST `daily_market` row (the source for "when did run_daily last
+    run", different from `daily_news` which can have zero rows on a quiet
+    day) + decodes the `source_flags` JSON into ok/fail counts + the count
+    of `daily_news` for that date + the count of `news_thread_links` with
+    SUGGESTED status awaiting Giel's review — all from data that ALREADY
+    exists, no new table/column.
+  - A webhook incident (recorded because it's recurring — a failure
+    pattern for this Railway project): `getWebhookInfo` initially returned
+    `last_error_message: "Wrong response from webhook: 403 Forbidden"` —
+    the root cause was in `web/app.py:479-481`, the
+    `X-Telegram-Bot-Api-Secret-Token` header from Telegram didn't match
+    Railway's `TELEGRAM_WEBHOOK_SECRET` (likely that var was set but not
+    yet deployed, Railway's staged changes don't auto-apply — same as the
+    earlier `KASTARA_DB_PATH` incident). Giel chose the simple route:
+    re-run `setWebhook` WITHOUT `secret_token` (still gated by the chat_id
+    check) rather than debug two values across systems — worked after
+    that.
+- 7 new tests (`tests/test_web_app.py` 3 new for `/start`/`/status`/
+  no-pipeline-data-yet, `tests/test_web_writes.py` 2 new for
+  `telegram_status_summary`) — full suite still green.
 
-**Update -- Rebuild bot Telegram per spec "Telegram Bot Commands v1.0"
-(6 Agustus 2026):** Giel kasih dokumen spec lengkap (versi 1.0, ditulis
-independen dari sesi ini) minta bot dibangun ulang jadi long-polling +
-systemd service di VPS terpisah (asumsi "host always-on" belum ada).
-**Konflik nyata dgn kondisi asli**: bot SUDAH jalan via webhook di Railway
-(diverifikasi live barusan -- `/start`/`/run_daily` sukses), dan Railway
-SENDIRI SUDAH jadi host always-on (itu tujuan awal deploy ke Railway).
-Long-polling+systemd butuh proses ke-2 yang jalan terus -- di Railway
-berarti service ke-2, kena blocker Volume-cuma-1-service PERSIS SAMA yang
-menggagalkan rencana cron-service terpisah 4 Agustus (§8.0 deploy.md).
-Ditanya ke Giel via AskUserQuestion sebelum eksekusi (bukan diam-diam
-override spec-nya) -- **Giel pilih: tetap webhook di Railway, ambil isi
-spec yang relevan** (bukan bangun VPS baru).
-- **`web/writes.py::telegram_status_summary()` ditulis ulang** -- dari
-  1 tanggal gabungan jadi TIAP tabel dicek tanggal terbarunya SENDIRI
-  (`daily_market`, `daily_news`, `asset_ohlcv` masing-masing bisa beda
-  tanggal, tidak diasumsikan selalu sinkron -- kalau berita ketinggalan
-  tapi market ok, itu sekarang kelihatan bukan tersembunyi). Field baru:
-  `sources_fail_names` (nama sumber yg gagal, bukan cuma angka),
-  `sources_skip`, `daily_news_date`/`asset_ohlcv_date` (+count masing2),
-  `econ_upcoming` (event `econ_calendar` >= hari ini), `pending_signals`
-  (`trade_signals` WHERE approved=0).
-- **`web/app.py` -- allowlist multi chat_id**: `TELEGRAM_CHAT_IDS` (jamak,
-  koma-pisah) baru, fallback ke `TELEGRAM_CHAT_ID` (tunggal) kalau belum
-  di-set -- backward-compatible, TIDAK perlu re-deploy env var Railway lagi
-  (sudah cukup drama env var minggu ini).
-- **Lock anti-double-run + rate limit utk `/run_daily`** (§3.2/3.3 spec) --
-  `RUN_DAILY_LOCK_PATH` (tempdir, isi PID+timestamp, stale >30 menit
-  diambil alih, WAJIB lepas via try/finally di `_run_daily_via_telegram`
-  supaya run yg crash tidak mengunci selamanya) + `RUN_DAILY_LAST_TRIGGER_
-  PATH` (jeda minimal 5 menit antar-trigger, beda tujuan dari lock --
-  cegah spam BERURUTAN stlh run sebelumnya selesai, bukan cuma cegah
-  tumpang tindih).
-- **Pesan `/run_daily` selesai SEKARANG FORMAT SAMA seperti `/status`**
-  (§2 spec eksplisit minta ini) -- drpd ringkasan ad-hoc terpisah,
-  `_format_status_message()` dipakai di 2 tempat (DRY, bukan 2 versi teks
-  yang bisa nyimpang).
-- **Command lain (`approve/reject sinyal`, `backfill`, `settings/grader
-  override`) SENGAJA TETAP TIDAK dibangun** -- persis matching §1 spec
-  ("operasi butuh gate/ritual sadar, bukan operasi pipa idempoten") --
-  3 command (`start`/`status`/`run_daily`) sudah dari awal satu2nya yg
-  diimplementasikan, keputusan ini TIDAK berubah, cuma sekarang eksplisit
-  didokumentasikan alasannya matching kerangka risiko spec, bukan cuma
-  "belum sempat".
-- 6 test baru (`tests/test_web_app.py`: multi chat_id allowlist, lock
-  blocks double-run, stale lock diambil alih, rate limit blocks) + 2 test
-  existing di-update (`telegram_status_summary` field baru, format pesan
-  /status baru) -- full suite tetap hijau.
-- Docs: `docs/deploy.md` §8.1/§8.2 diperbarui (3 command, alasan tetap
-  webhook drpd long-polling, `TELEGRAM_CHAT_IDS` opsional).
+**Update -- Rebuild the Telegram bot per the "Telegram Bot Commands v1.0"
+spec (6 August 2026):** Giel gave a full spec document (version 1.0,
+written independently of this session) asking the bot to be rebuilt as
+long-polling + a systemd service on a separate VPS (assuming there wasn't
+yet an "always-on host"). **A real conflict with the actual state of
+things**: the bot was ALREADY running via webhook on Railway (verified
+live just now — `/start`/`/run_daily` succeed), and Railway ITSELF is
+already an always-on host (that was the point of deploying to Railway in
+the first place). Long-polling+systemd needs a 2nd always-running process
+— on Railway that means a 2nd service, hitting the EXACT SAME
+Volume-only-1-service blocker that killed the separate cron-service plan
+on 4 August (§8.0 of deploy.md). Asked Giel via AskUserQuestion before
+executing (rather than silently overriding his spec) — **Giel chose: stay
+on webhook on Railway, take the relevant parts of the spec** (not build a
+new VPS).
+- **`web/writes.py::telegram_status_summary()` rewritten** — from 1
+  combined date to EACH table checking its OWN latest date (`daily_market`,
+  `daily_news`, `asset_ohlcv` can each have a different date, no longer
+  assumed to always be in sync — if news is behind but market is ok,
+  that's now visible instead of hidden). New fields: `sources_fail_names`
+  (names of failed sources, not just a count), `sources_skip`,
+  `daily_news_date`/`asset_ohlcv_date` (+ counts for each), `econ_upcoming`
+  (`econ_calendar` events >= today), `pending_signals` (`trade_signals`
+  WHERE approved=0).
+- **`web/app.py` -- multi chat_id allowlist**: new `TELEGRAM_CHAT_IDS`
+  (plural, comma-separated), falling back to `TELEGRAM_CHAT_ID` (singular)
+  if unset — backward-compatible, does NOT require redeploying the Railway
+  env var again (there's already been enough env-var drama this week).
+- **Anti-double-run lock + rate limit for `/run_daily`** (§3.2/3.3 of the
+  spec) — `RUN_DAILY_LOCK_PATH` (a temp dir, holding PID+timestamp, stale
+  after >30 minutes gets taken over, MUST be released via try/finally in
+  `_run_daily_via_telegram` so a crashed run doesn't lock forever) +
+  `RUN_DAILY_LAST_TRIGGER_PATH` (a minimum 5-minute gap between triggers,
+  a different purpose from the lock — prevents SEQUENTIAL spam after a
+  previous run finishes, not just overlapping runs).
+- **The `/run_daily`-complete message now uses the SAME FORMAT as
+  `/status`** (§2 of the spec explicitly asked for this) — rather than a
+  separate ad-hoc summary, `_format_status_message()` is used in 2 places
+  (DRY, not 2 texts that can drift apart).
+- **Other commands (`approve/reject signal`, `backfill`, `settings/grader
+  override`) DELIBERATELY still NOT built** — exactly matching §1 of the
+  spec ("operations need a gate/conscious ritual, not an idempotent pipe
+  operation") — the 3 commands (`start`/`status`/`run_daily`) were the
+  only ones implemented from the start, this decision hasn't changed, it's
+  just now explicitly documented as matching the spec's risk framework,
+  not just "hadn't gotten to it".
+- 6 new tests (`tests/test_web_app.py`: multi chat_id allowlist, lock
+  blocks double-run, stale lock gets taken over, rate limit blocks) + 2
+  existing tests updated (`telegram_status_summary` new fields, new
+  /status message format) — full suite still green.
+- Docs: `docs/deploy.md` §8.1/§8.2 updated (3 commands, the reason for
+  staying on webhook over long-polling, `TELEGRAM_CHAT_IDS` optional).
 
-**Update -- Mobile (`/m`) susul 2 fitur yg ketinggalan sejak dibangun
-(6 Agustus 2026):** Giel minta dibandingkan `/m` vs desktop -- ternyata
-`MobileView.vue` belum disentuh sejak commit pertamanya (31 Juli 2026,
-`git log` cek langsung, bukan asumsi) sementara 2 gelombang fitur desktop
-sudah jalan sesudahnya: Secondary Opinions F-1/F-2 (`ThreadDetailView.vue`,
-+292 baris, 3-4 Agustus) & restrukturisasi Portofolio/Holdings
-(`UniverseView.vue`, +608/-141 baris, `docs/universe_portfolio_
-restructure_v1.md`, 3 Agustus). Keduanya ditambahkan ke `/m` sekarang --
-TIDAK ADA endpoint baru, semua reuse API yang sudah ada.
-- **Kartu "Thread Aktif"**: sekarang tampilkan trend_30d, badge ⚠ shift
-  kalau `shift_warning` true, jumlah milestone, ringkasan opini
-  (total/sejalan/menantang) -- semua sudah ada di `/api/threads/stats`
-  (`thread_stats()`), cuma belum dirender di mobile. Tombol "+ Opini
-  Sekunder" per thread buka Dialog form (8 field, sama seperti desktop:
-  source_type, source_ref, author, ringkasan, klaim inti, testable,
-  sikap, conflict_of_interest, relation_to_view) -> `POST /api/
-  secondary_opinions`.
-- **Kartu "Portofolio" baru**: ringkasan alokasi (total IDR-equivalent +
-  jumlah holding belum terhitung) dari `/api/portfolio/allocation`, daftar
-  holding, form "+ Tambah Holding" (instrumen/provider/book/quantity/unit/
-  avg price/currency/kategori SOP/tanggal/catatan) -> `POST /api/holdings`.
-  **Keputusan**: log holding baru diperlakukan sama seperti catat prediksi
-  (record-keeping, bukan keputusan trading) -- BUKAN pelanggaran prinsip
-  "endpoint keputusan tidak dirender di /m" (itu utk approve sinyal,
-  sizing, backfill, settings, run persona -- prinsip itu sendiri TETAP
-  tidak disentuh).
-- Verifikasi: `npm run build` bersih (364 modul, tidak ada error), dev
-  server dicek lewat browser -- `/m` redirect ke `/login` benar (guard
-  auth jalan), 0 console error. **Sama seperti sesi-sesi sebelumnya:
-  tidak bisa verifikasi visual isi kartu di balik login** (aturan
-  kredensial) -- dibuktikan lewat compile-clean + baca kode langsung,
-  bukan screenshot behind-auth.
+**Update -- Mobile (`/m`) catches up on 2 features it had missed since
+being built (6 August 2026):** Giel asked for `/m` to be compared against
+desktop — turned out `MobileView.vue` hadn't been touched since its first
+commit (31 July 2026, checked directly via `git log`, not assumed) while 2
+waves of desktop features had shipped since: Secondary Opinions F-1/F-2
+(`ThreadDetailView.vue`, +292 lines, 3-4 August) & the Portfolio/Holdings
+restructuring (`UniverseView.vue`, +608/-141 lines,
+`docs/universe_portfolio_restructure_v1.md`, 3 August). Both were added to
+`/m` now — NO new endpoints, all reusing existing APIs.
+- **The "Active Threads" card**: now shows trend_30d, a ⚠ shift badge if
+  `shift_warning` is true, milestone count, opinion summary
+  (total/aligned/challenging) — all already available in
+  `/api/threads/stats` (`thread_stats()`), just not yet rendered on
+  mobile. A "+ Secondary Opinion" button per thread opens a Dialog form (8
+  fields, same as desktop: source_type, source_ref, author, summary, core
+  claim, testable, stance, conflict_of_interest, relation_to_view) ->
+  `POST /api/secondary_opinions`.
+- **New "Portfolio" card**: allocation summary (total IDR-equivalent +
+  count of unaccounted holdings) from `/api/portfolio/allocation`, a
+  holdings list, a "+ Add Holding" form
+  (instrument/provider/book/quantity/unit/avg price/currency/SOP
+  category/date/notes) -> `POST /api/holdings`. **Decision**: logging a
+  new holding is treated the same as logging a prediction (record-keeping,
+  not a trading decision) — NOT a violation of the "decision endpoints
+  aren't rendered on /m" principle (that's for approving signals, sizing,
+  backfill, settings, running the persona — that principle itself remains
+  untouched).
+- Verification: `npm run build` clean (364 modules, no errors), the dev
+  server checked via browser — `/m` correctly redirects to `/login` (auth
+  guard works), 0 console errors. **Same as previous sessions: can't
+  visually verify the card contents behind login** (credential rule) —
+  proven via compile-clean + reading the code directly, not a behind-auth
+  screenshot.
 
-**Update -- Bug fix login-redirect + sidebar collapse + 4 perbaikan mobile
-susulan (6 Agustus 2026, sesi sama):** Giel pakai `/m` beneran dari Chrome
-Android, laporan balik 2 bug + 2 permintaan fitur.
-- **Bug: login SELALU mendarat di `/snapshot`, bukan balik ke tujuan
-  asli.** Root cause: `router/index.js` guard redirect ke `/login` TANPA
-  bawa `to.fullPath`, dan `LoginView.vue` hardcode `router.push
-  ('/snapshot')`. Efeknya buka `/m` dari HP saat belum login (mis. dari
-  ikon PWA) SELALU nyasar ke dashboard desktop stlh login -- inilah
-  jawaban keluhan "kok selalu diredirect ke halaman biasa". Fix: guard
-  simpan query `?redirect=<tujuan>`, LoginView baca & push ke situ (fallback
-  `/snapshot` kalau kosong). Diverifikasi live: `/m` -> `/login?redirect=/m`.
-- **Fitur: sidebar desktop bisa diciutkan** (`App.vue`) -- tombol «/»
-  toggle lebar 200px <-> 44px, state persist `localStorage`.
-- **Fix #1+#2 (laporan Giel "di thread inactive tidak jalan" + "cuma ada
-  tag, butuh thread juga")**: root cause `MobileView.vue` filter
-  `status==='ACTIVE'` bikin thread DORMANT/CLOSED TIDAK PERNAH muncul di
-  `/m` sama sekali (bukan cuma redup, benar2 hilang, tidak ada jalan lain
-  jangkau dari HP). Kartu "Thread" sekarang tampilkan SEMUA status --
-  ACTIVE full detail (trend/opini/tombol +Opini), non-ACTIVE ringkas
-  (judul+badge status) di sub-list "Non-aktif", tetap link ke
-  `/threads/:id`.
-  - **Fix #3 ("apa chart bisa ditampilkan di dashboard")**: `drawCandleChart`
-  diekstrak dari `ChartView.vue` ke `lib/candleChart.js` (module bersama,
-  murni pindah kode, tidak ada logic baru) supaya `/m` bisa reuse chart
-  candlestick+MA+volume+zona yang SAMA PERSIS tanpa duplikasi ~130 baris.
-  Kartu "Chart" baru di `/m`: dropdown instrumen (default BTC, sama seperti
-  desktop) + SVG scale otomatis ke lebar layar (`viewBox` + CSS
-  `aspect-ratio`). Read-only murni -- TIDAK ada tombol approve/reject
-  sinyal (endpoint keputusan, prinsip yang sama dipertahankan).
-  - **Fix #4 ("apa semua daily bisa ditampilkan di /m")**: toggle "Semua
-  berita" di kartu INTI -- default tetap HIGH-only (prinsip layar tunggal
-  tidak berubah), tapi 1 tap buka semua impact level (limit naik ke 100).
-- Verifikasi: `npm run build` bersih (365 modul -- `candleChart.js` kepisah
-  jadi chunk sendiri 3.98kB dipakai `ChartView` DAN `MobileView`, bukti
-  reuse beneran bukan copy-paste), browser dicek `/m` unauthenticated ->
-  `/login?redirect=/m` (fix redirect kerja), 0 console error. **Isi kartu
-  Chart/Thread/Portfolio TETAP tidak bisa diverifikasi visual di balik
-  login** (aturan kredensial) -- Giel perlu cek langsung di HP.
+**Update -- Bug fix login-redirect + sidebar collapse + 4 follow-up mobile
+fixes (6 August 2026, same session):** Giel actually used `/m` from Chrome
+on Android, reported back 2 bugs + 2 feature requests.
+- **Bug: login ALWAYS lands on `/snapshot`, not back to the original
+  destination.** Root cause: the `router/index.js` guard redirects to
+  `/login` WITHOUT carrying `to.fullPath`, and `LoginView.vue` hardcodes
+  `router.push('/snapshot')`. The effect: opening `/m` from a phone while
+  not logged in (e.g. from the PWA icon) ALWAYS lands on the desktop
+  dashboard after login — this is the answer to the complaint "why does it
+  always redirect to the regular page". Fix: the guard now saves a
+  `?redirect=<destination>` query, LoginView reads it & pushes there
+  (falls back to `/snapshot` if empty). Verified live: `/m` ->
+  `/login?redirect=/m`.
+- **Feature: desktop sidebar can now be collapsed** (`App.vue`) — a «/»
+  button toggles width between 200px <-> 44px, state persisted in
+  `localStorage`.
+- **Fix #1+#2 (Giel's report "doesn't work on inactive thread" + "only
+  tags shown, need thread too")**: root cause was `MobileView.vue`'s
+  `status==='ACTIVE'` filter, which made DORMANT/CLOSED threads NEVER
+  appear on `/m` at all (not just dimmed, genuinely gone, no other way to
+  reach them from a phone). The "Thread" card now shows ALL statuses —
+  ACTIVE full detail (trend/opinions/+Opinion button), non-ACTIVE
+  condensed (title+status badge) in an "Inactive" sub-list, still linking
+  to `/threads/:id`.
+  - **Fix #3 ("can the chart be shown on the dashboard")**: `drawCandleChart`
+  extracted from `ChartView.vue` into `lib/candleChart.js` (a shared
+  module, purely moved code, no new logic) so `/m` can reuse the EXACT
+  SAME candlestick+MA+volume+zone chart without duplicating ~130 lines.
+  New "Chart" card on `/m`: an instrument dropdown (default BTC, same as
+  desktop) + an SVG that auto-scales to screen width (`viewBox` + CSS
+  `aspect-ratio`). Purely read-only — NO approve/reject signal buttons (a
+  decision endpoint, the same principle preserved).
+  - **Fix #4 ("can all daily news be shown on /m")**: an "All news" toggle
+  on the CORE card — still defaults to HIGH-only (the single-screen
+  principle unchanged), but 1 tap opens all impact levels (limit raised to
+  100).
+- Verification: `npm run build` clean (365 modules -- `candleChart.js`
+  split into its own 3.98kB chunk used by BOTH `ChartView` AND
+  `MobileView`, proof of real reuse not copy-paste), browser-checked `/m`
+  unauthenticated -> `/login?redirect=/m` (the redirect fix works), 0
+  console errors. **The content of the Chart/Thread/Portfolio cards STILL
+  can't be visually verified behind login** (credential rule) — Giel needs
+  to check directly on his phone.
 
-**Update -- Koreksi diagnosa: bug beneran ada di ThreadsView.vue desktop,
-bukan visibility mobile (6 Agustus 2026, sesi sama):** Giel pakai fitur
-Chart/Thread/Portfolio baru di `/m`, lapor balik 2 hal.
-- **Bug asli "tidak bisa save status inactive, tidak bisa klik simpan"**:
-  ternyata BUKAN soal `/m` (salah duga sesi sebelumnya) -- akar masalah di
-  `ThreadsView.vue` DESKTOP, form quick-edit inline (kolom Status + tombol
-  Simpan di tabel). `patch_thread()` backend WAJIB `verdict` non-kosong
-  saat `status='CLOSED'` (§20.1, "vonis auditable", guard sudah ada &
-  benar dari awal) -- tapi form quick-edit TIDAK PERNAH punya field
-  verdict sama sekali (cuma dialog "Kelola Thread" terpisah yang punya).
-  Efeknya: pilih CLOSED di quick-edit, klik Simpan -> selalu gagal dgn
-  toast error yang gampang kelewat, form tidak nutup, row tetap dalam mode
-  edit -- kelihatan seperti "tombol tidak bisa diklik" padahal sebenarnya
-  klik-nya jalan tapi request-nya ditolak backend. Fix: tambah field
-  verdict inline (muncul cuma saat status=CLOSED dipilih, sama pola dgn
-  dialog Kelola), plus validasi client-side dgn pesan jelas SEBELUM kirim
-  request (bukan cuma andalkan toast error dari backend).
-- **Revert bagian "Non-aktif" di kartu Thread `/m`**: Giel eksplisit
-  "tidak perlu ditampilkan" -- balik ke ACTIVE-only murni (`activeThreads`
-  filter, `inactiveThreads` computed & import `THREAD_STATUS_CLASS` yang
-  jadi tidak terpakai dihapus). Menegaskan: keluhan "inactive tidak jalan"
-  sesi sebelumnya SELALU soal tombol Simpan desktop, bukan soal apa yang
-  ditampilkan di HP -- diagnosa awal salah arah, dikoreksi begitu Giel
-  kasih detail lebih spesifik ("tidak bisa klik simpan").
-- Verifikasi: `npm run build` bersih (0 error). Browser-check dev server
-  terhalang port 5000 kepakai proses lama (`wslrelay.exe`) di sesi ini --
-  TIDAK dipaksa lanjut krn perubahan murni di area behind-login yang
-  sudah berulang kali terverifikasi via compile-clean sepanjang sesi ini;
-  Giel perlu coba langsung save status CLOSED di dashboard utk konfirmasi.
+**Update -- Diagnosis correction: the real bug is in desktop
+ThreadsView.vue, not mobile visibility (6 August 2026, same session):**
+Giel used the new Chart/Thread/Portfolio features on `/m`, reported back 2
+things.
+- **The real bug, "can't save inactive status, can't click save"**: turned
+  out to NOT be about `/m` at all (a wrong guess in the previous session)
+  — the root cause is in the DESKTOP `ThreadsView.vue`, the inline
+  quick-edit form (a Status column + Save button in the table). The
+  backend's `patch_thread()` REQUIRES a non-empty `verdict` when
+  `status='CLOSED'` (§20.1, "an auditable verdict", the guard already
+  existed & was correct from the start) — but the quick-edit form NEVER
+  had a verdict field at all (only the separate "Manage Thread" dialog has
+  one). The effect: selecting CLOSED in quick-edit, clicking Save ->
+  always fails with an error toast that's easy to miss, the form doesn't
+  close, the row stays in edit mode — looking like "the button can't be
+  clicked" when really the click works but the backend rejects the
+  request. Fix: added an inline verdict field (only appears when
+  status=CLOSED is selected, same pattern as the Manage dialog), plus
+  client-side validation with a clear message BEFORE sending the request
+  (not just relying on the backend's error toast).
+- **Reverted the "Inactive" section in the `/m` Thread card**: Giel
+  explicitly said "no need to show it" — reverted back to ACTIVE-only (the
+  `activeThreads` filter; the now-unused `inactiveThreads` computed & the
+  `THREAD_STATUS_CLASS` import were removed). To be clear: the earlier
+  "inactive doesn't work" complaint was ALWAYS about the desktop Save
+  button, not about what's shown on the phone — the initial diagnosis went
+  the wrong direction, corrected once Giel gave a more specific detail
+  ("can't click save").
+- Verification: `npm run build` clean (0 errors). Browser-checking on the
+  dev server was blocked by port 5000 being held by an old process
+  (`wslrelay.exe`) this session — NOT forced through, since the change is
+  purely in a behind-login area that's already been repeatedly verified
+  via compile-clean throughout this session; Giel needs to try saving a
+  CLOSED status directly on the dashboard to confirm.
 
-**Update -- Bug nyata: tanggal berita = tanggal SCRAPE, bukan tanggal
-TERBIT (6 Agustus 2026, sesi sama):** Giel lapor filter search di News
-kelihatannya pakai "create date" -- "berita beberapa hari lalu dianggap
-hari ini pas diseeding". Dicek: filter `/api/news` (date_from/date_to)
-SUDAH benar query kolom `date`, BUKAN `created_at` -- tapi `scrapers/
-news.py::fetch_all_news()` (dipakai `run_daily()`, JALUR CRON HARIAN --
-beda dari `scrapers/news_archive.py` yg dipakai backfill historis & SUDAH
-benar baca tanggal asli) ternyata SELALU stamp SEMUA artikel dengan
-`target_date` (tanggal pipeline dijalankan) -- TIDAK PERNAH baca tanggal
-terbit asli dari entry RSS-nya sendiri. Kalau cron telat jalan (kejadian
-berulang, alasan bot Telegram dibangun) lalu catch-up hari ini, headline
-yg sebenarnya terbit beberapa hari lalu (tapi masih ada di window rolling
-RSS feed) ke-stamp seolah baru terbit HARI INI -- jadi filter/search
-NewsView "kelihatan" salah padahal query-nya benar; datanya sendiri yang
-salah sejak masuk DB.
-- **Fix**: `_entry_date(entry, fallback)` baru -- baca `published_parsed`/
-  `updated_parsed` feedparser (UTC struct_time standar) kalau feed
-  sertakan, konversi ke tanggal WIB eksplisit (`tzinfo=timezone.utc` dulu
-  sebelum `.astimezone(WIB)` -- tanpa itu Python anggap struct_time itu
-  waktu LOKAL SISTEM, hasil salah). Fallback ke `target_date` (perilaku
-  lama) HANYA kalau feed benar2 tidak sertakan tanggal -- jujur pakai
-  tanggal scrape drpd menebak, bukan constraint baru yang mengada-ada.
-- **Keterbatasan jujur**: fix ini cuma berlaku ke depan (scrape baru
-  setelah fix di-deploy). Baris `daily_news` yang SUDAH masuk dgn tanggal
-  scrape yang salah (dari cron yang telat sebelumnya) TIDAK di-backfill/
-  dikoreksi -- tanggal terbit asli entry RSS lama itu sudah tidak
-  tersimpan di mana pun (RSS tidak retain history), jadi tidak ada
-  sumber utk mengoreksi mundur, beda dgn `scrapers/news_archive.py`
-  (backfill historis) yang memang punya akses tanggal asli dari API
-  sumbernya.
-- 4 test baru (`tests/test_news.py`): `_entry_date` pakai published_parsed
-  (konversi UTC->WIB lewat batas hari, bukan kebetulan sama), fallback ke
-  updated_parsed, fallback ke tanggal scrape kalau keduanya tidak ada, +
-  1 test regresi langsung `fetch_all_news()` dgn entry bertanggal lampau
-  memastikan `date` hasil BEDA dari `target_date`. 18/18 test_news.py hijau.
+**Update -- Real bug: the news date is the SCRAPE date, not the PUBLISH
+date (6 August 2026, same session):** Giel reported that the News search
+filter appeared to use a "create date" — "news from a few days ago is
+treated as today when it gets seeded". Checked: the `/api/news` filter
+(date_from/date_to) already correctly queries the `date` column, NOT
+`created_at` — but `scrapers/news.py::fetch_all_news()` (used by
+`run_daily()`, the DAILY CRON PATH — different from
+`scrapers/news_archive.py`, used for historical backfill & which ALREADY
+correctly reads the real date) turned out to ALWAYS stamp EVERY article
+with `target_date` (the date the pipeline ran) — NEVER reading the actual
+publish date from the RSS entry itself. If the cron runs late (a recurring
+occurrence, the reason the Telegram bot was built) and then catches up
+today, a headline that was actually published a few days ago (but still
+within the RSS feed's rolling window) gets stamped as if it were published
+TODAY — so the NewsView filter/search "looked" wrong even though the query
+itself was correct; the data itself was wrong from the moment it entered
+the DB.
+- **Fix**: a new `_entry_date(entry, fallback)` -- reads feedparser's
+  `published_parsed`/`updated_parsed` (a standard UTC struct_time) if the
+  feed includes it, converts to an explicit WIB date (`tzinfo=timezone.utc`
+  set first before `.astimezone(WIB)` -- without that, Python treats the
+  struct_time as LOCAL SYSTEM time, giving a wrong result). Falls back to
+  `target_date` (the old behavior) ONLY if the feed genuinely doesn't
+  include a date — honestly using the scrape date rather than guessing,
+  not a made-up new constraint.
+- **Honest limitation**: this fix only applies going forward (new scrapes
+  after the fix is deployed). `daily_news` rows already inserted with the
+  wrong scrape date (from a previously-late cron) are NOT
+  backfilled/corrected -- the old RSS entry's real publish date is no
+  longer stored anywhere (RSS doesn't retain history), so there's no
+  source to correct it retroactively, unlike `scrapers/news_archive.py`
+  (historical backfill), which does have access to the real date from its
+  source API.
+- 4 new tests (`tests/test_news.py`): `_entry_date` using published_parsed
+  (UTC->WIB conversion across a day boundary, not a coincidental match),
+  fallback to updated_parsed, fallback to the scrape date when neither
+  exists, + 1 regression test directly on `fetch_all_news()` with a
+  past-dated entry confirming the resulting `date` DIFFERS from
+  `target_date`. 18/18 test_news.py green.
 
-**Update -- Tombol "Get News" + "Get Price" terpisah di `/m` (6 Agustus
-2026, sesi sama):** Giel minta trigger manual dari HP, tapi scoped
-(bukan 1 tombol yang selalu jalankan SEMUA scraper spt "Trigger Berita"
-di desktop Snapshot) -- kadang cuma mau lihat berita terbaru tanpa nunggu
-semua scraper market, atau sebaliknya.
-- **`pipeline/run_daily.py`**: 2 fungsi orkestrasi baru, `run_news_only()`
-  (fetch+simpan berita/tags/thread-suggest/auto-dormant SAJA) dan
-  `run_price_only()` (crypto/coinalyze/yfinance/FRED/equity/IDX-flow/
-  econ-calendar/positioning SAJA) -- **`run_daily()` TIDAK disentuh sama
-  sekali** (nol risiko ke jalur cron/Telegram/desktop yang sudah ada).
-  Keduanya reuse helper yang SAMA PERSIS dgn `run_daily()`
-  (`insert_news_dedup`, `upsert_asset_ohlcv`, `upsert_daily_market`, dst
-  -- sudah faktor terpisah dari awal) -- bukan reimplementasi, cuma subset
-  urutan langkah + transaksi SENDIRI (sengaja terpisah dari transaksi
-  `run_daily()`, supaya 2 trigger scoped ini benar2 independen).
-- **`web/app.py`**: `POST /api/news/fetch_now` dan `POST /api/price/
-  fetch_now`, pola sama persis `/api/run_daily_now` (sinkron/blocking,
-  try/except ValueError->error json) -- tidak ada lock/rate-limit (sama
-  seperti endpoint aslinya, proteksi cukup dari session auth + sifat
-  sinkron request/response).
-- **`/m`**: 2 tombol baru "📰 Get News"/"💹 Get Price" di bawah header,
-  selalu terlihat (bukan di dalam kartu tertentu) -- disabled+ubah label
-  saat sedang jalan, toast ringkasan hasil, refresh data terkait
-  (`loadHighNews()`/`loadLatest()`) begitu selesai.
-- Verifikasi: `npm run build` bersih. Endpoint baru TIDAK ditulis test unit
-  (matching konvensi proyek -- `run_daily()`/`/api/run_daily_now` sendiri
-  juga tidak ada test-nya, orkestrator live-network, verifikasi manual
-  lewat pemakaian nyata, bukan mock berlapis).
+**Update -- Separate "Get News" + "Get Price" buttons on `/m` (6 August
+2026, same session):** Giel asked for a manual trigger from his phone, but
+scoped (not 1 button that always runs EVERY scraper like the "Trigger
+News" button on the desktop Snapshot) — sometimes he just wants to see the
+latest news without waiting for all the market scrapers, or vice versa.
+- **`pipeline/run_daily.py`**: 2 new orchestration functions,
+  `run_news_only()` (fetch+save news/tags/thread-suggest/auto-dormant
+  ONLY) and `run_price_only()` (crypto/coinalyze/yfinance/FRED/
+  equity/IDX-flow/econ-calendar/positioning ONLY) -- **`run_daily()`
+  itself untouched** (zero risk to the existing cron/Telegram/desktop
+  path). Both reuse the EXACT SAME helpers as `run_daily()`
+  (`insert_news_dedup`, `upsert_asset_ohlcv`, `upsert_daily_market`, etc.
+  -- already factored out separately from the start) -- not a
+  reimplementation, just a subset of the steps + their OWN transaction
+  (deliberately separate from `run_daily()`'s transaction, so these 2
+  scoped triggers are genuinely independent).
+- **`web/app.py`**: `POST /api/news/fetch_now` and `POST
+  /api/price/fetch_now`, exactly the same pattern as
+  `/api/run_daily_now` (synchronous/blocking, try/except
+  ValueError->error json) -- no lock/rate-limit (same as the original
+  endpoint, protection is enough from session auth + the synchronous
+  request/response nature).
+- **`/m`**: 2 new buttons "📰 Get News"/"💹 Get Price" below the header,
+  always visible (not inside a specific card) -- disabled+relabeled while
+  running, a summary toast, refreshing related data
+  (`loadHighNews()`/`loadLatest()`) once done.
+- Verification: `npm run build` clean. The new endpoints were NOT given
+  unit tests (matching the project convention -- `run_daily()`/
+  `/api/run_daily_now` itself also has no tests, a live-network
+  orchestrator, verified manually through real usage, not layered mocks).
 
-**Update -- `/m` dipecah jadi tab, bukan 1 layar scroll panjang (6 Agustus
-2026, sesi sama):** Giel lapor scroll di mobile dashboard "sangat
-melelahkan" -- masuk akal, `/m` sudah tumbuh dari 4 kartu (desain awal,
-31 Juli) jadi 6 kartu ditumpuk 1 layar (WAJIB, Berita, Chart, Thread,
-Portofolio, Posisi -- 3 kartu terakhir ditambah hari ini juga). Dipecah
-jadi 4 tab, pola SAMA PERSIS `ThreadDetailView.vue`/`UniverseView.vue`
-(`activeTab` ref + `TABS` computed + `.tab-bar`/`.tab-btn`, CSS diadaptasi
-lebar mobile -- `overflow-x:auto` jaga-jaga drpd wrap kalau label
-kepanjangan di layar sempit):
-- **Utama** -- WAJIB (prediksi) + INTI (berita) TETAP digabung 1 tab
-  (bukan dipisah lagi) -- keduanya ritual harian yang harus 1 langkah,
-  bukan 2 tab terpisah yang malah nambah friksi.
-- **Chart** -- kartu Chart sendirian.
-- **Thread (N)** -- kartu Thread Aktif, label pakai jumlah thread ACTIVE.
-- **Posisi (N)** -- Portofolio + Posisi ONGOING digabung 1 tab (sama-sama
-  "punya apa saat ini"), label pakai jumlah holding+posisi gabungan.
-- Tab bar muncul SETELAH loading selesai (di dalam `v-else`, sebelum
-  section pertama) -- tombol Get News/Get Price di header TETAP selalu
-  terlihat lintas tab (bukan bagian dari salah satu tab), sesuai fungsinya
-  sebagai aksi cepat bukan konten per-tab.
-- Verifikasi: `npm run build` bersih (tag `<template>` seimbang -- Vue
-  compile-error keras kalau tidak, jadi ini sinyal struktural yang kuat).
-  Browser-check tidak bisa dilanjutkan (port 5000 masih kepakai proses
-  lama sesi ini, sama seperti pengecekan sebelumnya) -- Giel perlu cek
-  langsung navigasi antar-tab di HP.
+**Update -- `/m` split into tabs instead of 1 long scrolling screen (6
+August 2026, same session):** Giel reported that scrolling on the mobile
+dashboard is "very tiring" -- makes sense, `/m` had grown from 4 cards
+(the original design, 31 July) to 6 cards stacked on 1 screen (MANDATORY,
+News, Chart, Thread, Portfolio, Positions -- the last 3 cards added today
+as well). Split into 4 tabs, the EXACT SAME pattern as
+`ThreadDetailView.vue`/`UniverseView.vue` (an `activeTab` ref + a `TABS`
+computed + `.tab-bar`/`.tab-btn`, CSS adapted for mobile width --
+`overflow-x:auto` just in case, rather than wrapping if a label is too
+long on a narrow screen):
+- **Main** -- MANDATORY (predictions) + CORE (news) STAY combined in 1 tab
+  (not split further) -- both are a daily ritual that must be 1 step, not
+  2 separate tabs adding friction.
+- **Chart** -- the Chart card alone.
+- **Thread (N)** -- the Active Threads card, label using the count of
+  ACTIVE threads.
+- **Position (N)** -- Portfolio + ONGOING Positions combined into 1 tab
+  (both are "what do I currently hold"), label using the combined
+  holdings+positions count.
+- The tab bar appears AFTER loading finishes (inside `v-else`, before the
+  first section) -- the Get News/Get Price buttons in the header STAY
+  always visible across tabs (not part of any one tab), matching their
+  role as a quick action rather than per-tab content.
+- Verification: `npm run build` clean (`<template>` tags balanced -- Vue
+  hard-fails compilation if not, so this is a strong structural signal).
+  Browser-checking couldn't continue (port 5000 still held by an old
+  process this session, same as the earlier check) -- Giel needs to check
+  navigating between tabs directly on his phone.
 
-**Update -- Bersihkan duplikat daily_news dari bug tanggal-scrape lama
-(6 Agustus 2026, sesi sama):** Giel kasih 1 contoh nyata -- artikel "World
-Cup gave bars..." (tanggal asli Jul 15) muncul dgn tanggal 2026-08-09 di
-produksi. Digali: bug `scrapers/news.py` yang diperbaiki sesi ini (stamp
-`target_date` bukan tanggal terbit asli) sudah lama aktif -- 1 artikel yg
-lama nongkrong di window rolling RSS ke-insert ULANG tiap hari cron jalan,
-tiap kali dpt tanggal SCRAPE baru (salah). Fix scraper cuma cegah KE
-DEPAN, tidak beresin baris yg SUDAH terlanjur masuk -- jadi dibangun
-`tools/dedupe_news.py` (one-off cleanup, bukan bagian pipeline harian).
-- **Strategi tentukan tanggal benar per grup (headline+source+raw_url,
-  SEMUA identik = pasti artikel yang sama)**: (1) kalau raw_url CNBC
-  (pola `/YYYY/MM/DD/` tertanam di path URL-nya sendiri -- diverifikasi
-  match 100% di sampel) -- pakai tanggal itu, dari sumbernya langsung,
-  bukan tebakan. (2) kalau tidak (mis. ANTARA, URL cuma id artikel) --
-  pakai MIN(date) di antara duplikat, best-effort. **Sengaja group by
-  raw_url JUGA, bukan cuma headline+source** -- headline generik yang
-  genuinely berulang di artikel BEDA (mis. ANTARA "IHSG melemah ikuti
-  bursa Asia" dipakai utk banyak hari asli beda) TIDAK ikut kena kolaps,
-  krn raw_url-nya beda (diverifikasi: 986 grup kalau cuma headline+source,
-  778 stlh raw_url ikut dicek -- 208 grup itu memang bukan bug, HARUS
-  dibiarkan).
-- **content_tags/news_thread_links yang nempel di baris yg dihapus WAJIB
-  di-repoint ke baris yang dipertahankan dulu** (bukan orphan) -- kalau
-  target sudah py pasangan yg sama (UNIQUE collision), baris duplikat
-  dihapus bukan di-UPDATE (guard collision, bukan crash). `tag_dictionary.
-  usage_count` di-recompute di akhir.
-- **Dites di COPY DB dulu** (bukan langsung ke file asli) -- 778 grup,
-  1993 baris berlebih, 0 orphan referensi stlh, idempoten (run ke-2 = 0
-  perubahan), contoh "World Cup" jadi benar 2026-07-15. **Baru setelah
-  itu dijalankan ke DB lokal asli** (Giel eksplisit konfirmasi "ok") --
-  hasil PERSIS sama dgn dry-run di copy: 1993 baris dihapus, 113 tanggal
-  dikoreksi, 38 tag + 67 thread link di-repoint, 0 orphan, 0 grup
-  duplikat tersisa.
-- **Belum dijalankan ke Railway** (production) -- perlu script terpisah +
-  `railway ssh`, pola sama migrasi data sebelumnya (Giel jalankan
-  sendiri, aku tidak punya akses DB Railway langsung).
-- 6 test baru (`tests/test_dedupe_news.py`): preview counting, kolaps +
-  ambil tanggal dari URL, fallback MIN(date), headline sama tapi raw_url
-  beda TIDAK dikolaps (guard §21.9-style, mencegah false-positive),
-  repoint tags/thread-links tanpa orphan + usage_count recompute,
-  idempoten. 469 test total tetap hijau.
+**Update -- Clean up `daily_news` duplicates from the old scrape-date bug
+(6 August 2026, same session):** Giel gave 1 concrete example -- the
+article "World Cup gave bars..." (real date Jul 15) appeared with the date
+2026-08-09 in production. Dug in: the `scrapers/news.py` bug fixed this
+session (stamping `target_date` instead of the real publish date) had
+been active for a long time -- 1 old article that lingered in the RSS
+rolling window got RE-inserted every day the cron ran, each time getting a
+new (wrong) SCRAPE date. The scraper fix only prevents this GOING FORWARD,
+it doesn't fix rows that already got in -- so `tools/dedupe_news.py` was
+built (a one-off cleanup, not part of the daily pipeline).
+- **Strategy to determine the correct date per group (headline+source+
+  raw_url, ALL identical = definitely the same article)**: (1) if raw_url
+  is CNBC (a `/YYYY/MM/DD/` pattern embedded in its own URL path --
+  verified to match 100% in the sample) -- use that date, straight from
+  the source, not a guess. (2) if not (e.g. ANTARA, whose URL is just an
+  article id) -- use MIN(date) among the duplicates, best-effort.
+  **Deliberately grouped by raw_url TOO, not just headline+source** -- a
+  generic headline that genuinely repeats across DIFFERENT articles (e.g.
+  ANTARA's "IHSG weakens following Asian markets", used for many genuinely
+  different days) does NOT get collapsed, since its raw_url differs
+  (verified: 986 groups with just headline+source, 778 once raw_url is
+  also checked -- that 208-group difference really isn't a bug, and MUST
+  be left alone).
+- **content_tags/news_thread_links attached to deleted rows MUST be
+  repointed to the kept row first** (not orphaned) -- if the target
+  already has the same pair (a UNIQUE collision), the duplicate row is
+  deleted rather than UPDATEd (a collision guard, not a crash).
+  `tag_dictionary.usage_count` recomputed at the end.
+- **Tested on a COPY of the DB first** (not directly on the real file) --
+  778 groups, 1993 excess rows, 0 orphaned references afterward, idempotent
+  (a 2nd run = 0 changes), the "World Cup" example correctly became
+  2026-07-15. **Only after that was it run against the real local DB**
+  (Giel explicitly confirmed "ok") -- the result EXACTLY matched the
+  copy's dry-run: 1993 rows deleted, 113 dates corrected, 38 tags + 67
+  thread links repointed, 0 orphans, 0 duplicate groups remaining.
+- **Not yet run on Railway** (production) -- needs a separate script +
+  `railway ssh`, same pattern as previous data migrations (Giel runs it
+  himself, I don't have direct access to the Railway DB).
+- 6 new tests (`tests/test_dedupe_news.py`): preview counting, collapse +
+  take the date from the URL, fallback to MIN(date), same headline but
+  different raw_url NOT collapsed (a §21.9-style guard, preventing false
+  positives), repointing tags/thread-links without orphans +
+  usage_count recompute, idempotency. 469 tests total still green.
 
-**Update -- Scroll dipertahankan setelah save/toggle/confirm di FE
-(6 Agustus 2026, sesi sama):** Giel lapor annoyance FE -- tiap klik
-Simpan/toggle/confirm di halaman list panjang, halaman lompat balik ke
-atas, harus scroll ulang. Diagnosa via 2 subagent (Explore lalu Plan)
-sblm eksekusi, per alur mode-plan: root cause SAMA di semua view --
-`save*`/`toggle*`/`confirm*` handler panggil `await post(...)` lalu
-`load*()` yang timpa SELURUH array reaktif (`rows.value = await
-get(...)`), Vue re-render seluruh DataTable, browser (scroll di level
-window/document, bukan sub-container -- `html/body/#app` tidak ada
-`overflow` rule) reset scroll ke atas krn nol scroll-position handling
-di codebase.
-- **`web/frontend/src/composables/useScrollPreserve.js` baru** (~15
-  baris, pola sama `useAppToast.js`): `preserveScroll(fn)` -- bungkus
-  fungsi async, tangkap `window.scrollY` SEBELUM reload, pulihkan lewat
-  `window.scrollTo` SETELAH DOM update (`nextTick`, bukan `setTimeout`).
-- **Definition-wrap vs call-site-wrap, dipilih per view**: `NewsView.vue`
-  (8 titik) & `TagsView.vue` (4 titik) dibungkus di CALL SITE tiap
-  handler save -- keduanya juga panggil `load*()` dari filter/checkbox
-  (`watch`/`@change`), reset scroll ke atas DI SITU tetap wajar (hasil
-  filter baru), cuma yang dari save yang harus dipertahankan. 4 view
-  lain (`ThreadsView`, `UniverseView` 9 fungsi, `ForwardView` 4 fungsi,
-  `ThreadDetailView` 2 fungsi) dibungkus di DEFINISI fungsi `load*()`
-  sekali -- terverifikasi tidak ada filter/watch yang manggil fungsi
-  load di view-view ini, jadi setara perilakunya tapi jauh lebih murah
-  (1 titik drpd sampai ~15 call site di UniverseView).
-- **Sengaja TIDAK diperluas**: `MobileView.vue` (layout tab 1-kolom,
-  dampaknya lebih kecil, `loadAll()` fan-out `Promise.all` butuh
-  penanganan beda) dan 4 view form pendek (`Synthesis`/`Snapshot`/
-  `Chart`/`Reading` -- konten sedikit, scroll-reset di situ nyaris tidak
-  kerasa). Revisit kalau Giel lapor masih ganggu di situ juga.
-- Verifikasi: `npm run build` bersih (365→366 modul, `useScrollPreserve.js`
-  kepisah jadi chunk sendiri 0.17kB dipakai 6 view -- bukti reuse, bukan
-  copy-paste; compile hard-fail kalau ada brace/paren tidak seimbang dari
-  wrap yang salah, jadi ini sinyal struktural kuat). **Tidak bisa
-  verifikasi visual behind-login** (aturan kredensial, sama sepanjang
-  sesi ini) -- Giel perlu coba langsung: save/toggle di News/Threads/
-  Universe/Forward/Tags, cek scroll tidak lompat.
-  tersimpan berlebih).
+**Update -- Scroll position preserved after save/toggle/confirm on the FE
+(6 August 2026, same session):** Giel reported an FE annoyance -- every
+click of Save/toggle/confirm on a long list page, the page jumps back to
+the top, requiring scrolling back down. Diagnosed via 2 subagents (Explore
+then Plan) before executing, per the plan-mode flow: the root cause is THE
+SAME across all views -- `save*`/`toggle*`/`confirm*` handlers call
+`await post(...)` then `load*()`, which overwrites the ENTIRE reactive
+array (`rows.value = await get(...)`), Vue re-renders the whole DataTable,
+and the browser (scroll at the window/document level, not a sub-container
+-- `html/body/#app` has no `overflow` rule) resets scroll to the top since
+there's zero scroll-position handling anywhere in the codebase.
+- **New `web/frontend/src/composables/useScrollPreserve.js`** (~15 lines,
+  same pattern as `useAppToast.js`): `preserveScroll(fn)` -- wraps an
+  async function, captures `window.scrollY` BEFORE the reload, restores it
+  via `window.scrollTo` AFTER the DOM updates (`nextTick`, not
+  `setTimeout`).
+- **Definition-wrap vs. call-site-wrap, chosen per view**: `NewsView.vue`
+  (8 spots) & `TagsView.vue` (4 spots) were wrapped at the CALL SITE of
+  each save handler -- both also call `load*()` from filters/checkboxes
+  (`watch`/`@change`), and resetting scroll to the top THERE is still
+  reasonable (a new filter result) -- only the save-triggered ones need
+  preserving. The other 4 views (`ThreadsView`, `UniverseView` 9
+  functions, `ForwardView` 4 functions, `ThreadDetailView` 2 functions)
+  were wrapped once at the `load*()` function's DEFINITION -- verified
+  there's no filter/watch calling the load function in these views, so
+  the behavior is equivalent but much cheaper (1 spot instead of up to
+  ~15 call sites in UniverseView).
+- **Deliberately NOT extended to**: `MobileView.vue` (a 1-column tab
+  layout, smaller impact, `loadAll()`'s `Promise.all` fan-out needs
+  different handling) and the 4 short-form views
+  (`Synthesis`/`Snapshot`/`Chart`/`Reading` -- little content,
+  scroll-reset there is barely noticeable). Revisit if Giel reports it's
+  still bothersome there too.
+- Verification: `npm run build` clean (365→366 modules,
+  `useScrollPreserve.js` split into its own 0.17kB chunk used by 6 views
+  -- proof of reuse, not copy-paste; compilation hard-fails on unbalanced
+  braces/parens from a bad wrap, so this is a strong structural signal).
+  **Can't verify visually behind login** (credential rule, consistent
+  throughout this session) -- Giel needs to try directly: save/toggle in
+  News/Threads/Universe/Forward/Tags, check that scroll doesn't jump.

@@ -83,7 +83,7 @@ Login uses `DASHBOARD_PASSWORD`, set by you in `.env` (see §Setup).
     free, no key needed: BTC/DXY/GOLD/SP500 speculator net-long) + BTC ETF net
     flow (farside.co.uk, unofficial HTML scrape, needs realistic browser
     headers since the site sits behind Cloudflare — see
-    [ARCHITECTURE.md §6.11](docs/ARCHITECTURE.md#611-scraperspositioningpy--cloudflare-butuh-header-browser-realistis)).
+    [ARCHITECTURE.md §6.11](docs/ARCHITECTURE.md#611-scraperspositioningpy--cloudflare-needs-browser-realistic-headers)).
   - `scrapers/coinalyze.py` (Track B) — cross-exchange aggregate OI +
     24h long/short liquidation + long/short ratio (Coinalyze REST, free key).
   - `scrapers/idx_foreign_flow.py` (Track C) — market-level IHSG foreign flow
